@@ -1,16 +1,32 @@
-// Use Case: Validar QR + GPS + Evidencia
 import '../entities/visit_entity.dart';
+import '../../data/datasources/validation_remote_datasource.dart';
+import '../../data/models/visit_model.dart';
 
 class ValidateVisitUseCase {
-  /// Valida que el QR escaneado corresponda al lugar,
-  /// que el GPS esté a < 100m y guarda la evidencia.
+  final ValidationRemoteDataSource _dataSource;
+
+  ValidateVisitUseCase(this._dataSource);
+
   Future<VisitEntity> execute({
     required String qrToken,
     required double currentLat,
     required double currentLng,
     String? evidenceUrl,
   }) async {
-    // TODO: Llamar a /validation del backend Dart Frog
-    throw UnimplementedError();
+    final json = await _dataSource.validateQr(
+      qrToken: qrToken,
+      lat: currentLat,
+      lng: currentLng,
+      evidenceUrl: evidenceUrl,
+    );
+    final model = VisitModel.fromResponse(json);
+    return VisitEntity(
+      id: model.id,
+      userId: model.userId,
+      placeId: model.placeId,
+      verifiedAt: DateTime.parse(model.verifiedAt),
+      evidenceUrl: model.evidenceUrl,
+      isVerified: model.isVerified,
+    );
   }
 }

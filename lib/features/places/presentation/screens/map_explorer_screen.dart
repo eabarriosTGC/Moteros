@@ -5,6 +5,7 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../validation/presentation/screens/qr_scanner_screen.dart';
 import '../../domain/entities/place_entity.dart';
 import '../bloc/places_bloc.dart';
 import '../bloc/places_event.dart';
@@ -160,6 +161,25 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               ),
             ],
             const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const QrScannerScreen()),
+                  );
+                },
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Validar visita'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondaryColor,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -265,12 +285,17 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                     ),
                   ],
                 ),
-          floatingActionButton: state is PlacesLoading
-              ? const FloatingActionButton(
-                  onPressed: null,
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              : null,
+          floatingActionButton: FloatingActionButton(
+            heroTag: 'scan_qr',
+            backgroundColor: AppTheme.secondaryColor,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+              );
+            },
+            child: const Icon(Icons.qr_code_scanner, color: Colors.white),
+          ),
         );
       },
     );

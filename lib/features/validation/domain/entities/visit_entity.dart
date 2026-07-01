@@ -1,5 +1,6 @@
-// Domain Entity - Visita / Validación gamificada
-class VisitEntity {
+import 'package:equatable/equatable.dart';
+
+class VisitEntity extends Equatable {
   final int id;
   final int userId;
   final int placeId;
@@ -15,4 +16,7 @@ class VisitEntity {
     this.evidenceUrl,
     required this.isVerified,
   });
+
+  @override
+  List<Object?> get props => [id, userId, placeId, isVerified];
 }

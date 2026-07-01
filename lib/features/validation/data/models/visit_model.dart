@@ -1,4 +1,3 @@
-// Modelo Visit con serialización JSON
 class VisitModel {
   final int id;
   final int userId;
@@ -16,21 +15,24 @@ class VisitModel {
     required this.isVerified,
   });
 
-  factory VisitModel.fromJson(Map<String, dynamic> json) => VisitModel(
-        id: json['id'] as int,
-        userId: json['user_id'] as int,
-        placeId: json['place_id'] as int,
-        verifiedAt: json['verified_at'] as String,
-        evidenceUrl: json['evidence_url'] as String?,
-        isVerified: json['is_verified'] as bool,
+  factory VisitModel.fromResponse(Map<String, dynamic> json) => VisitModel(
+        id: json['id'] as int? ?? 0,
+        userId: json['userId'] as int? ?? 0,
+        placeId: json['placeId'] as int,
+        verifiedAt: DateTime.now().toIso8601String(),
+        evidenceUrl: json['evidenceUrl'] as String?,
+        isVerified: json['isVerified'] as bool,
       );
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'user_id': userId,
-        'place_id': placeId,
-        'verified_at': verifiedAt,
+  Map<String, dynamic> toRequest({
+    required String qrToken,
+    required double latitude,
+    required double longitude,
+    String? evidenceUrl,
+  }) => {
+        'qr_token': qrToken,
+        'latitude': latitude,
+        'longitude': longitude,
         'evidence_url': evidenceUrl,
-        'is_verified': isVerified,
       };
 }
