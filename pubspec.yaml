@@ -37,6 +37,16 @@ dependencies:
 
   # HTTP Client
   dio: ^5.7.0
+  mobile_scanner: ^7.2.0
+  flutter_map: ^8.3.1
+  geolocator: ^14.0.3
+  flutter_secure_storage: ^10.3.1
+  image_picker: ^1.2.3
+  flutter_bloc: ^9.1.1
+  cloudinary_flutter: ^1.3.0
+  equatable: ^2.0.8
+  latlong2: ^0.9.1
+  flutter_map_marker_cluster: ^8.2.2
 
 dev_dependencies:
   flutter_test:

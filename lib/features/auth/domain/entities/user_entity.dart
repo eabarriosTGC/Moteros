@@ -1,12 +1,16 @@
-// Domain Entity - Capa de Dominio Pura (sin dependencias externas)
-class UserEntity {
+import 'package:equatable/equatable.dart';
+
+class UserEntity extends Equatable {
   final int id;
   final String email;
-  final String role; // aspirant, member, admin, ally
+  final String role;
 
   const UserEntity({
     required this.id,
     required this.email,
     required this.role,
   });
+
+  @override
+  List<Object?> get props => [id, email, role];
 }

@@ -1,0 +1,62 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Flutter 3.44.4, Dart 3.12.2, Dio 5.7.0, BLoC pattern
+  Architecture: Clean Architecture (feature-based: data/domain/presentation)
+  Testing: flutter_test (widget tests), Strict TDD enabled
+  Style: flutter_lints 6.0.0, dark theme (Material 3)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Document architecture decisions with rationale
+    - Include sequence diagrams for complex flows
+  tasks:
+    - Group by feature module, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing Clean Architecture patterns (entity/model/usecase/datasource)
+    - BLoC for state management (flutter_bloc)
+    - Dio for HTTP (ApiClient wrapper)
+    strict_tdd: true
+    test_command: "flutter test"
+  verify:
+    test_command: "flutter test"
+    build_command: "flutter analyze"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: true
+  detected: "2026-07-01"
+  test_runner:
+    command: "flutter test"
+    framework: flutter_test
+  layers:
+    unit:
+      available: true
+      tool: flutter_test
+    integration:
+      available: false
+      tool: —
+    e2e:
+      available: false
+      tool: —
+  coverage:
+    available: false
+    command: —
+  quality:
+    linter:
+      available: true
+      command: "flutter analyze (flutter_lints 6.0.0)"
+    type_checker:
+      available: true
+      command: "dart analyze"
+    formatter:
+      available: true
+      command: "dart format ."
