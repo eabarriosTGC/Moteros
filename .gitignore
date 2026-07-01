@@ -1,0 +1,43 @@
+# Flutter
+build/
+.dart_tool/
+.packages
+.pub-preload-cache/
+*.iml
+*.lock
+**/doc/api/
+.metadata
+*.freezed.dart
+*.g.dart
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+*.xcworkspace
+xcuserdata/
+
+# IDE
+.idea/
+.vscode/
+.vs/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
