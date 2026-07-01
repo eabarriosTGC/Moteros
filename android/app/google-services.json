@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "309812958317",
+    "project_id": "moteros-f2204",
+    "storage_bucket": "moteros-f2204.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309812958317:android:1a238c85d52d777e801b64",
+        "android_client_info": {
+          "package_name": "com.moteros.moteros_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWbOKYuVEQlmL2o7ln2RGAVPTApSN2-WQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

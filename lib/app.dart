@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'features/admin/data/datasources/admin_remote_datasource.dart';
 import 'features/admin/domain/usecases/manage_allies.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
+import 'features/auth/data/datasources/firebase_auth_service.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
@@ -21,14 +22,24 @@ import 'features/validation/presentation/bloc/validation_bloc.dart';
 
 class MoterosApp extends StatelessWidget {
   final ApiClient apiClient;
+  final FirebaseAuthService firebaseAuthService;
 
-  const MoterosApp({super.key, required this.apiClient});
+  const MoterosApp({
+    super.key,
+    required this.apiClient,
+    required this.firebaseAuthService,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (_) => AuthBloc(apiClient: apiClient)),
+        BlocProvider(
+          create: (_) => AuthBloc(
+            apiClient: apiClient,
+            firebaseAuthService: firebaseAuthService,
+          ),
+        ),
         BlocProvider(
           create: (_) => PlacesBloc(
             getNearbyPlaces: GetNearbyPlacesUseCase(

@@ -5,36 +5,35 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  void _onLogin() {
+  void _onRegister() {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AuthBloc>().add(LoginRequested(
+      context.read<AuthBloc>().add(RegisterRequested(
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            fullName: _nameController.text.trim(),
           ));
     }
-  }
-
-  void _onGoogleSignIn() {
-    context.read<AuthBloc>().add(const GoogleSignInRequested());
   }
 
   @override
@@ -49,6 +48,10 @@ class _LoginScreenState extends State<LoginScreen> {
       },
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          title: const Text('Crear cuenta'),
+          backgroundColor: Colors.transparent,
+        ),
         body: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -57,17 +60,25 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.motorcycle, size: 80, color: Colors.white),
-                  const SizedBox(height: 24),
+                  const Icon(Icons.motorcycle, size: 64, color: Colors.white),
+                  const SizedBox(height: 16),
                   Text(
-                    'Moteros Colombia',
+                    'Unite a Moteros',
                     style:
                         Theme.of(context).textTheme.headlineMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -97,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       return SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: isLoading ? null : _onLogin,
+                          onPressed: isLoading ? null : _onRegister,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.secondaryColor,
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -111,45 +122,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Ingresar'),
+                              : const Text('Registrarse'),
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 16),
-                  _buildGoogleButton(),
                 ],
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildGoogleButton() {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        final isLoading = state is AuthLoading;
-        return SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: isLoading ? null : _onGoogleSignIn,
-            icon: Image.asset(
-              'assets/google_logo.png',
-              height: 20,
-              width: 20,
-              errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata),
-            ),
-            label: const Text('Continuar con Google'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white38),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres_moteros:
     image: postgis/postgis:15-3.3
