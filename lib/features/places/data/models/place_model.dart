@@ -1,4 +1,3 @@
-// Modelo Place con serialización JSON para PostGIS
 class PlaceModel {
   final int id;
   final String name;
@@ -7,6 +6,10 @@ class PlaceModel {
   final double latitude;
   final double longitude;
   final String qrToken;
+  final String? address;
+  final String? city;
+  final String? department;
+  final String? imageUrl;
 
   const PlaceModel({
     required this.id,
@@ -16,6 +19,10 @@ class PlaceModel {
     required this.latitude,
     required this.longitude,
     required this.qrToken,
+    this.address,
+    this.city,
+    this.department,
+    this.imageUrl,
   });
 
   factory PlaceModel.fromJson(Map<String, dynamic> json) => PlaceModel(
@@ -25,7 +32,11 @@ class PlaceModel {
         category: json['category'] as String,
         latitude: (json['latitude'] as num).toDouble(),
         longitude: (json['longitude'] as num).toDouble(),
-        qrToken: json['qr_token'] as String,
+        qrToken: json['qrToken'] as String,
+        address: json['address'] as String?,
+        city: json['city'] as String?,
+        department: json['department'] as String?,
+        imageUrl: json['imageUrl'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +46,10 @@ class PlaceModel {
         'category': category,
         'latitude': latitude,
         'longitude': longitude,
-        'qr_token': qrToken,
+        'qrToken': qrToken,
+        'address': address,
+        'city': city,
+        'department': department,
+        'imageUrl': imageUrl,
       };
 }

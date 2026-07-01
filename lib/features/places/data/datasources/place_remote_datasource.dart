@@ -1,17 +1,19 @@
-// Data Source Remoto - Places
-import 'package:dio/dio.dart';
+import '../../../../core/network/api_client.dart';
 
 class PlaceRemoteDataSource {
-  final Dio _dio;
+  final ApiClient _apiClient;
 
-  PlaceRemoteDataSource(this._dio);
+  PlaceRemoteDataSource(this._apiClient);
 
   Future<List<Map<String, dynamic>>> getNearbyPlaces(
-      double lat, double lng, double radiusKm) async {
-    final response = await _dio.get('/places', queryParameters: {
+    double lat,
+    double lng,
+    double radiusMeters,
+  ) async {
+    final response = await _apiClient.get('/places', queryParams: {
       'lat': lat,
       'lng': lng,
-      'radius': radiusKm,
+      'radius': radiusMeters,
     });
     return (response.data as List).cast<Map<String, dynamic>>();
   }
