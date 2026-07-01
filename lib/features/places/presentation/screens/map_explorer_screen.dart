@@ -5,6 +5,8 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../admin/presentation/screens/admin_panel_screen.dart';
+import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../validation/presentation/screens/qr_scanner_screen.dart';
 import '../../domain/entities/place_entity.dart';
 import '../bloc/places_bloc.dart';
@@ -195,6 +197,28 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
           appBar: AppBar(
             title: const Text('Explorar Rutas'),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.admin_panel_settings),
+                tooltip: 'Admin',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const AdminPanelScreen()),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.workspace_premium),
+                tooltip: 'Membresia',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const MembershipScreen()),
+                  );
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.my_location),
                 onPressed: _getCurrentPosition,

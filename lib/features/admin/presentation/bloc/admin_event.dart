@@ -1,7 +1,15 @@
 import 'package:equatable/equatable.dart';
 
-class AllyEntity extends Equatable {
-  final int id;
+sealed class AdminEvent extends Equatable {
+  const AdminEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
+final class LoadAllies extends AdminEvent {}
+
+final class CreateAlly extends AdminEvent {
   final String businessName;
   final String category;
   final String? description;
@@ -12,8 +20,7 @@ class AllyEntity extends Equatable {
   final double? latitude;
   final double? longitude;
 
-  const AllyEntity({
-    required this.id,
+  const CreateAlly({
     required this.businessName,
     required this.category,
     this.description,
@@ -24,7 +31,4 @@ class AllyEntity extends Equatable {
     this.latitude,
     this.longitude,
   });
-
-  @override
-  List<Object?> get props => [id, businessName, category];
 }
