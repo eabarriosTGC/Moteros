@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../../lib/database.dart';
 import '../../lib/middleware/auth_middleware.dart';
 import 'package:dart_frog/dart_frog.dart';
+import 'package:postgres/postgres.dart';
 
 final middleware = authMiddleware;
 
@@ -18,16 +19,16 @@ Future<Response> onRequest(RequestContext context) async {
     final allies = <Map<String, dynamic>>[];
     for (final row in results) {
       allies.add({
-        'id': row[0],
-        'businessName': row[1],
-        'category': row[2],
-        'description': row[3],
-        'benefit': row[4],
-        'address': row[5],
-        'phone': row[6],
-        'website': row[7],
-        'latitude': row[8],
-        'longitude': row[9],
+        'id': cellAsInt(row[0]),
+        'businessName': cellAsString(row[1]),
+        'category': cellAsString(row[2]),
+        'description': cellAsString(row[3]),
+        'benefit': cellAsString(row[4]),
+        'address': cellAsString(row[5]),
+        'phone': cellAsString(row[6]),
+        'website': cellAsString(row[7]),
+        'latitude': cellAsDouble(row[8]),
+        'longitude': cellAsDouble(row[9]),
       });
     }
 
@@ -39,12 +40,12 @@ Future<Response> onRequest(RequestContext context) async {
     final data = json.decode(body) as Map<String, dynamic>;
 
     final result = await conn.execute(
-      r'INSERT INTO allies'
+      Sql.named(r'INSERT INTO allies'
       r' (business_name, category, description, benefit,'
       r'  address, phone, website, latitude, longitude)'
       r' VALUES (@name, @cat, @desc, @benefit,'
       r'  @addr, @phone, @web, @lat, @lng)'
-      r' RETURNING id',
+      r' RETURNING id'),
       parameters: {
         'name': data['businessName'],
         'cat': data['category'],
@@ -60,7 +61,7 @@ Future<Response> onRequest(RequestContext context) async {
 
     return Response.json(
       statusCode: 201,
-      body: {'id': result.first[0], 'message': 'Aliado creado'},
+      body: {'id': cellAsInt(result.first[0]), 'message': 'Aliado creado'},
     );
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../../lib/database.dart';
 import '../../lib/middleware/auth_middleware.dart';
 import 'package:dart_frog/dart_frog.dart';
+import 'package:postgres/postgres.dart';
 
 final middleware = authMiddleware;
 
@@ -11,10 +12,10 @@ Future<Response> onRequest(RequestContext context) async {
 
   if (context.request.method == HttpMethod.get) {
     final result = await conn.execute(
-      r'SELECT id, user_id, plan::text, start_date, end_date, is_active'
+      Sql.named(r'SELECT id, user_id, plan::text, start_date, end_date, is_active'
       r' FROM memberships'
       r' WHERE user_id = @userId AND is_active = true'
-      r' ORDER BY end_date DESC LIMIT 1',
+      r' ORDER BY end_date DESC LIMIT 1'),
       parameters: {'userId': userId},
     );
 
@@ -24,12 +25,12 @@ Future<Response> onRequest(RequestContext context) async {
 
     final row = result.first;
     return Response.json(body: {
-      'id': row[0],
-      'userId': row[1],
-      'plan': row[2],
+      'id': cellAsInt(row[0]),
+      'userId': cellAsInt(row[1]),
+      'plan': cellAsString(row[2]),
       'startDate': (row[3] as DateTime).toIso8601String(),
       'endDate': (row[4] as DateTime).toIso8601String(),
-      'isActive': row[5],
+      'isActive': row[5] is bool ? row[5] : true,
     });
   }
 
@@ -50,10 +51,10 @@ Future<Response> onRequest(RequestContext context) async {
     final endDate = startDate.add(const Duration(days: 30));
 
     final result = await conn.execute(
-      r'INSERT INTO memberships'
+      Sql.named(r'INSERT INTO memberships'
       r' (user_id, plan, payment_ref, start_date, end_date, is_active)'
       r' VALUES (@userId, @plan, @ref, @start, @end, true)'
-      r' RETURNING id',
+      r' RETURNING id'),
       parameters: {
         'userId': userId,
         'plan': plan,
@@ -64,12 +65,12 @@ Future<Response> onRequest(RequestContext context) async {
     );
 
     await conn.execute(
-      r'UPDATE users SET role = @role'
-      r' WHERE id = @id AND role = @aspirant',
+      Sql.named(r'UPDATE users SET role = @role'
+      r' WHERE id = @id AND role = @aspirant'),
       parameters: {'role': 'member', 'id': userId, 'aspirant': 'aspirant'},
     );
 
-    final membershipId = result.first[0] as int;
+    final membershipId = cellAsInt(result.first[0]);
     return Response.json(statusCode: 201, body: {
       'id': membershipId,
       'userId': userId,

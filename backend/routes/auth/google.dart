@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../../lib/auth.dart';
 import '../../lib/database.dart';
 import 'package:dart_frog/dart_frog.dart';
+import 'package:postgres/postgres.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -29,7 +30,7 @@ Future<Response> onRequest(RequestContext context) async {
   try {
     // Buscar si el usuario ya existe por email
     var result = await conn.execute(
-      r'SELECT id, email, role FROM users WHERE email = @email',
+      Sql.named(r'SELECT id, email, role FROM users WHERE email = @email'),
       parameters: {'email': email},
     );
 
@@ -39,9 +40,9 @@ Future<Response> onRequest(RequestContext context) async {
     if (result.isEmpty) {
       // Crear nuevo usuario
       result = await conn.execute(
-        r'INSERT INTO users (email, password_hash, full_name, profile_image, role)'
+        Sql.named(r'INSERT INTO users (email, password_hash, full_name, profile_image, role)'
         r' VALUES (@email, @hash, @name, @photo, @role)'
-        r' RETURNING id, email, role',
+        r' RETURNING id, email, role'),
         parameters: {
           'email': email,
           'hash': '',  // Sin password para usuarios de Google
@@ -51,12 +52,12 @@ Future<Response> onRequest(RequestContext context) async {
         },
       );
       final row = result.first;
-      userId = row[0] as int;
-      role = row[2] as String;
+      userId = cellAsInt(row[0]);
+      role = cellAsString(row[2]);
     } else {
       final row = result.first;
-      userId = row[0] as int;
-      role = row[2] as String;
+      userId = cellAsInt(row[0]);
+      role = cellAsString(row[2]);
     }
 
     final token = createJwt(userId, role);
@@ -64,8 +65,8 @@ Future<Response> onRequest(RequestContext context) async {
 
     final expiresAt = DateTime.now().toUtc().add(const Duration(days: 30));
     await conn.execute(
-      r'INSERT INTO refresh_tokens (user_id, token, expires_at)'
-      r' VALUES (@userId, @token, @expires)',
+      Sql.named(r'INSERT INTO refresh_tokens (user_id, token, expires_at)'
+      r' VALUES (@userId, @token, @expires)'),
       parameters: {
         'userId': userId,
         'token': refreshToken,

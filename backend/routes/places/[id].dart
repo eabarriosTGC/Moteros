@@ -1,5 +1,6 @@
 import '../../lib/database.dart';
 import 'package:dart_frog/dart_frog.dart';
+import 'package:postgres/postgres.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
   if (context.request.method != HttpMethod.get) {
@@ -16,12 +17,12 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   final conn = await db;
   final result = await conn.execute(
-    '''
+    Sql.named('''
     SELECT id, name, description, category::text, address,
            city, department, ST_Y(geom) as lat, ST_X(geom) as lng,
-           qr_token, image_url
+           qr_token
     FROM places WHERE id = @id
-    ''',
+    '''),
     parameters: {'id': placeId},
   );
 
@@ -34,16 +35,15 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   final row = result.first;
   return Response.json(body: {
-    'id': row[0],
-    'name': row[1],
-    'description': row[2],
-    'category': row[3],
-    'address': row[4],
-    'city': row[5],
-    'department': row[6],
-    'latitude': row[7],
-    'longitude': row[8],
-    'qrToken': row[9],
-    'imageUrl': row[10],
+    'id': cellAsInt(row[0]),
+    'name': cellAsString(row[1]),
+    'description': cellAsString(row[2]),
+    'category': cellAsString(row[3]),
+    'address': cellAsString(row[4]),
+    'city': cellAsString(row[5]),
+    'department': cellAsString(row[6]),
+    'latitude': cellAsDouble(row[7]),
+    'longitude': cellAsDouble(row[8]),
+    'qrToken': cellAsString(row[9]),
   });
 }

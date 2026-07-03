@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dotenv/dotenv.dart';
 import 'package:postgres/postgres.dart';
 
@@ -23,6 +24,10 @@ Future<Connection> get db async {
       username: user,
       password: pass,
     ),
+    settings: ConnectionSettings(
+      sslMode: SslMode.disable,
+      encoding: utf8,
+    ),
   );
   return _connection!;
 }
@@ -30,4 +35,25 @@ Future<Connection> get db async {
 Future<void> closeDb() async {
   await _connection?.close();
   _connection = null;
+}
+
+/// Helper: extrae un String de una celda Postgres, manejando UndecodedBytes.
+String cellAsString(Object? value) {
+  if (value == null) return '';
+  if (value is String) return value;
+  if (value is UndecodedBytes) return value.asString;
+  return value.toString();
+}
+
+/// Helper: extrae un int de una celda Postgres.
+int cellAsInt(Object? value) {
+  if (value is int) return value;
+  return int.parse(cellAsString(value));
+}
+
+/// Helper: extrae un double de una celda Postgres.
+double cellAsDouble(Object? value) {
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  return double.parse(cellAsString(value));
 }

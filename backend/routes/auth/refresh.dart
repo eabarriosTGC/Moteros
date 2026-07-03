@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../../lib/auth.dart';
 import '../../lib/database.dart';
 import 'package:dart_frog/dart_frog.dart';
+import 'package:postgres/postgres.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -21,10 +22,10 @@ Future<Response> onRequest(RequestContext context) async {
 
   final conn = await db;
   final result = await conn.execute(
-    r'SELECT rt.user_id, rt.expires_at, u.role'
+    Sql.named(r'SELECT rt.user_id, rt.expires_at, u.role'
     r' FROM refresh_tokens rt'
     r' JOIN users u ON u.id = rt.user_id'
-    r' WHERE rt.token = @token',
+    r' WHERE rt.token = @token'),
     parameters: {'token': refreshToken},
   );
 
@@ -36,10 +37,10 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final row = result.first;
-  final expiresAt = row[1] as DateTime;
+  final expiresAt = row[1] as DateTime;  // TIMESTAMPTZ returns DateTime natively
   if (expiresAt.isBefore(DateTime.now().toUtc())) {
     await conn.execute(
-      r'DELETE FROM refresh_tokens WHERE token = @token',
+      Sql.named(r'DELETE FROM refresh_tokens WHERE token = @token'),
       parameters: {'token': refreshToken},
     );
     return Response.json(
@@ -55,12 +56,12 @@ Future<Response> onRequest(RequestContext context) async {
   final newExpiresAt = DateTime.now().toUtc().add(const Duration(days: 30));
 
   await conn.execute(
-    r'DELETE FROM refresh_tokens WHERE token = @token',
+    Sql.named(r'DELETE FROM refresh_tokens WHERE token = @token'),
     parameters: {'token': refreshToken},
   );
   await conn.execute(
-    r'INSERT INTO refresh_tokens (user_id, token, expires_at)'
-    r' VALUES (@userId, @token, @expires)',
+    Sql.named(r'INSERT INTO refresh_tokens (user_id, token, expires_at)'
+    r' VALUES (@userId, @token, @expires)'),
     parameters: {
       'userId': userId,
       'token': newRefreshToken,

@@ -10,6 +10,6 @@ Handler authMiddleware(Handler handler) {
         body: {'error': 'No autorizado. Token JWT requerido.'},
       );
     }
-    return handler(context.provide(() => userId));
+    return handler(context.provide<int>(() => userId));
   };
 }

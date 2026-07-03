@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../../lib/database.dart';
 import '../../lib/middleware/auth_middleware.dart';
 import 'package:dart_frog/dart_frog.dart';
+import 'package:postgres/postgres.dart';
 
 final middleware = authMiddleware;
 
@@ -28,9 +29,9 @@ Future<Response> onRequest(RequestContext context) async {
   final conn = await db;
 
   final placeResult = await conn.execute(
-    r'SELECT id FROM places'
+    Sql.named(r'SELECT id FROM places'
     r' WHERE qr_token = @token'
-    r' AND is_within_distance(geom, @lat, @lng, 100)',
+    r' AND is_within_distance(geom, @lat, @lng, 100)'),
     parameters: {'token': qrToken, 'lat': latitude, 'lng': longitude},
   );
 
@@ -48,8 +49,8 @@ Future<Response> onRequest(RequestContext context) async {
 
   try {
     await conn.execute(
-      r'INSERT INTO visits (user_id, place_id, evidence_url, is_verified)'
-      r' VALUES (@userId, @placeId, @evidence, true)',
+      Sql.named(r'INSERT INTO visits (user_id, place_id, evidence_url, is_verified)'
+      r' VALUES (@userId, @placeId, @evidence, true)'),
       parameters: {
         'userId': userId,
         'placeId': placeId,
