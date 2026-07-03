@@ -61,7 +61,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     try {
       // Connect to the WebSocket chat server
       _channel = WebSocketChannel.connect(
-        Uri.parse('ws://10.0.2.2:8082/ws?room=${event.roomId}&user=${Uri.encodeComponent(event.username)}'),
+        Uri.parse('ws://192.168.101.5:8082/ws?room=${event.roomId}&user=${Uri.encodeComponent(event.username)}'),
       );
 
       await _channel!.ready;

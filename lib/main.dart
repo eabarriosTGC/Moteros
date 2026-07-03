@@ -15,7 +15,7 @@ void main() async {
 
   const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8081',
+    defaultValue: 'http://192.168.101.5:8081',
   );
   final apiClient = ApiClient(baseUrl: baseUrl);
 
