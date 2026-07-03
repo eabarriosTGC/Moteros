@@ -1,13 +1,16 @@
 /// Map Explorer — "Mapa de Conquistas" redesign.
 /// Dark tiles + filter chips + redesigned markers + premium bottom sheet.
 library;
-
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_buttons.dart';
@@ -185,11 +188,126 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               child: IconButton(
                 icon: const Icon(AppIcons.navigate, size: AppSpacing.iconSm),
                 color: AppColors.primary,
-                onPressed: () {},
+                onPressed: () => _openNavigation(place.latitude, place.longitude, place.name),
               ),
             ),
           ]),
         ]),
+      ),
+    );
+  }
+
+  void _openNavigation(double lat, double lng, String name) {
+    HapticFeedback.lightImpact();
+    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
+    launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Abre Google Maps y busca: $name')),
+      );
+    });
+  }
+
+  void _osmAction(String action) {
+    HapticFeedback.lightImpact();
+    if (action == 'note') {
+      if (_currentPosition == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Espera a que se active el GPS')),
+        );
+        return;
+      }
+      final lat = _currentPosition!.latitude.toStringAsFixed(5);
+      final lng = _currentPosition!.longitude.toStringAsFixed(5);
+      final uri = Uri.parse('https://www.openstreetmap.org/note/new?lat=$lat&lon=$lng#map=16/$lat/$lng');
+      launchUrl(uri, mode: LaunchMode.externalApplication);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🌍 Reporta el error en OpenStreetMap')),
+      );
+    } else if (action == 'gps') {
+      launchUrl(Uri.parse('https://www.openstreetmap.org/traces/new'), mode: LaunchMode.externalApplication);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('📡 Sube tus trazados GPS para mejorar el mapa')),
+      );
+    } else if (action == 'import') {
+      _importFromOsm();
+    }
+  }
+
+  Future<void> _importFromOsm() async {
+    try {
+      final api = context.read<PlacesBloc>();
+      // We need the API client - for now open the docs
+      final uri = Uri.parse('https://overpass-api.de/api/interpreter');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🌍 Importando lugares de OpenStreetMap...')),
+      );
+      final response = await context.read<ApiClient>().post('/import', data: {
+        'department': 'La Guajira',
+      });
+      final data = response.data as Map<String, dynamic>;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ ${data['message'] ?? 'Importado'}')),
+      );
+      // Refresh places
+      _getCurrentPosition();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  void _showAddPlaceDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    String category = 'otro';
+    final categories = ['restaurante', 'hotel', 'taller', 'mirador', 'moto_posada', 'otro'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Agregar lugar', style: TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: nameCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Nombre del lugar',
+                labelStyle: TextStyle(color: AppColors.textMuted),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: category,
+              dropdownColor: AppColors.card,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(labelText: 'Categoría', labelStyle: TextStyle(color: AppColors.textMuted)),
+              items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase()))).toList(),
+              onChanged: (v) => category = v ?? 'otro',
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty || _currentPosition == null) return;
+              try {
+                await context.read<ApiClient>().post('/import/manual', data: {
+                  'name': nameCtrl.text.trim(),
+                  'category': category,
+                  'latitude': _currentPosition!.latitude,
+                  'longitude': _currentPosition!.longitude,
+                });
+                Navigator.pop(ctx);
+                _getCurrentPosition(); // refresh
+              } catch (_) {}
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
       ),
     );
   }
@@ -210,6 +328,23 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               IconButton(icon: const Icon(AppIcons.fuel), tooltip: 'Membresía',
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MembershipScreen()))),
               IconButton(icon: const Icon(AppIcons.gps), onPressed: _getCurrentPosition),
+              // OSM contribution
+              PopupMenuButton<String>(
+                icon: const Icon(AppIcons.info, size: 20),
+                tooltip: 'Contribuir a OpenStreetMap',
+                onSelected: (v) => _osmAction(v),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'note', child: Text('Reportar error en mapa')),
+                  const PopupMenuItem(value: 'gps', child: Text('Subir traza GPS')),
+                  const PopupMenuItem(value: 'import', child: Text('Importar lugares de OSM')),
+                ],
+              ),
+              // Add place manually
+              IconButton(
+                icon: const Icon(Icons.add_location_alt, color: AppColors.primary),
+                tooltip: 'Agregar lugar',
+                onPressed: () => _showAddPlaceDialog(context),
+              ),
             ],
           ),
           body: Stack(children: [

@@ -271,112 +271,35 @@ class _ChallengesScreenState extends State<ChallengesScreen>
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black54,
-      builder: (_) => _ConfettiDialog(),
+      builder: (_) => const _SimpleCelebration(),
     );
   }
 }
 
-/// Simple confetti celebration dialog
-class _ConfettiDialog extends StatefulWidget {
-  @override
-  State<_ConfettiDialog> createState() => _ConfettiDialogState();
-}
-
-class _ConfettiDialogState extends State<_ConfettiDialog>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  final _particles = List.generate(30, (i) => _Particle(
-    x: Random().nextDouble(),
-    y: -0.2 - Random().nextDouble() * 0.3,
-    speed: 0.3 + Random().nextDouble() * 0.5,
-    drift: (Random().nextDouble() - 0.5) * 0.3,
-    size: 6 + Random().nextDouble() * 8,
-    color: [AppColors.primary, AppColors.secondary, AppColors.success, AppColors.info, Colors.white][i % 5],
-    rotation: Random().nextDouble() * 6.28,
-    rotSpeed: (Random().nextDouble() - 0.5) * 0.1,
-  ));
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+/// Simple celebration dialog - no heavy animations
+class _SimpleCelebration extends StatelessWidget {
+  const _SimpleCelebration();
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) => CustomPaint(
-        size: MediaQuery.of(context).size,
-        painter: _ConfettiPainter(_particles, _controller.value),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.emoji_events, size: 80, color: AppColors.secondary),
-            const SizedBox(height: 16),
-            const Text('¡FELICIDADES!', style: AppTypography.displayMedium),
-            const SizedBox(height: 8),
-            Text('Completaste todos los retos.\n¡Ya eres Miembro Oficial!',
-              textAlign: TextAlign.center,
-              style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
-                minimumSize: const Size(200, 48),
-              ),
-              child: const Text('¡A rodar!'),
-            ),
-          ],
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.lgCircular),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 16),
+        const Icon(Icons.emoji_events, size: 80, color: AppColors.secondary),
+        const SizedBox(height: 16),
+        const Text('¡FELICIDADES!', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white)),
+        const SizedBox(height: 8),
+        const Text('Completaste todos los retos.\n¡Ya eres Miembro Oficial!', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, minimumSize: const Size(200, 48), shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular)),
+          child: const Text('¡A rodar!'),
         ),
-      ),
+        const SizedBox(height: 8),
+      ]),
     );
   }
-}
-
-class _Particle {
-  final double x, y, speed, drift, size;
-  final Color color;
-  final double rotation, rotSpeed;
-  _Particle({required this.x, required this.y, required this.speed, required this.drift, required this.size, required this.color, required this.rotation, required this.rotSpeed});
-}
-
-class _ConfettiPainter extends CustomPainter {
-  final List<_Particle> particles;
-  final double progress;
-
-  _ConfettiPainter(this.particles, this.progress);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final p in particles) {
-      final y = (p.y + progress * p.speed) * size.height;
-      if (y < -20 || y > size.height + 20) continue;
-      final x = (p.x + sin(progress * 10 + p.drift * 20) * p.drift) * size.width;
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(p.rotation + progress * p.rotSpeed);
-      final paint = Paint()..color = p.color.withAlpha((255 * (1 - progress * 0.3)).round());
-      canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6), paint);
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

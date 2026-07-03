@@ -3,11 +3,14 @@ library;
 
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:collection/collection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
@@ -242,6 +245,21 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
                       child: const Text('Guardar'),
                     ),
                   ]),
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _exportToOsm(state),
+                      icon: const Icon(Icons.map, size: AppSpacing.iconSm),
+                      label: const Text('SUBIR TRAZA A OpenStreetMap'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.success,
+                        side: const BorderSide(color: AppColors.success),
+                        minimumSize: const Size(0, 44),
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.smCircular),
+                      ),
+                    ),
+                  ),
                 ] else ...[
                   // Start button
                   SizedBox(
@@ -282,6 +300,32 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
         Text(label, style: AppTypography.label.copyWith(color: AppColors.textMuted)),
         Text(value, style: AppTypography.body.copyWith(color: color, fontWeight: FontWeight.w700)),
       ]),
+    );
+  }
+
+  void _exportToOsm(TrackerRecording state) {
+    final now = DateTime.now();
+    final gpx = '''<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="AsfaltoClub" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Ruta AsfaltoClub ${now.day}/${now.month}/${now.year}</name>
+    <desc>Ruta grabada con AsfaltoClub - ${state.distanceKm.toStringAsFixed(2)}km, ${state.durationStr}</desc>
+    <time>${now.toUtc().toIso8601String()}</time>
+  </metadata>
+  <trk>
+    <name>Ruta ${now.day}/${now.month}</name>
+    <trkseg>
+${state.points.map((p) => '      <trkpt lat="${p.latitude}" lon="${p.longitude}"></trkpt>').join('\n')}
+    </trkseg>
+  </trk>
+</gpx>''';
+
+    // Encode and open OSM trace upload page
+    final encoded = Uri.encodeComponent(gpx);
+    final osmUrl = Uri.parse('https://www.openstreetmap.org/traces/new');
+    launchUrl(osmUrl, mode: LaunchMode.externalApplication);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('🌍 Sube tu traza GPX a openstreetmap.org/traces/new')),
     );
   }
 }

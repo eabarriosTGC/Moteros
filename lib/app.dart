@@ -13,6 +13,7 @@ import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/challenges/presentation/screens/challenges_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'features/validation/presentation/screens/qr_scanner_screen.dart';
 import 'features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import 'features/challenges/presentation/bloc/challenges_bloc.dart';
 import 'features/refugios/presentation/bloc/refugios_bloc.dart';
@@ -123,7 +124,7 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
   void _openScanner() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const _ScannerScreen(),
+        builder: (_) => const QrScannerScreen(),
       ),
     );
   }
@@ -147,37 +148,6 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
         child: ScannerFab(onTap: _openScanner),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    );
-  }
-}
-
-/// Placeholder scanner screen — will be replaced by QrScannerScreen in Phase 2.
-class _ScannerScreen extends StatelessWidget {
-  const _ScannerScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Escanear QR')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.qr_code_scanner, size: 80, color: Colors.white24),
-            const SizedBox(height: 24),
-            Text(
-              'Cámara QR',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Apunta al código QR del lugar\npara registrar tu visita',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white54),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
