@@ -10,6 +10,7 @@ import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../patches/presentation/screens/patches_screen.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
+import '../../../chat/presentation/screens/direct_messages_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -111,6 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMenu(BuildContext context) {
     return Column(children: [
+      _item(AppIcons.chat, 'Mensajes', sub: 'Chat directo con otros moteros', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesScreen()))),
       _item(AppIcons.badge, 'Mis Parches', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatchesScreen()))),
       _item(AppIcons.route, 'Historial de Rutas', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteTrackerScreen()))),
       _item(AppIcons.group, 'Comunidad', sub: 'Buscar y seguir moteros', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityScreen()))),

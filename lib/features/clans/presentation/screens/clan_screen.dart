@@ -1,6 +1,9 @@
 /// Clan Screen — AsfaltoClub Battle Ride.
 /// Pantalla principal del clan con stats, miembros y chat.
+/// Incluye chat integrado con Realtime en vivo.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,19 +26,155 @@ class _ClanScreenState extends State<ClanScreen> {
   final _chatController = TextEditingController();
   final _chatScrollController = ScrollController();
 
+  // Chat state
+  List<Map<String, dynamic>> _clanMessages = [];
+  bool _chatLoading = true;
+  String? _chatError;
+  RealtimeChannel? _clanChatChannel;
+  final Map<String, String> _userNameCache = {};
+  bool _autoScroll = true;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ClanBloc>().add(LoadClan(clanId: widget.clanId));
     });
+    _loadClanChat();
   }
 
   @override
   void dispose() {
+    _clanChatChannel?.unsubscribe();
+    _clanChatChannel = null;
     _chatController.dispose();
     _chatScrollController.dispose();
     super.dispose();
+  }
+
+  /// Load existing clan messages and subscribe to Realtime
+  Future<void> _loadClanChat() async {
+    try {
+      _chatLoading = true;
+      if (mounted) setState(() {});
+
+      final messages = await Supabase.instance.client
+          .from('clan_messages')
+          .select()
+          .eq('clan_id', int.parse(widget.clanId))
+          .order('created_at', ascending: true);
+
+      _clanMessages = (messages as List).cast<Map<String, dynamic>>();
+      _chatLoading = false;
+
+      // Cache user names for existing messages
+      for (final msg in _clanMessages) {
+        final uid = msg['user_id'] as String?;
+        if (uid != null && !_userNameCache.containsKey(uid)) {
+          _userNameCache[uid] = await _fetchUserName(uid);
+        }
+      }
+
+      if (mounted) setState(() {});
+      _scrollToBottom();
+
+      // Subscribe to Realtime for new clan messages
+      _subscribeToClanChat();
+    } catch (e) {
+      _chatLoading = false;
+      _chatError = e.toString();
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Subscribe to Realtime inserts on clan_messages
+  void _subscribeToClanChat() {
+    _clanChatChannel = Supabase.instance.client.channel('clan-${widget.clanId}');
+
+    _clanChatChannel!.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'clan_messages',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'clan_id',
+        value: widget.clanId,
+      ),
+      callback: (payload) async {
+        final newMsg = Map<String, dynamic>.from(payload.newRecord);
+        // Fetch username if not cached
+        final uid = newMsg['user_id'] as String?;
+        if (uid != null && !_userNameCache.containsKey(uid)) {
+          _userNameCache[uid] = await _fetchUserName(uid);
+        }
+        if (mounted) {
+          setState(() {
+            _clanMessages.add(newMsg);
+          });
+          _scrollToBottom();
+        }
+      },
+    );
+
+    _clanChatChannel!.subscribe();
+  }
+
+  /// Fetch a user's display name from the profiles/users table
+  Future<String> _fetchUserName(String userId) async {
+    try {
+      final resp = await Supabase.instance.client
+          .from('profiles')
+          .select('username, display_name, full_name')
+          .eq('id', userId)
+          .maybeSingle();
+      if (resp != null) {
+        return (resp['display_name'] ??
+                resp['username'] ??
+                resp['full_name'] ??
+                userId.substring(0, 8))
+            .toString();
+      }
+    } catch (_) {}
+    return userId.substring(0, 8);
+  }
+
+  /// Auto-scroll to bottom of chat
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_chatScrollController.hasClients) {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  /// Send a clan chat message
+  void _sendClanChat() {
+    final text = _chatController.text.trim();
+    if (text.isEmpty) return;
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    if (userId.isEmpty) return;
+
+    Supabase.instance.client.from('clan_messages').insert({
+      'clan_id': int.parse(widget.clanId),
+      'user_id': userId,
+      'message': text,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    }).then((_) {
+      _chatController.clear();
+    }).catchError((e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al enviar: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -436,6 +575,8 @@ class _ClanScreenState extends State<ClanScreen> {
   }
 
   Widget _buildClanChat(ClanLoaded state) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
+
     return Container(
       width: double.infinity,
       padding: AppSpacing.cardPadding,
@@ -446,28 +587,84 @@ class _ClanScreenState extends State<ClanScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('CHAT DEL CLAN',
-            style: AppTypography.label.copyWith(
-              color: AppColors.textMuted,
-              letterSpacing: 1.5,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('CHAT DEL CLAN (${_clanMessages.length})',
+                style: AppTypography.label.copyWith(
+                  color: AppColors.textMuted,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              Icon(Icons.circle, size: 8,
+                color: _clanChatChannel != null ? AppColors.success : AppColors.textMuted,
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          // Chat messages placeholder
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppColors.input,
-              borderRadius: AppRadius.smCircular,
-            ),
-            child: Center(
-              child: Text('Conéctate al chat del clan',
-                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+
+          // Chat messages list
+          if (_chatLoading)
+            SizedBox(
+              height: 200,
+              child: Center(
+                child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            )
+          else if (_chatError != null)
+            SizedBox(
+              height: 200,
+              child: Center(
+                child: Text('Error: $_chatError',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+                ),
+              ),
+            )
+          else if (_clanMessages.isEmpty)
+            SizedBox(
+              height: 200,
+              child: Center(
+                child: Text('Sin mensajes aún. ¡Sé el primero en escribir!',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 300,
+              child: ListView.builder(
+                controller: _chatScrollController,
+                padding: EdgeInsets.zero,
+                itemCount: _clanMessages.length,
+                itemBuilder: (context, index) {
+                  final msg = _clanMessages[index];
+                  final uid = msg['user_id'] as String? ?? '';
+                  final isMe = uid == currentUserId;
+                  final userName = _userNameCache[uid] ?? uid.substring(0, 8);
+                  final text = msg['message'] as String? ?? '';
+                  final createdAt = msg['created_at'] as String? ?? '';
+
+                  return _buildClanChatBubble(
+                    userName: userName,
+                    text: text,
+                    createdAt: createdAt,
+                    isMe: isMe,
+                  );
+                },
               ),
             ),
-          ),
+
           const SizedBox(height: AppSpacing.sm),
+
           // Chat input
           Row(
             children: [
@@ -510,16 +707,118 @@ class _ClanScreenState extends State<ClanScreen> {
     );
   }
 
-  void _sendClanChat() {
-    final text = _chatController.text.trim();
-    if (text.isEmpty) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('💬 Mensaje enviado al clan'),
-        backgroundColor: AppColors.primary,
-        duration: Duration(seconds: 1),
+  /// Build a chat bubble for clan messages
+  Widget _buildClanChatBubble({
+    required String userName,
+    required String text,
+    required String createdAt,
+    required bool isMe,
+  }) {
+    final timestamp = _formatTimestamp(createdAt);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Avatar
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: isMe
+                  ? AppColors.primary.withAlpha(30)
+                  : AppColors.secondary.withAlpha(20),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isMe
+                    ? AppColors.primary.withAlpha(60)
+                    : AppColors.border,
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                style: AppTypography.caption.copyWith(
+                  color: isMe ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Message content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(userName,
+                      style: AppTypography.caption.copyWith(
+                        color: isMe ? AppColors.primary : AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (timestamp.isNotEmpty)
+                      Text(timestamp,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                          fontSize: 9,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? AppColors.primary.withAlpha(20)
+                        : AppColors.input,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(
+                      color: isMe
+                          ? AppColors.primary.withAlpha(40)
+                          : AppColors.border,
+                    ),
+                  ),
+                  child: Text(text,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
-    _chatController.clear();
+  }
+
+  /// Format timestamp for display
+  String _formatTimestamp(String iso) {
+    if (iso.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+
+      if (diff.inMinutes < 1) return 'ahora';
+      if (diff.inHours < 1) return '${diff.inMinutes}m';
+      if (diff.inDays < 1) {
+        return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      }
+      if (diff.inDays == 1) return 'ayer';
+      if (diff.inDays < 7) return '${diff.inDays}d';
+      return '${dt.day}/${dt.month}';
+    } catch (_) {
+      return '';
+    }
   }
 }
