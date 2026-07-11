@@ -8,24 +8,24 @@ import '../theme/app_icons.dart';
 import '../widgets/scanner_fab.dart';
 
 /// Tab index mapping
-enum AppTab { dashboard, map, scanner, refugios, challenges, profile }
+enum AppTab { dashboard, raid, scanner, refugios, clan, profile }
 
 class MainShell extends StatefulWidget {
   const MainShell({
     super.key,
     required this.dashboard,
-    required this.mapScreen,
-    required this.challengesScreen,
+    required this.raidScreen,
     required this.profileScreen,
     required this.refugiosScreen,
+    required this.clanScreen,
     this.initialTab = AppTab.dashboard,
   });
 
   final Widget dashboard;
-  final Widget mapScreen;
-  final Widget challengesScreen;
+  final Widget raidScreen;
   final Widget profileScreen;
   final Widget refugiosScreen;
+  final Widget clanScreen;
   final AppTab initialTab;
 
   @override
@@ -53,10 +53,10 @@ class _MainShellState extends State<MainShell> {
         index: _currentTab.index,
         children: [
           widget.dashboard,
-          widget.mapScreen,
+          widget.raidScreen,
           const SizedBox.shrink(), // Scanner placeholder (never shown)
           widget.refugiosScreen,
-          widget.challengesScreen,
+          widget.clanScreen,
           widget.profileScreen,
         ],
       ),
@@ -90,10 +90,10 @@ class _MainShellState extends State<MainShell> {
             onTap: () => _onTabSelected(AppTab.dashboard),
           ),
           _NavItem(
-            icon: AppIcons.map,
-            label: 'Mapa',
-            isSelected: _currentTab == AppTab.map,
-            onTap: () => _onTabSelected(AppTab.map),
+            icon: AppIcons.raid,
+            label: 'Raid',
+            isSelected: _currentTab == AppTab.raid,
+            onTap: () => _onTabSelected(AppTab.raid),
           ),
           // Center FAB spacer
           const SizedBox(width: AppSpacing.fabSize + 8),
@@ -104,10 +104,10 @@ class _MainShellState extends State<MainShell> {
             onTap: () => _onTabSelected(AppTab.refugios),
           ),
           _NavItem(
-            icon: AppIcons.challenges,
-            label: 'Retos',
-            isSelected: _currentTab == AppTab.challenges,
-            onTap: () => _onTabSelected(AppTab.challenges),
+            icon: AppIcons.clan,
+            label: 'Clan',
+            isSelected: _currentTab == AppTab.clan,
+            onTap: () => _onTabSelected(AppTab.clan),
           ),
           _NavItem(
             icon: AppIcons.profile,

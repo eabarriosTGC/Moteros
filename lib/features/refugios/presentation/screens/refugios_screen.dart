@@ -286,7 +286,7 @@ class _RealChatScreenState extends State<_RealChatScreen> {
                   child: Container(
                     width: 44, height: 44,
                     decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle,
-                      boxShadow: AppShadows.neonOrange.take(1).toList()),
+                      boxShadow: AppShadows.amberGlow.take(1).toList()),
                     child: const Icon(Icons.send, color: Colors.white, size: 20),
                   ),
                 ),

@@ -11,6 +11,8 @@ class AppIcons {
   static const IconData dashboard = Icons.speed;
   static const IconData map = Icons.map_outlined;
   static const IconData mapFilled = Icons.map;
+  static const IconData raid = Icons.route;
+  static const IconData clan = Icons.groups;
   static const IconData challenges = Icons.emoji_events_outlined;
   static const IconData challengesFilled = Icons.emoji_events;
   static const IconData shelter = Icons.house_outlined; // Moto Posada

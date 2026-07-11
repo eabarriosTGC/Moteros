@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Logo
+                    // Logo — amber circle with glow
                     Container(
                       width: 88,
                       height: 88,
@@ -84,13 +84,7 @@ class _LoginScreenState extends State<LoginScreen>
                           color: AppColors.primary.withAlpha(60),
                           width: 2,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withAlpha(30),
-                            blurRadius: 25,
-                            spreadRadius: 5,
-                          ),
-                        ],
+                        boxShadow: AppShadows.amberGlow,
                       ),
                       child: const Icon(
                         Icons.motorcycle,
@@ -99,13 +93,18 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'ASFALTOCLUB',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 6,
+                    // ASFALTOCLUB — Space Grotesk, amber, glow
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        boxShadow: AppShadows.amberGlow,
+                      ),
+                      child: Text(
+                        'ASFALTOCLUB',
+                        style: AppTypography.displaySmall.copyWith(
+                          color: AppColors.primary,
+                          letterSpacing: 6,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -121,21 +120,10 @@ class _LoginScreenState extends State<LoginScreen>
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      decoration: const InputDecoration(
                         labelText: 'Email',
-                        labelStyle: const TextStyle(color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.email, color: AppColors.textMuted),
-                        filled: true,
-                        fillColor: AppColors.input,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                        ),
+                        prefixIcon: Icon(Icons.email, color: AppColors.textMuted),
                       ),
                       validator: (v) =>
                           (v == null || v.isEmpty) ? 'Ingresa tu email' : null,
@@ -145,28 +133,17 @@ class _LoginScreenState extends State<LoginScreen>
                     TextFormField(
                       controller: _passwordController,
                       obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      decoration: const InputDecoration(
                         labelText: 'Contraseña',
-                        labelStyle: const TextStyle(color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.lock, color: AppColors.textMuted),
-                        filled: true,
-                        fillColor: AppColors.input,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                        ),
+                        prefixIcon: Icon(Icons.lock, color: AppColors.textMuted),
                       ),
                       validator: (v) => (v == null || v.isEmpty)
                           ? 'Ingresa tu contraseña'
                           : null,
                     ),
                     const SizedBox(height: 24),
-                    // Login button
+                    // Login button — uses theme's amber elevatedButtonTheme
                     BlocBuilder<AuthBloc, AuthState>(
                       builder: (context, state) {
                         final isLoading = state is AuthLoading;
@@ -174,23 +151,13 @@ class _LoginScreenState extends State<LoginScreen>
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: isLoading ? null : _onLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 4,
-                              shadowColor: AppColors.primary.withAlpha(80),
-                            ),
                             child: isLoading
                                 ? const SizedBox(
                                     height: 20,
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.black,
+                                      color: AppColors.textOnAmber,
                                     ),
                                   )
                                 : const Text(
@@ -221,7 +188,6 @@ class _LoginScreenState extends State<LoginScreen>
                         style: TextStyle(color: AppColors.primary.withAlpha(180)),
                       ),
                     ),
-
                   ],
                 ),
               ),

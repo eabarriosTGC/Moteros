@@ -46,44 +46,71 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo con glow
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary.withAlpha(60), width: 2),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.primary.withAlpha(40), blurRadius: 30, spreadRadius: 8),
-                    ],
-                  ),
-                  child: const Icon(Icons.motorcycle, size: 52, color: AppColors.primary),
+                // Central glow + logo
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Amber glow background circle
+                    Container(
+                      width: 160,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: AppShadows.amberGlow,
+                      ),
+                    ),
+                    // Logo icon
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.surface.withAlpha(180),
+                        border: Border.all(
+                          color: AppColors.primary.withAlpha(80),
+                          width: 2,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.motorcycle,
+                        size: 52,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 32),
-                const Text(
-                  'ASFALTOCLUB',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 8,
+                // ASFALTOCLUB — Space Grotesk, amber, glow
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  decoration: BoxDecoration(
+                    boxShadow: AppShadows.amberGlow,
+                  ),
+                  child: Text(
+                    'ASFALTOCLUB',
+                    style: AppTypography.displayMedium.copyWith(
+                      color: AppColors.primary,
+                      letterSpacing: 8,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
+                // BATTLE RIDE — cyan subtitle
                 Text(
-                  'MOTEROS COLOMBIA',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textMuted,
-                    letterSpacing: 4,
+                  'BATTLE RIDE',
+                  style: AppTypography.h2.copyWith(
+                    color: AppColors.secondary,
+                    letterSpacing: 6,
                   ),
                 ),
                 const SizedBox(height: 48),
-                SizedBox(
+                // Loading indicator — amber
+                const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: AppColors.primary.withAlpha(180),
+                    color: AppColors.primary,
                   ),
                 ),
               ],

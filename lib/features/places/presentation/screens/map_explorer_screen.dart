@@ -383,12 +383,12 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                       ),
                     // User location dot
                     MarkerLayer(markers: [
-                      Marker(point: _currentPosition!, width: 20, height: 20,
+                      Marker(point: _currentPosition!, width: 22, height: 22,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.blue, shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: const [BoxShadow(color: Colors.blueAccent, blurRadius: 8)],
+                            color: AppColors.secondary, shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.textPrimary, width: 3),
+                            boxShadow: AppShadows.cyanGlow,
                           ),
                         ),
                       ),
@@ -407,7 +407,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
 
             // Loading overlay
             if (state is PlacesLoading)
-              Container(color: Colors.black26, child: const Center(child: CircularProgressIndicator())),
+              Container(color: AppColors.overlay, child: const Center(child: CircularProgressIndicator())),
           ]),
         );
       },
@@ -426,7 +426,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             color: selected ? AppColors.primary : AppColors.card.withAlpha(220),
             borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(color: selected ? AppColors.primaryLight : AppColors.border, width: 1),
-            boxShadow: selected ? AppShadows.neonOrange : null,
+            boxShadow: selected ? AppShadows.amberGlow : null,
           ),
           child: Text(filter.label, style: AppTypography.label.copyWith(
             color: selected ? Colors.white : AppColors.textSecondary,

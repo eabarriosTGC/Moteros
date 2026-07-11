@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/network/api_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../../../features/auth/presentation/bloc/auth_event.dart';
+import '../../../../features/community/presentation/screens/community_screen.dart';
 import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../patches/presentation/screens/patches_screen.dart';
@@ -24,13 +25,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadFollowData() async {
     try {
-      final api = context.read<ApiClient>();
-      final f1 = await api.get('/follows?type=followers');
-      final f2 = await api.get('/follows?type=following');
-      if (mounted) setState(() {
-        _followers = (f1.data as Map)['count'] as int? ?? 0;
-        _following = (f2.data as Map)['count'] as int? ?? 0;
-      });
+      final uid = Supabase.instance.client.auth.currentUser!.id;
+
+      _followers = await Supabase.instance.client
+          .from('user_follows')
+          .count(CountOption.exact)
+          .eq('followed_id', uid);
+      _following = await Supabase.instance.client
+          .from('user_follows')
+          .count(CountOption.exact)
+          .eq('follower_id', uid);
+
+      if (mounted) setState(() {});
     } catch (_) {}
   }
 
@@ -58,10 +64,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildHeader() {
     return Column(children: [
-      Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 2), color: AppColors.card),
-        child: const Icon(AppIcons.profile, color: AppColors.textMuted, size: 40)),
+      Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 2.5), color: AppColors.surface, boxShadow: AppShadows.amberGlow),
+        child: const Icon(AppIcons.profile, color: AppColors.primary, size: 40)),
       const SizedBox(height: 8),
-      const Text('Usuario de Prueba', style: AppTypography.h2),
+      Text('Usuario de Prueba', style: AppTypography.h2.copyWith(color: AppColors.textPrimary, letterSpacing: 1)),
       Text('test@moteros.app', style: AppTypography.body.copyWith(color: AppColors.textMuted)),
       const SizedBox(height: 12),
     ]);
@@ -84,12 +90,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMembership(BuildContext context) {
     return Container(width: double.infinity, padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(gradient: AppGradients.cardHighlight, borderRadius: AppRadius.mdCircular, border: Border.all(color: AppColors.primary.withAlpha(40))),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mdCircular, border: Border.all(color: AppColors.primary.withAlpha(50))),
       child: Row(children: [
-        const Icon(AppIcons.fuel, color: AppColors.primary, size: 32),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: AppColors.primary.withAlpha(25), borderRadius: AppRadius.smCircular),
+          child: const Icon(AppIcons.fuel, color: AppColors.primary, size: 24),
+        ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('MEMBRESÍA', style: AppTypography.caption),
+          Text('MEMBRESÍA', style: AppTypography.caption.copyWith(color: AppColors.textSecondary, letterSpacing: 1.5)),
           const SizedBox(height: 4),
           Text('Miembro', style: AppTypography.h3.copyWith(color: AppColors.primary)),
         ])),
@@ -139,81 +149,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class CommunityScreen extends StatefulWidget {
-  const CommunityScreen();
-  @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
-}
 
-class _CommunityScreenState extends State<CommunityScreen> {
-  final _ctrl = TextEditingController();
-  List<Map<String, dynamic>> _results = [];
-  bool _loading = false;
-
-  void _search() async {
-    setState(() => _loading = true);
-    try {
-      await context.read<ApiClient>().get('/follows?type=followers');
-      setState(() => _results = [
-        {'id': 1, 'fullName': 'Usuario de Prueba', 'email': 'test@moteros.app', 'role': 'member'},
-      ]);
-    } catch (_) {}
-    setState(() => _loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Comunidad')),
-      body: SafeArea(
-        child: Column(children: [
-          Padding(padding: AppSpacing.screenPadding, child: TextField(
-            controller: _ctrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              hintText: 'Buscar moteros...',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
-              suffixIcon: IconButton(icon: const Icon(Icons.search, color: AppColors.primary), onPressed: _search),
-              filled: true, fillColor: AppColors.input,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            ),
-          )),
-          if (_loading) const Center(child: CircularProgressIndicator()),
-          Expanded(child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _results.length,
-            itemBuilder: (_, i) => _buildUserTile(_results[i]),
-          )),
-        ]),
-      ),
-    );
-  }
-
-  Widget _buildUserTile(Map<String, dynamic> u) {
-    final name = (u['fullName'] ?? u['email'] ?? '') as String;
-    final role = (u['role'] ?? '') as String;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AppColors.card, borderRadius: AppRadius.mdCircular),
-      child: Row(children: [
-        Container(width: 44, height: 44, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withAlpha(25)),
-          child: const Icon(AppIcons.profile, color: AppColors.primary)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(name, style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
-          Text(role, style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
-        ])),
-        OutlinedButton(
-          onPressed: () async {
-            try { await context.read<ApiClient>().post('/follows', data: {'user_id': u['id']}); } catch (_) {}
-          },
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary),
-            minimumSize: const Size(80, 32), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-          child: const Text('Seguir', style: TextStyle(fontSize: 12)),
-        ),
-      ]),
-    );
-  }
-}

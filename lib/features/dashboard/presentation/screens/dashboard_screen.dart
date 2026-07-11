@@ -211,7 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _statTile(String value, String label, IconData icon, Color color) => Container(
     padding: const EdgeInsets.all(AppSpacing.sm),
-    decoration: BoxDecoration(color: AppColors.card, borderRadius: AppRadius.mdCircular, border: Border.all(color: color.withAlpha(40))),
+    decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mdCircular, border: Border.all(color: color.withAlpha(40))),
     child: Column(children: [
       Icon(icon, color: color, size: AppSpacing.iconMd),
       const SizedBox(height: AppSpacing.xs),
@@ -224,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     onTap: _tap,
     child: Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(color: AppColors.card, borderRadius: AppRadius.mdCircular, border: Border.all(color: color.withAlpha(40))),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mdCircular, border: Border.all(color: color.withAlpha(40))),
       child: Row(children: [
         Icon(icon, color: color, size: 32),
         const SizedBox(width: AppSpacing.md),
@@ -266,7 +266,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     icon: Icon(icon, size: AppSpacing.iconSm),
     label: Text(label, style: AppTypography.buttonSmall),
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColors.card, foregroundColor: color,
+      backgroundColor: AppColors.surface, foregroundColor: color,
       side: BorderSide(color: color.withAlpha(60)),
       shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
       minimumSize: const Size(0, 64),
@@ -287,7 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.card, foregroundColor: color,
+        backgroundColor: AppColors.surface, foregroundColor: color,
         side: BorderSide(color: color.withAlpha(60)),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.lg),
@@ -307,7 +307,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildAlertCard(AlertItem alert) => Container(
     width: double.infinity, padding: const EdgeInsets.all(AppSpacing.sm),
     decoration: BoxDecoration(
-      color: AppColors.card, borderRadius: AppRadius.mdCircular,
+      color: AppColors.surface, borderRadius: AppRadius.mdCircular,
       border: Border.all(color: alert.color.withAlpha(30)),
     ),
     child: Row(children: [

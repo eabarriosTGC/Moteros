@@ -11,23 +11,23 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
-import 'features/challenges/presentation/screens/challenges_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'features/validation/presentation/screens/qr_scanner_screen.dart';
 import 'features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import 'features/challenges/presentation/bloc/challenges_bloc.dart';
 import 'features/refugios/presentation/bloc/refugios_bloc.dart';
 import 'features/refugios/presentation/screens/refugios_screen.dart';
-import 'features/patches/presentation/bloc/patches_bloc.dart';
-import 'features/patches/presentation/screens/patches_screen.dart';
 import 'features/membership/data/datasources/membership_remote_datasource.dart';
 import 'features/membership/domain/usecases/activate_membership.dart';
 import 'features/membership/presentation/bloc/membership_bloc.dart';
 import 'features/places/data/datasources/place_remote_datasource.dart';
 import 'features/places/domain/usecases/get_nearby_places.dart';
 import 'features/places/presentation/bloc/places_bloc.dart';
-import 'features/places/presentation/screens/map_explorer_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
+import 'features/raids/presentation/bloc/raid_bloc.dart';
+import 'features/raids/presentation/screens/create_raid_screen.dart';
+import 'features/clans/presentation/bloc/clan_bloc.dart';
+import 'features/clans/presentation/screens/clan_list_screen.dart';
 import 'features/validation/data/datasources/validation_remote_datasource.dart';
 import 'features/validation/domain/usecases/validate_visit.dart';
 import 'features/validation/presentation/bloc/validation_bloc.dart';
@@ -57,9 +57,6 @@ class MoterosApp extends StatelessWidget {
           create: (_) => RefugiosBloc(),
         ),
         BlocProvider(
-          create: (_) => PatchesBloc(apiClient: apiClient),
-        ),
-        BlocProvider(
           create: (_) => PlacesBloc(
             getNearbyPlaces: GetNearbyPlacesUseCase(
               PlaceRemoteDataSource(apiClient),
@@ -86,6 +83,12 @@ class MoterosApp extends StatelessWidget {
               AdminRemoteDataSource(apiClient),
             ),
           ),
+        ),
+        BlocProvider(
+          create: (_) => RaidBloc(),
+        ),
+        BlocProvider(
+          create: (_) => ClanBloc(),
         ),
       ],
       child: MaterialApp(
@@ -138,9 +141,9 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
       extendBody: true,
       body: const MainShell(
         dashboard: DashboardScreen(),
-        mapScreen: MapExplorerScreen(),
+        raidScreen: CreateRaidScreen(),
         refugiosScreen: RefugiosScreen(),
-        challengesScreen: ChallengesScreen(),
+        clanScreen: ClanListScreen(),
         profileScreen: ProfileScreen(),
         initialTab: AppTab.dashboard,
       ),
