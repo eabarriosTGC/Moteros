@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/usecases/activate_membership.dart';
 import 'membership_event.dart';
@@ -43,12 +42,8 @@ class MembershipBloc extends Bloc<MembershipEvent, MembershipState> {
         plan: event.plan,
       );
       emit(MembershipActive(membership));
-    } on DioException catch (e) {
-      final msg =
-          e.response?.data?['error'] as String? ?? 'Error al activar';
-      emit(MembershipError(msg));
     } catch (e) {
-      emit(const MembershipError('Error inesperado'));
+      emit(MembershipError(e.toString()));
     }
   }
 }

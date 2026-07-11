@@ -7,10 +7,10 @@ import 'core/widgets/scanner_fab.dart';
 import 'features/admin/data/datasources/admin_remote_datasource.dart';
 import 'features/admin/domain/usecases/manage_allies.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
-import 'features/auth/data/datasources/firebase_auth_service.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/challenges/presentation/screens/challenges_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'features/validation/presentation/screens/qr_scanner_screen.dart';
@@ -34,24 +34,19 @@ import 'features/validation/presentation/bloc/validation_bloc.dart';
 
 class MoterosApp extends StatelessWidget {
   final ApiClient apiClient;
-  final FirebaseAuthService firebaseAuthService;
+  final AuthBloc authBloc;
 
   const MoterosApp({
     super.key,
     required this.apiClient,
-    required this.firebaseAuthService,
+    required this.authBloc,
   });
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (_) => AuthBloc(
-            apiClient: apiClient,
-            firebaseAuthService: firebaseAuthService,
-          ),
-        ),
+        BlocProvider.value(value: authBloc),
         BlocProvider(
           create: (_) => DashboardBloc(apiClient: apiClient),
         ),
@@ -99,9 +94,16 @@ class MoterosApp extends StatelessWidget {
         theme: AppTheme.dark,
         home: BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
+            if (state is AuthInitial) {
+              return const SplashScreen();
+            }
+            if (state is AuthLoading) {
+              return const SplashScreen();
+            }
             if (state is Authenticated) {
               return const _AuthenticatedShell();
             }
+            // Unauthenticated or AuthError → show login
             return const LoginScreen();
           },
         ),
@@ -142,7 +144,6 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
         profileScreen: ProfileScreen(),
         initialTab: AppTab.dashboard,
       ),
-      // FAB positioned above the bottom nav bar
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: ScannerFab(onTap: _openScanner),

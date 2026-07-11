@@ -204,6 +204,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Abre Google Maps y busca: $name')),
       );
+      return false;
     });
   }
 
@@ -235,9 +236,6 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
 
   Future<void> _importFromOsm() async {
     try {
-      final api = context.read<PlacesBloc>();
-      // We need the API client - for now open the docs
-      final uri = Uri.parse('https://overpass-api.de/api/interpreter');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('🌍 Importando lugares de OpenStreetMap...')),
       );

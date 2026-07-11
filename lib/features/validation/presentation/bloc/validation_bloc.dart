@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/usecases/validate_visit.dart';
 import 'validation_event.dart';
@@ -50,12 +49,8 @@ class ValidationBloc extends Bloc<ValidationEvent, ValidationState> {
         evidenceUrl: event.evidenceUrl,
       );
       emit(VisitVerified(visit.placeId));
-    } on DioException catch (e) {
-      final msg =
-          e.response?.data?['error'] as String? ?? 'Error de conexion';
-      emit(ValidationError(msg));
     } catch (e) {
-      emit(ValidationError('Error inesperado'));
+      emit(ValidationError(e.toString()));
     }
   }
 

@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../bloc/validation_bloc.dart';
 import '../bloc/validation_event.dart';
 import '../bloc/validation_state.dart';
@@ -53,7 +53,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       },
       builder: (context, state) {
         return Scaffold(
-          backgroundColor: AppTheme.backgroundColor,
+          backgroundColor: AppColors.background,
           appBar: AppBar(
             title: const Text('Validar Destino'),
             actions: [
@@ -104,7 +104,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             height: 250,
             decoration: BoxDecoration(
               border: Border.all(
-                color: AppTheme.secondaryColor,
+                color: AppColors.primary,
                 width: 3,
               ),
               borderRadius: BorderRadius.circular(16),
@@ -190,12 +190,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.gps_fixed, size: 64, color: AppTheme.secondaryColor),
+          Icon(Icons.gps_fixed, size: 64, color: AppColors.primary),
           SizedBox(height: 16),
           Text('QR detectado. Obteniendo ubicacion...',
               style: TextStyle(color: Colors.white70)),
           SizedBox(height: 24),
-          CircularProgressIndicator(color: AppTheme.secondaryColor),
+          CircularProgressIndicator(color: AppColors.primary),
         ],
       ),
     );
@@ -208,7 +208,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.check_circle_outline,
-              size: 80, color: AppTheme.secondaryColor),
+              size: 80, color: AppColors.primary),
           const SizedBox(height: 24),
           const Text('QR y ubicacion listos',
               style: TextStyle(
@@ -255,7 +255,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   icon: const Icon(Icons.verified),
                   label: const Text('Validar'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.secondaryColor,
+                    backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
@@ -286,7 +286,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: AppTheme.secondaryColor),
+          CircularProgressIndicator(color: AppColors.primary),
           SizedBox(height: 24),
           Text('Validando visita...',
               style: TextStyle(color: Colors.white70, fontSize: 18)),
@@ -321,7 +321,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               icon: const Icon(Icons.qr_code_scanner),
               label: const Text('Escanear otro'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.secondaryColor,
+                backgroundColor: AppColors.primary,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
@@ -365,7 +365,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('Intentar de nuevo'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.secondaryColor,
+                backgroundColor: AppColors.primary,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),

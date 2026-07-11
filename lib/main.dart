@@ -1,26 +1,32 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/network/api_client.dart';
-import 'features/auth/data/datasources/firebase_auth_service.dart';
+import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/auth/presentation/bloc/auth_event.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
+  // Load .env
+  await dotenv.load(fileName: '.env');
 
-  // Inicializar Google Sign-In
-  final firebaseAuthService = FirebaseAuthService();
-  await firebaseAuthService.initialize();
-
-  const baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://192.168.101.5:8081',
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL']!,
+    publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
-  final apiClient = ApiClient(baseUrl: baseUrl);
+
+  // Create ApiClient (compatibility shim wrapping SupabaseClient)
+  final apiClient = ApiClient();
+
+  // Create AuthBloc and dispatch CheckAuthStatus immediately
+  final authBloc = AuthBloc();
+  authBloc.add(CheckAuthStatus());
 
   runApp(MoterosApp(
     apiClient: apiClient,
-    firebaseAuthService: firebaseAuthService,
+    authBloc: authBloc,
   ));
 }

@@ -1,24 +1,33 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/network/api_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../domain/entities/user_entity.dart';
-import '../../data/datasources/firebase_auth_service.dart';
-import '../../data/datasources/google_auth_repository.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  final ApiClient _apiClient;
-  final FirebaseAuthService _firebaseAuthService;
-  late final GoogleAuthRepository _googleAuthRepository;
+  StreamSubscription? _authSubscription;
 
-  AuthBloc({
-    required ApiClient apiClient,
-    required FirebaseAuthService firebaseAuthService,
-  })  : _apiClient = apiClient,
-        _firebaseAuthService = firebaseAuthService,
-        super(AuthInitial()) {
-    _googleAuthRepository = GoogleAuthRepository(apiClient);
+  AuthBloc() : super(AuthInitial()) {
+    // Listen for real‑time auth state changes from Supabase
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+      (data) {
+        final session = data.session;
+        if (session != null && session.user != null) {
+          final user = session.user;
+          emit(Authenticated(
+            user: UserEntity(
+              id: user.id,
+              email: user.email ?? '',
+              role: user.userMetadata?['role'] as String? ?? 'rider',
+            ),
+          ));
+        } else {
+          emit(Unauthenticated());
+        }
+      },
+    );
+
     on<LoginRequested>(_onLoginRequested);
     on<RegisterRequested>(_onRegisterRequested);
     on<LogoutRequested>(_onLogoutRequested);
@@ -32,29 +41,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final response = await _apiClient.post(
-        '/auth/login',
-        data: {'email': event.email, 'password': event.password},
+      final response = await Supabase.instance.client.auth.signInWithPassword(
+        email: event.email,
+        password: event.password,
       );
-
-      final token = response.data['token'] as String;
-      final refreshToken = response.data['refreshToken'] as String;
-      final email = response.data['email'] as String;
-      final role = response.data['role'] as String;
-
-      await _apiClient.setTokens(token, refreshToken);
-
-      emit(Authenticated(
-        user: UserEntity(id: 0, email: email, role: role),
-        token: token,
-        refreshToken: refreshToken,
-      ));
-    } on DioException catch (e) {
-      final message =
-          e.response?.data?['error'] as String? ?? 'Error de conexión';
-      emit(AuthError(message));
+      if (response.user == null) {
+        emit(const AuthError('Credenciales inválidas'));
+      }
+      // Auth state change listener will emit Authenticated
     } catch (e) {
-      emit(AuthError('Error inesperado'));
+      final message = _extractError(e);
+      emit(AuthError(message));
     }
   }
 
@@ -64,33 +61,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final response = await _apiClient.post(
-        '/auth/register',
+      final response = await Supabase.instance.client.auth.signUp(
+        email: event.email,
+        password: event.password,
         data: {
-          'email': event.email,
-          'password': event.password,
-          'fullName': event.fullName,
+          if (event.fullName != null) 'full_name': event.fullName,
+          'role': 'rider',
         },
       );
-
-      final token = response.data['token'] as String;
-      final refreshToken = response.data['refreshToken'] as String;
-      final email = response.data['email'] as String;
-      final role = response.data['role'] as String;
-
-      await _apiClient.setTokens(token, refreshToken);
-
-      emit(Authenticated(
-        user: UserEntity(id: 0, email: email, role: role),
-        token: token,
-        refreshToken: refreshToken,
-      ));
-    } on DioException catch (e) {
-      final message =
-          e.response?.data?['error'] as String? ?? 'Error de conexión';
-      emit(AuthError(message));
+      if (response.user != null) {
+        // If email confirmation is disabled, the session will be set automatically
+        // and the auth listener will emit Authenticated.
+        // If it requires confirmation, we stay in a "check your email" state.
+        if (response.session == null) {
+          emit(const AuthError('Revisa tu correo para confirmar la cuenta'));
+        }
+      }
     } catch (e) {
-      emit(AuthError('Error inesperado'));
+      final message = _extractError(e);
+      emit(AuthError(message));
     }
   }
 
@@ -100,40 +89,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      // 1. Iniciar sesión con Google (Firebase Auth + google_sign_in)
-      final googleResult = await _firebaseAuthService.signInWithGoogle();
-
-      if (googleResult['success'] != true) {
-        emit(AuthError(googleResult['error'] as String));
-        return;
-      }
-
-      // 2. Enviar ID token al backend Dart Frog
-      final backendResult = await _googleAuthRepository.signInWithGoogle(
-        idToken: googleResult['idToken'] as String,
-        email: googleResult['email'] as String,
-        fullName: googleResult['displayName'] as String,
-        photoUrl: googleResult['photoUrl'] as String?,
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
       );
-
-      final token = backendResult['token'] as String;
-      final refreshToken = backendResult['refreshToken'] as String;
-      final role = backendResult['role'] as String;
-      final email = backendResult['email'] as String;
-
-      await _apiClient.setTokens(token, refreshToken);
-
-      emit(Authenticated(
-        user: UserEntity(id: 0, email: email, role: role),
-        token: token,
-        refreshToken: refreshToken,
-      ));
-    } on DioException catch (e) {
-      final message =
-          e.response?.data?['error'] as String? ?? 'Error de conexión';
-      emit(AuthError(message));
+      // Auth state change listener handles the rest
     } catch (e) {
-      emit(AuthError('Error al iniciar sesión con Google'));
+      final message = _extractError(e);
+      emit(AuthError(message));
     }
   }
 
@@ -141,24 +103,47 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
-    await _firebaseAuthService.signOut();
-    await _apiClient.clearTokens();
-    emit(Unauthenticated());
+    await Supabase.instance.client.auth.signOut();
+    // Auth state change listener will emit Unauthenticated
   }
 
   Future<void> _onCheckAuthStatus(
     CheckAuthStatus event,
     Emitter<AuthState> emit,
   ) async {
-    final token = await _apiClient.tokenStorage.getToken();
-    if (token != null) {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null && session.user != null) {
+      final user = session.user;
       emit(Authenticated(
-        user: const UserEntity(id: 0, email: '', role: ''),
-        token: token,
-        refreshToken: '',
+        user: UserEntity(
+          id: user.id,
+          email: user.email ?? '',
+          role: user.userMetadata?['role'] as String? ?? 'rider',
+        ),
       ));
     } else {
       emit(Unauthenticated());
     }
+  }
+
+  String _extractError(Object e) {
+    final msg = e.toString();
+    // Supabase AuthException.message
+    if (msg.contains('Invalid login credentials')) {
+      return 'Email o contraseña incorrectos';
+    }
+    if (msg.contains('Email not confirmed')) {
+      return 'Confirma tu correo antes de iniciar sesión';
+    }
+    if (msg.contains('User already registered')) {
+      return 'El correo ya está registrado';
+    }
+    return 'Error de autenticación';
+  }
+
+  @override
+  Future<void> close() {
+    _authSubscription?.cancel();
+    return super.close();
   }
 }

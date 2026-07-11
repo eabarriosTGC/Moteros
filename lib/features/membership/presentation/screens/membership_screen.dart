@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/membership_bloc.dart';
 import '../bloc/membership_event.dart';
@@ -37,16 +38,16 @@ class _MembershipScreenState extends State<MembershipScreen> {
   Widget _buildLoading() {
     return Scaffold(
       appBar: AppBar(title: const Text('Membresia')),
-      backgroundColor: AppTheme.backgroundColor,
-      body: const Center(
-        child: CircularProgressIndicator(color: AppTheme.secondaryColor),
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
       ),
     );
   }
 
   Widget _buildPlans() {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Membresia')),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -54,8 +55,8 @@ class _MembershipScreenState extends State<MembershipScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 16),
-            const Icon(Icons.workspace_premium,
-                size: 64, color: AppTheme.secondaryColor),
+            Icon(Icons.workspace_premium,
+                size: 64, color: AppColors.primary),
             const SizedBox(height: 16),
             const Text(
               'Elige tu plan',
@@ -112,7 +113,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
   Widget _buildActive(MembershipActive state) {
     final m = state.membership;
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Membresia')),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -122,14 +123,14 @@ class _MembershipScreenState extends State<MembershipScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
+                color: AppColors.card,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.secondaryColor, width: 2),
+                border: Border.all(color: AppColors.primary, width: 2),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.verified,
-                      size: 48, color: AppTheme.secondaryColor),
+                  Icon(Icons.verified,
+                      size: 48, color: AppColors.primary),
                   const SizedBox(height: 12),
                   Text(
                     'Plan ${m.plan.toUpperCase()}',
@@ -161,7 +162,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
+                color: AppColors.card,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Column(
@@ -188,13 +189,13 @@ class _MembershipScreenState extends State<MembershipScreen> {
 
   Widget _buildActivating() {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Membresia')),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: AppTheme.secondaryColor),
+            CircularProgressIndicator(color: AppColors.primary),
             SizedBox(height: 24),
             Text('Activando membresia...',
                 style: TextStyle(color: Colors.white70, fontSize: 18)),
@@ -206,7 +207,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
 
   Widget _buildError(MembershipError state) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Membresia')),
       body: Center(
         child: Padding(
@@ -224,7 +225,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                 onPressed: () =>
                     context.read<MembershipBloc>().add(LoadMembership()),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.secondaryColor,
+                  backgroundColor: AppColors.primary,
                 ),
                 child: const Text('Reintentar'),
               ),
@@ -259,10 +260,10 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isPopular ? AppTheme.secondaryColor : Colors.white12,
+          color: isPopular ? AppColors.primary : Colors.white12,
           width: isPopular ? 2 : 1,
         ),
       ),
@@ -275,7 +276,7 @@ class _PlanCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.secondaryColor,
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text('POPULAR',
@@ -297,8 +298,8 @@ class _PlanCard extends StatelessWidget {
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(price,
-                    style: const TextStyle(
-                        color: AppTheme.secondaryColor,
+                    style: TextStyle(
+                        color: AppColors.primary,
                         fontSize: 16,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
@@ -323,7 +324,7 @@ class _PlanCard extends StatelessWidget {
                     onPressed: onTap,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isPopular
-                          ? AppTheme.secondaryColor
+                          ? AppColors.primary
                           : Colors.white12,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -383,7 +384,7 @@ class _BenefitItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          const Icon(Icons.star, size: 16, color: AppTheme.secondaryColor),
+          Icon(Icons.star, size: 16, color: AppColors.primary),
           const SizedBox(width: 8),
           Text(text, style: const TextStyle(color: Colors.white70)),
         ],

@@ -8,6 +8,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
+import '../../../validation/presentation/screens/qr_scanner_screen.dart';
+import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -251,7 +253,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   ]);
 
   Widget _actionBtn(BuildContext context, IconData icon, String label, Color color) => ElevatedButton.icon(
-    onPressed: () { _tap(); },
+    onPressed: () {
+      _tap();
+      if (label == 'Escanear') {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+      } else if (label == 'Auxilio') {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()));
+      } else if (label == 'Ruta') {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteTrackerScreen()));
+      }
+    },
     icon: Icon(icon, size: AppSpacing.iconSm),
     label: Text(label, style: AppTypography.buttonSmall),
     style: ElevatedButton.styleFrom(
@@ -265,7 +276,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _bigActionBtn(BuildContext context, IconData icon, String title, String subtitle, Color color) => SizedBox(
     width: double.infinity,
     child: ElevatedButton(
-      onPressed: () { _tap(); },
+      onPressed: () {
+        _tap();
+        if (title.startsWith('Escanear')) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+        } else if (title.startsWith('Auxilio')) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()));
+        } else if (title.startsWith('Navegar')) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteTrackerScreen()));
+        }
+      },
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.card, foregroundColor: color,
         side: BorderSide(color: color.withAlpha(60)),

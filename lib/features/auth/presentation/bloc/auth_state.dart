@@ -14,17 +14,11 @@ final class AuthLoading extends AuthState {}
 
 final class Authenticated extends AuthState {
   final UserEntity user;
-  final String token;
-  final String refreshToken;
 
-  const Authenticated({
-    required this.user,
-    required this.token,
-    required this.refreshToken,
-  });
+  const Authenticated({required this.user});
 
   @override
-  List<Object?> get props => [user, token, refreshToken];
+  List<Object?> get props => [user];
 }
 
 final class AuthError extends AuthState {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/admin_bloc.dart';
 import '../bloc/admin_event.dart';
@@ -38,7 +39,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Panel Admin'),
           actions: [
@@ -59,7 +60,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       builder: (context, state) {
         if (state is AdminLoading) {
           return const Center(
-            child: CircularProgressIndicator(color: AppTheme.secondaryColor),
+            child: CircularProgressIndicator(color: AppColors.primary),
           );
         }
         if (state is AlliesLoaded) {
@@ -82,16 +83,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             itemBuilder: (context, index) {
               final ally = state.allies[index];
               return Card(
-                color: AppTheme.primaryColor,
+                color: AppColors.card,
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(16),
                   leading: CircleAvatar(
-                    backgroundColor: AppTheme.secondaryColor.withValues(alpha: 0.2),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                     child: Icon(_iconForCategory(ally.category),
-                        color: AppTheme.secondaryColor),
+                        color: AppColors.primary),
                   ),
                   title: Text(ally.businessName,
                       style: const TextStyle(
@@ -102,7 +103,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       const SizedBox(height: 4),
                       Text(ally.category.toUpperCase(),
                           style: const TextStyle(
-                              color: AppTheme.secondaryColor, fontSize: 12)),
+                              color: AppColors.primary, fontSize: 12)),
                       if (ally.benefit != null && ally.benefit!.isNotEmpty)
                         Text(ally.benefit!,
                             style:
@@ -131,7 +132,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   onPressed: () =>
                       context.read<AdminBloc>().add(LoadAllies()),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondaryColor),
+                      backgroundColor: AppColors.primary),
                   child: const Text('Reintentar'),
                 ),
               ],
@@ -197,7 +198,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             ));
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.secondaryColor,
+                  backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: isLoading
@@ -233,7 +234,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppTheme.secondaryColor),
+            borderSide: const BorderSide(color: AppColors.primary),
           ),
         ),
       ),

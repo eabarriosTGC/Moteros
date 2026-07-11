@@ -1,45 +1,91 @@
-import 'package:dio/dio.dart';
-import 'auth_interceptor.dart';
-import 'token_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Compatibility shim wrapping SupabaseClient with the old ApiClient interface.
+/// Migrate callers to use SupabaseClient directly over time.
 class ApiClient {
-  late final Dio dio;
-  final TokenStorage tokenStorage;
+  final SupabaseClient _client;
 
-  ApiClient({
-    required String baseUrl,
-    TokenStorage? tokenStorage,
-  }) : tokenStorage = tokenStorage ?? TokenStorage() {
-    dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-      headers: {'Content-Type': 'application/json'},
-    ));
+  ApiClient() : _client = Supabase.instance.client;
 
-    dio.interceptors.addAll([
-      AuthInterceptor(
-        tokenStorage: this.tokenStorage,
-        dio: dio,
-        baseUrl: baseUrl,
-      ),
-      LogInterceptor(requestBody: true, responseBody: true),
-    ]);
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? queryParams,
+  }) async {
+    // Auth endpoints → already migrated to supabase.auth
+    if (path.startsWith('/auth/')) {
+      throw UnsupportedError('Use supabase.auth instead of ApiClient for $path');
+    }
+
+    // Data endpoints → forward to PostgREST or mark as TODO
+    // Strip leading / and convert to table name
+    final table = _pathToTable(path);
+
+    if (table == null) {
+      throw UnimplementedError('ApiClient.get($path) not yet migrated');
+    }
+
+    // For tables that exist on Supabase, we can query via PostgREST
+    // This is a simplified wrapper — full migration happens per feature
+    final query = _client.from(table).select();
+
+    // Apply query params
+    if (queryParams != null && queryParams.isNotEmpty) {
+      for (final entry in queryParams.entries) {
+        // Basic filter support — expand as needed
+        query.eq(entry.key, entry.value);
+      }
+    }
+
+    return SupabaseResponse(data: await query);
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? queryParams}) =>
-      dio.get(path, queryParameters: queryParams);
+  Future<dynamic> post(
+    String path, {
+    Map<String, dynamic>? data,
+  }) async {
+    if (path.startsWith('/auth/')) {
+      throw UnsupportedError('Use supabase.auth instead of ApiClient for $path');
+    }
 
-  Future<Response> post(String path, {dynamic data}) =>
-      dio.post(path, data: data);
+    final table = _pathToTable(path);
+    if (table == null) {
+      throw UnimplementedError('ApiClient.post($path) not yet migrated');
+    }
 
-  Future<Response> put(String path, {dynamic data}) =>
-      dio.put(path, data: data);
+    if (data != null) {
+      await _client.from(table).insert(data);
+    }
+    return SupabaseResponse(data: {'success': true});
+  }
 
-  Future<Response> delete(String path) => dio.delete(path);
+  /// Extract table name from URL path
+  String? _pathToTable(String path) {
+    final clean = path.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
+    final segments = clean.split('/');
+    if (segments.isEmpty) return null;
 
-  Future<void> setTokens(String token, String refreshToken) =>
-      tokenStorage.saveTokens(token: token, refreshToken: refreshToken);
+    // Map common paths to table names
+    const tableMap = <String, String>{
+      'places': 'places',
+      'visits': 'visits',
+      'memberships': 'memberships',
+      'dashboard': 'user_xp',
+      'challenges': 'challenges',
+      'patches': 'patches',
+      'refugios': 'allies',
+      'alerts': 'road_alerts',
+      'follows': 'user_follows',
+      'tracks': 'saved_routes',
+      'routes': 'saved_routes',
+      'admin/allies': 'allies',
+    };
 
-  Future<void> clearTokens() => tokenStorage.clearTokens();
+    return tableMap[clean] ?? segments.first;
+  }
+}
+
+/// Mimics Dio response.data shape for backward compatibility
+class SupabaseResponse {
+  final dynamic data;
+  const SupabaseResponse({required this.data});
 }

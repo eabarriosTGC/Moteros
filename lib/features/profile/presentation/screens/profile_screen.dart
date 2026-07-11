@@ -3,9 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../../../features/auth/presentation/bloc/auth_event.dart';
 import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../patches/presentation/screens/patches_screen.dart';
+import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -101,8 +104,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _item(AppIcons.badge, 'Mis Parches', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatchesScreen()))),
       _item(AppIcons.route, 'Historial de Rutas', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteTrackerScreen()))),
       _item(AppIcons.group, 'Comunidad', sub: 'Buscar y seguir moteros', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityScreen()))),
-      _item(AppIcons.shield, 'Modo Conducción'),
-      _item(AppIcons.settings, 'Configuración'),
+      _item(AppIcons.shield, 'Modo Conducción', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()))),
+      _item(AppIcons.settings, 'Configuración', onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚙️ Próximamente')),
+        );
+      }),
     ]);
   }
 
@@ -120,8 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildLogout(BuildContext context) {
     return SizedBox(width: double.infinity, child: OutlinedButton.icon(
       onPressed: () {
-        context.read<ApiClient>().clearTokens();
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LogoutScreen()), (r) => false);
+        context.read<AuthBloc>().add(LogoutRequested());
       },
       icon: const Icon(AppIcons.logout, color: AppColors.error),
       label: const Text('Cerrar Sesión'),
@@ -131,12 +137,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular)),
     ));
   }
-}
-
-class LogoutScreen extends StatelessWidget {
-  const LogoutScreen();
-  @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Sesión cerrada', style: TextStyle(color: Colors.white54))));
 }
 
 class CommunityScreen extends StatefulWidget {

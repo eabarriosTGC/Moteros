@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -47,7 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Crear cuenta'),
           backgroundColor: Colors.transparent,
@@ -60,48 +60,82 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.motorcycle, size: 64, color: Colors.white),
+                  const Icon(Icons.motorcycle,
+                      size: 64, color: AppColors.primary),
                   const SizedBox(height: 16),
-                  Text(
-                    'Unite a Moteros',
-                    style:
-                        Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre',
-                      prefixIcon: Icon(Icons.person),
+                  const Text(
+                    'Únete a AsfaltoClub',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Crea tu cuenta de motero',
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Name
+                  TextFormField(
+                    controller: _nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre completo',
+                      prefixIcon: Icon(
+                        Icons.person_outline,
+                        color: AppColors.textMuted,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.input,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Ingresa tu nombre' : null,
+                  ),
                   const SizedBox(height: 16),
+                  // Email
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
                       labelText: 'Email',
-                      prefixIcon: Icon(Icons.email),
+                      prefixIcon: Icon(
+                        Icons.email_outlined,
+                        color: AppColors.textMuted,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.input,
                     ),
                     validator: (v) =>
                         (v == null || v.isEmpty) ? 'Ingresa tu email' : null,
                   ),
                   const SizedBox(height: 16),
+                  // Password
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
+                    style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
                       labelText: 'Contraseña',
-                      prefixIcon: Icon(Icons.lock),
+                      prefixIcon: Icon(
+                        Icons.lock_outline,
+                        color: AppColors.textMuted,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.input,
                     ),
                     validator: (v) => (v == null || v.isEmpty)
                         ? 'Ingresa tu contraseña'
                         : null,
+                    onFieldSubmitted: (_) => _onRegister(),
                   ),
                   const SizedBox(height: 24),
+                  // Register button
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       final isLoading = state is AuthLoading;
@@ -110,8 +144,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: ElevatedButton(
                           onPressed: isLoading ? null : _onRegister,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.secondaryColor,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: AppColors.metallicDark,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadius.mdCircular,
+                            ),
                           ),
                           child: isLoading
                               ? const SizedBox(
@@ -122,10 +162,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Registrarse'),
+                              : Text(
+                                  'Registrarse',
+                                  style: AppTypography.button.copyWith(
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       );
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  // Back to login
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text.rich(
+                      TextSpan(
+                        text: '¿Ya tienes cuenta? ',
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Inicia sesión',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

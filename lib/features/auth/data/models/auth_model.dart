@@ -1,3 +1,6 @@
+// DEPRECATED — kept for reference only.
+// Auth is now handled by supabase_flutter's gotrue client.
+// Session tokens are managed internally by Supabase.
 class AuthModel {
   final String token;
   final String refreshToken;
