@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../sos/presentation/screens/emergency_contact_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -369,6 +370,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EmergencyContactScreen(),
+              ),
+            ),
+            child: _settingRow(
+              icon: Icons.warning_amber_rounded,
+              title: 'Contacto de Emergencia',
+              subtitle: 'Configurar contacto SOS',
+              trailing: const Icon(AppIcons.chevronRight, color: AppColors.textMuted, size: 20),
             ),
           ),
         ]),

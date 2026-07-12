@@ -1,15 +1,18 @@
-/// Safe Mode — Modo Conducción.
-/// Simplified full-screen overlay for riding. Only essentials: route, SOS, speed.
+/// Safe Mode — Modo Conducción con SOS real + GPS + Speedometer.
 library;
 
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/sos_service.dart';
 
 class SafeModeScreen extends StatefulWidget {
-  const SafeModeScreen({super.key});
+  final int? raidId;
+  const SafeModeScreen({super.key, this.raidId});
 
   @override
   State<SafeModeScreen> createState() => _SafeModeScreenState();
@@ -20,6 +23,8 @@ class _SafeModeScreenState extends State<SafeModeScreen>
   late AnimationController _speedController;
   late Animation<double> _speedAnim;
   double _simulatedSpeed = 0;
+  final _sosService = SosService(Supabase.instance.client);
+  bool _sosSending = false;
 
   @override
   void initState() {
@@ -35,7 +40,7 @@ class _SafeModeScreenState extends State<SafeModeScreen>
   void _simulateSpeed() {
     _speedController.addListener(() {
       setState(() {
-        _simulatedSpeed = _speedAnim.value * 120; // 0-120 km/h sweep
+        _simulatedSpeed = _speedAnim.value * 120;
       });
     });
     _speedController.repeat(reverse: true);
@@ -47,6 +52,30 @@ class _SafeModeScreenState extends State<SafeModeScreen>
     super.dispose();
   }
 
+  Future<void> _triggerSos() async {
+    if (_sosSending) return;
+    setState(() => _sosSending = true);
+    HapticFeedback.heavyImpact();
+
+    final result = await _sosService.sendManualSos(raidId: widget.raidId);
+    if (!mounted) return;
+    setState(() => _sosSending = false);
+
+    if (result != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('🚨 Alerta SOS enviada con tu ubicación'),
+        backgroundColor: AppColors.error,
+        duration: Duration(seconds: 3),
+      ));
+    } else {
+      // Fallback: show error but alert was still attempted
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('⚠️ No se pudo enviar ubicación. Intentá de nuevo.'),
+        backgroundColor: AppColors.warning,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,7 +85,6 @@ class _SafeModeScreenState extends State<SafeModeScreen>
           // Speedometer
           Positioned(top: 40, left: 0, right: 0,
             child: Column(children: [
-              // Speed value
               Text('${_simulatedSpeed.round()}', style: const TextStyle(
                 fontSize: 96, fontWeight: FontWeight.w800,
                 color: Colors.white, letterSpacing: -4,
@@ -66,7 +94,6 @@ class _SafeModeScreenState extends State<SafeModeScreen>
                 color: AppColors.textMuted, fontSize: 14, letterSpacing: 4,
               )),
               const SizedBox(height: 16),
-              // Speed arc
               SizedBox(
                 width: 280, height: 80,
                 child: CustomPaint(
@@ -77,29 +104,51 @@ class _SafeModeScreenState extends State<SafeModeScreen>
             ]),
           ),
 
-          // SOS giant button
+          // SOS giant button (real)
           Positioned(left: 20, right: 20,
             bottom: MediaQuery.of(context).padding.bottom + 20,
             child: Column(children: [
               GestureDetector(
-                onTap: () {
-                  HapticFeedback.heavyImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('🚨 Alerta SOS enviada'),
-                    backgroundColor: AppColors.error,
-                  ));
+                onTap: _triggerSos,
+                onLongPress: () {
+                  // Long press for emergency contact info
+                  _sosService.getEmergencyContact().then((contact) {
+                    if (!mounted) return;
+                    if (contact != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Contacto: ${contact['emergency_contact_name'] ?? 'No configurado'}'),
+                        backgroundColor: AppColors.surface,
+                      ));
+                    }
+                  });
                 },
                 child: Container(
                   height: 80,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFFFF3B30), Color(0xFFFF6B6B)]),
+                    gradient: _sosSending
+                        ? const LinearGradient(colors: [Color(0xFF666666), Color(0xFF999999)])
+                        : const LinearGradient(colors: [Color(0xFFFF3B30), Color(0xFFFF6B6B)]),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.red.withAlpha(80), blurRadius: 20, spreadRadius: 4)],
+                    boxShadow: [
+                      if (!_sosSending)
+                        BoxShadow(color: Colors.red.withAlpha(80), blurRadius: 20, spreadRadius: 4),
+                    ],
                   ),
-                  child: const Center(child: Text('SOS', style: TextStyle(
-                    color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4,
-                  ))),
+                  child: Center(
+                    child: _sosSending
+                        ? const SizedBox(
+                            width: 32, height: 32,
+                            child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                          )
+                        : const Text('SOS', style: TextStyle(
+                            color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4,
+                          )),
+                  ),
                 ),
+              ),
+              const SizedBox(height: 8),
+              Text('MANTENÉ presionado para ver contacto',
+                style: TextStyle(color: Colors.white38, fontSize: 10),
               ),
               const SizedBox(height: 12),
               // Exit
@@ -120,7 +169,7 @@ class _SafeModeScreenState extends State<SafeModeScreen>
             ]),
           ),
 
-          // Current GPS info
+          // GPS indicator
           Positioned(top: MediaQuery.of(context).padding.top + 8, left: 16,
             child: Row(children: [
               Container(width: 8, height: 8, decoration: const BoxDecoration(
@@ -149,13 +198,13 @@ class _SpeedArcPainter extends CustomPainter {
 
     // Background arc
     final bgPaint = Paint()
-      ..color = AppColors.metallicDark.withAlpha(80)
+      ..color = const Color(0xFF2A2A35).withAlpha(80)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(rect, pi, pi, false, bgPaint);
 
-    // Progress arc (orange to red gradient)
+    // Progress arc (amber to red)
     final sweep = pi * progress.clamp(0.0, 1.0);
     final fgPaint = Paint()
       ..shader = LinearGradient(

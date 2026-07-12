@@ -10,6 +10,7 @@ import '../../../../core/theme/design_tokens.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
+import 'raid_live_screen.dart';
 
 class RaidLobbyScreen extends StatefulWidget {
   final String raidId;
@@ -52,8 +53,11 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         if (state is RaidLobby) return _buildLobby(state);
         if (state is RaidActive) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushReplacementNamed(context, '/raid/live',
-              arguments: widget.raidId,
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RaidLiveScreen(raidId: widget.raidId),
+              ),
             );
           });
         }
@@ -64,11 +68,23 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.error,
+                    size: 48,
+                  ),
                   const SizedBox(height: AppSpacing.md),
-                  Text('Error', style: AppTypography.h2.copyWith(color: AppColors.error)),
+                  Text(
+                    'Error',
+                    style: AppTypography.h2.copyWith(color: AppColors.error),
+                  ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(state.message, style: AppTypography.body.copyWith(color: AppColors.textMuted)),
+                  Text(
+                    state.message,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -76,7 +92,12 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         }
         return const Scaffold(
           backgroundColor: AppColors.background,
-          body: Center(child: Text('Cargando...', style: TextStyle(color: AppColors.textMuted))),
+          body: Center(
+            child: Text(
+              'Cargando...',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+          ),
         );
       },
     );
@@ -98,7 +119,10 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(raid['title'] ?? 'RAID', style: AppTypography.h3.copyWith(color: AppColors.textPrimary)),
+            Text(
+              raid['title'] ?? 'RAID',
+              style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+            ),
             Text(
               '${raid['game_mode'] ?? 'Free Ride'} · ${_formatDate(raid['date_time'])}',
               style: AppTypography.caption.copyWith(color: AppColors.textMuted),
@@ -108,12 +132,19 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         actions: [
           Container(
             margin: const EdgeInsets.only(right: AppSpacing.sm),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
             decoration: BoxDecoration(
-              color: state.allReady ? AppColors.success.withAlpha(20) : AppColors.primary.withAlpha(20),
+              color: state.allReady
+                  ? AppColors.success.withAlpha(20)
+                  : AppColors.primary.withAlpha(20),
               borderRadius: AppRadius.smCircular,
               border: Border.all(
-                color: state.allReady ? AppColors.success.withAlpha(60) : AppColors.primary.withAlpha(60),
+                color: state.allReady
+                    ? AppColors.success.withAlpha(60)
+                    : AppColors.primary.withAlpha(60),
               ),
             ),
             child: Text(
@@ -161,20 +192,27 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: AppColors.success.withAlpha(30),
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.success, width: 2),
                   ),
-                  child: const Icon(Icons.flag, color: AppColors.success, size: 18),
+                  child: const Icon(
+                    Icons.flag,
+                    color: AppColors.success,
+                    size: 18,
+                  ),
                 ),
                 Container(
-                  width: 2, height: 30,
+                  width: 2,
+                  height: 30,
                   color: AppColors.primary.withAlpha(60),
                 ),
                 Container(
-                  width: 12, height: 12,
+                  width: 12,
+                  height: 12,
                   decoration: const BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
@@ -185,11 +223,13 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
           ),
           // Origin/dest labels
           Positioned(
-            top: 12, left: 12,
+            top: 12,
+            left: 12,
             child: _buildMapLabel('ORIGEN', AppColors.success),
           ),
           Positioned(
-            bottom: 12, right: 12,
+            bottom: 12,
+            right: 12,
             child: _buildMapLabel('DESTINO', AppColors.primary),
           ),
         ],
@@ -205,8 +245,12 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         borderRadius: BorderRadius.circular(AppRadius.xs),
         border: Border.all(color: color.withAlpha(40)),
       ),
-      child: Text(text,
-        style: AppTypography.caption.copyWith(color: color, fontWeight: FontWeight.w700),
+      child: Text(
+        text,
+        style: AppTypography.caption.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -222,24 +266,34 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         final isHostPlayer = p['user_id'] == state.raid['host_id'];
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: AppRadius.mdCircular,
             border: Border.all(
-              color: isReady ? AppColors.success.withAlpha(60) : AppColors.border,
+              color: isReady
+                  ? AppColors.success.withAlpha(60)
+                  : AppColors.border,
             ),
           ),
           child: Row(
             children: [
               // Avatar
               Container(
-                width: 44, height: 44,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: isReady ? AppColors.success.withAlpha(20) : AppColors.input,
+                  color: isReady
+                      ? AppColors.success.withAlpha(20)
+                      : AppColors.input,
                   borderRadius: AppRadius.mdCircular,
                   border: Border.all(
-                    color: isReady ? AppColors.success.withAlpha(80) : AppColors.border,
+                    color: isReady
+                        ? AppColors.success.withAlpha(80)
+                        : AppColors.border,
                   ),
                 ),
                 child: Icon(
@@ -257,19 +311,26 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
                       children: [
                         Text(
                           p['user_id']?.toString().substring(0, 8) ?? 'Usuario',
-                          style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         if (isHostPlayer) ...[
                           const SizedBox(width: AppSpacing.sm),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withAlpha(25),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text('HOST',
+                            child: Text(
+                              'HOST',
                               style: AppTypography.caption.copyWith(
-                                color: AppColors.primary, fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -281,10 +342,13 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
               ),
               // Ready indicator
               Container(
-                width: 32, height: 32,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isReady ? AppColors.success.withAlpha(25) : AppColors.textDisabled.withAlpha(15),
+                  color: isReady
+                      ? AppColors.success.withAlpha(25)
+                      : AppColors.textDisabled.withAlpha(15),
                   border: Border.all(
                     color: isReady ? AppColors.success : AppColors.textDisabled,
                     width: 2,
@@ -321,7 +385,9 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
               ),
               child: TextField(
                 controller: _chatController,
-                style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textPrimary,
+                ),
                 decoration: const InputDecoration(
                   hintText: 'Chat de raid...',
                   border: InputBorder.none,
@@ -335,7 +401,8 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
           GestureDetector(
             onTap: _sendChat,
             child: Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: const BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
@@ -357,7 +424,12 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
     final amReady = myParticipant['is_ready'] as bool? ?? false;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xl),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.border)),
@@ -366,7 +438,8 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
         children: [
           // Leave button
           Container(
-            width: 52, height: 52,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               color: AppColors.error.withAlpha(20),
               borderRadius: AppRadius.mdCircular,
@@ -375,10 +448,9 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
             child: IconButton(
               icon: const Icon(Icons.exit_to_app, color: AppColors.error),
               onPressed: () {
-                context.read<RaidBloc>().add(LeaveRaid(
-                  raidId: widget.raidId,
-                  userId: userId,
-                ));
+                context.read<RaidBloc>().add(
+                  LeaveRaid(raidId: widget.raidId, userId: userId),
+                );
                 Navigator.pop(context);
               },
             ),
@@ -392,14 +464,17 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
               child: ElevatedButton(
                 onPressed: () {
                   HapticFeedback.mediumImpact();
-                  context.read<RaidBloc>().add(ToggleReady(
-                    raidId: widget.raidId,
-                    userId: userId,
-                  ));
+                  context.read<RaidBloc>().add(
+                    ToggleReady(raidId: widget.raidId, userId: userId),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: amReady ? AppColors.success : AppColors.input,
-                  foregroundColor: amReady ? Colors.black : AppColors.textPrimary,
+                  backgroundColor: amReady
+                      ? AppColors.success
+                      : AppColors.input,
+                  foregroundColor: amReady
+                      ? Colors.black
+                      : AppColors.textPrimary,
                   shape: RoundedRectangleBorder(
                     borderRadius: AppRadius.mdCircular,
                     side: BorderSide(
@@ -430,15 +505,17 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
                   onPressed: state.allReady
                       ? () {
                           HapticFeedback.mediumImpact();
-                          context.read<RaidBloc>().add(StartRaid(
-                            raidId: widget.raidId,
-                          ));
+                          context.read<RaidBloc>().add(
+                            StartRaid(raidId: widget.raidId),
+                          );
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.textOnAmber,
-                    disabledBackgroundColor: AppColors.textDisabled.withAlpha(20),
+                    disabledBackgroundColor: AppColors.textDisabled.withAlpha(
+                      20,
+                    ),
                     disabledForegroundColor: AppColors.textMuted,
                     shape: RoundedRectangleBorder(
                       borderRadius: AppRadius.mdCircular,
@@ -448,7 +525,9 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
                   ),
                   child: Text(
                     'INICIAR RAID',
-                    style: AppTypography.buttonSmall.copyWith(fontWeight: FontWeight.w700),
+                    style: AppTypography.buttonSmall.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

@@ -12,6 +12,10 @@ import '../../../patches/presentation/screens/patches_screen.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../../../chat/presentation/screens/direct_messages_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../refugios/presentation/screens/refugios_screen.dart';
+import '../../../progression/presentation/widgets/xp_progress_card.dart';
+import '../../../progression/presentation/screens/achievements_screen.dart';
+import '../../../progression/presentation/screens/leaderboard_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,11 +25,15 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int _followers = 0, _following = 0;
+  XpData? _xpData;
 
   @override
-  void initState() { super.initState(); _loadFollowData(); }
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
-  Future<void> _loadFollowData() async {
+  Future<void> _loadData() async {
     try {
       final uid = Supabase.instance.client.auth.currentUser!.id;
 
@@ -37,6 +45,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .from('user_follows')
           .count(CountOption.exact)
           .eq('follower_id', uid);
+
+      _xpData = await fetchXpData(uid);
 
       if (mounted) setState(() {});
     } catch (_) {}
@@ -53,6 +63,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildHeader(),
             _buildFollowRow(),
             const SizedBox(height: 16),
+            if (_xpData != null) ...[
+              XpProgressCard(
+                data: _xpData!,
+                onAchievementsTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                onLeaderboardTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const LeaderboardScreen())),
+              ),
+              const SizedBox(height: 16),
+            ],
             _buildMembership(context),
             const SizedBox(height: 16),
             _buildMenu(context),
@@ -113,14 +133,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMenu(BuildContext context) {
     return Column(children: [
-      _item(AppIcons.chat, 'Mensajes', sub: 'Chat directo con otros moteros', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesScreen()))),
-      _item(AppIcons.badge, 'Mis Parches', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatchesScreen()))),
-      _item(AppIcons.route, 'Historial de Rutas', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteTrackerScreen()))),
-      _item(AppIcons.group, 'Comunidad', sub: 'Buscar y seguir moteros', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityScreen()))),
-      _item(AppIcons.shield, 'Modo Conducción', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()))),
-      _item(AppIcons.settings, 'Configuración', onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-      }),
+      _item(AppIcons.trophy, 'Logros', sub: '17 logros RPG por desbloquear',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen()))),
+      _item(AppIcons.medal, 'Ranking', sub: 'Top riders por XP',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaderboardScreen()))),
+      _item(AppIcons.shelter, 'Refugios', sub: 'Aliados y motoposadas comunitarias',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RefugiosScreen()))),
+      _item(AppIcons.chat, 'Mensajes', sub: 'Chat directo con otros moteros',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesScreen()))),
+      _item(AppIcons.badge, 'Mis Parches',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatchesScreen()))),
+      _item(AppIcons.route, 'Historial de Rutas',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RouteTrackerScreen()))),
+      _item(AppIcons.group, 'Comunidad', sub: 'Buscar y seguir moteros',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityScreen()))),
+      _item(AppIcons.shield, 'Modo Conducción',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()))),
+      _item(AppIcons.settings, 'Configuración',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
     ]);
   }
 
@@ -149,5 +179,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
   }
 }
-
-

@@ -9,6 +9,7 @@ import '../../../../core/theme/design_tokens.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
+import 'raid_lobby_screen.dart';
 
 class CreateRaidScreen extends StatefulWidget {
   const CreateRaidScreen({super.key});
@@ -55,13 +56,19 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
       listener: (context, state) {
         if (state is RaidLobby) {
           HapticFeedback.mediumImpact();
-          Navigator.pushReplacementNamed(context, '/raid/lobby',
-            arguments: state.raid['id'],
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RaidLobbyScreen(raidId: state.raid['id']),
+            ),
           );
         }
         if (state is RaidError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.error,
+            ),
           );
           setState(() => _isLoading = false);
         }
@@ -71,7 +78,10 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          title: Text('NUEVO RAID', style: AppTypography.h2.copyWith(color: AppColors.primary)),
+          title: Text(
+            'NUEVO RAID',
+            style: AppTypography.h2.copyWith(color: AppColors.primary),
+          ),
           centerTitle: true,
         ),
         body: SafeArea(
@@ -144,7 +154,8 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
   }
 
   Widget _sectionLabel(String text) {
-    return Text(text,
+    return Text(
+      text,
       style: AppTypography.caption.copyWith(
         color: AppColors.textMuted,
         letterSpacing: 1.5,
@@ -172,7 +183,11 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: AppTypography.body.copyWith(color: AppColors.textMuted),
-          prefixIcon: Icon(icon, color: AppColors.textMuted, size: AppSpacing.iconSm),
+          prefixIcon: Icon(
+            icon,
+            color: AppColors.textMuted,
+            size: AppSpacing.iconSm,
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
@@ -198,21 +213,26 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
               vertical: AppSpacing.sm,
             ),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withAlpha(20) : AppColors.input,
+              color: isSelected
+                  ? AppColors.primary.withAlpha(20)
+                  : AppColors.input,
               borderRadius: AppRadius.mdCircular,
               border: Border.all(
                 color: isSelected ? AppColors.primary : AppColors.border,
                 width: isSelected ? 1.5 : 1,
               ),
-              boxShadow: isSelected ? [
-                BoxShadow(
-                  color: AppColors.primaryGlow,
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                ),
-              ] : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primaryGlow,
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
             ),
-            child: Text(mode.toUpperCase(),
+            child: Text(
+              mode.toUpperCase(),
               style: AppTypography.buttonSmall.copyWith(
                 color: isSelected ? AppColors.primary : AppColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -256,7 +276,9 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
               ),
             ),
             child: MediaQuery(
-              data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+              data: MediaQuery.of(
+                context,
+              ).copyWith(alwaysUse24HourFormat: true),
               child: child!,
             ),
           ),
@@ -264,13 +286,20 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
         if (time == null) return;
         setState(() {
           _selectedDate = DateTime(
-            date.year, date.month, date.day, time.hour, time.minute,
+            date.year,
+            date.month,
+            date.day,
+            time.hour,
+            time.minute,
           );
         });
       },
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
         decoration: BoxDecoration(
           color: AppColors.input,
           borderRadius: AppRadius.mdCircular,
@@ -278,7 +307,11 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today_outlined, color: AppColors.primary, size: AppSpacing.iconSm),
+            Icon(
+              Icons.calendar_today_outlined,
+              color: AppColors.primary,
+              size: AppSpacing.iconSm,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
@@ -287,10 +320,16 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
                 '${_selectedDate.year}  '
                 '${_selectedDate.hour.toString().padLeft(2, '0')}:'
                 '${_selectedDate.minute.toString().padLeft(2, '0')}',
-                style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
-            Icon(Icons.edit_calendar_outlined, color: AppColors.textMuted, size: AppSpacing.iconSm),
+            Icon(
+              Icons.edit_calendar_outlined,
+              color: AppColors.textMuted,
+              size: AppSpacing.iconSm,
+            ),
           ],
         ),
       ),
@@ -299,7 +338,10 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
 
   Widget _buildVisibilityToggle() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: AppColors.input,
         borderRadius: AppRadius.mdCircular,
@@ -347,10 +389,19 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
         ),
         child: _isLoading
             ? const SizedBox(
-                width: 24, height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.black,
+                ),
               )
-            : Text('CREAR RAID', style: AppTypography.button.copyWith(color: AppColors.textOnAmber)),
+            : Text(
+                'CREAR RAID',
+                style: AppTypography.button.copyWith(
+                  color: AppColors.textOnAmber,
+                ),
+              ),
       ),
     );
   }
@@ -370,20 +421,36 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
     HapticFeedback.mediumImpact();
 
     // Parse coordinates
-    final originParts = _originController.text.split(',').map((s) => double.tryParse(s.trim())).toList();
-    final destParts = _destController.text.split(',').map((s) => double.tryParse(s.trim())).toList();
+    final originParts = _originController.text
+        .split(',')
+        .map((s) => double.tryParse(s.trim()))
+        .toList();
+    final destParts = _destController.text
+        .split(',')
+        .map((s) => double.tryParse(s.trim()))
+        .toList();
 
-    context.read<RaidBloc>().add(CreateRaid(
-      title: _titleController.text.trim(),
-      origin: _originController.text.trim(),
-      originLat: originParts.length >= 2 && originParts[0] != null ? originParts[0]! : 4.60971,
-      originLng: originParts.length >= 2 && originParts[1] != null ? originParts[1]! : -74.08175,
-      destination: _destController.text.trim(),
-      destLat: destParts.length >= 2 && destParts[0] != null ? destParts[0]! : 4.69127,
-      destLng: destParts.length >= 2 && destParts[1] != null ? destParts[1]! : -74.04583,
-      gameMode: _selectedMode,
-      dateTime: _selectedDate,
-      isPublic: _isPublic,
-    ));
+    context.read<RaidBloc>().add(
+      CreateRaid(
+        title: _titleController.text.trim(),
+        origin: _originController.text.trim(),
+        originLat: originParts.length >= 2 && originParts[0] != null
+            ? originParts[0]!
+            : 4.60971,
+        originLng: originParts.length >= 2 && originParts[1] != null
+            ? originParts[1]!
+            : -74.08175,
+        destination: _destController.text.trim(),
+        destLat: destParts.length >= 2 && destParts[0] != null
+            ? destParts[0]!
+            : 4.69127,
+        destLng: destParts.length >= 2 && destParts[1] != null
+            ? destParts[1]!
+            : -74.04583,
+        gameMode: _selectedMode,
+        dateTime: _selectedDate,
+        isPublic: _isPublic,
+      ),
+    );
   }
 }

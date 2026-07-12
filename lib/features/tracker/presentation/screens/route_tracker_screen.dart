@@ -615,12 +615,123 @@ ${state.points.map((p) => '      <trkpt lat="${p.latitude}" lon="${p.longitude}"
   </trk>
 </gpx>''';
 
-    final osmUrl = Uri.parse('https://www.openstreetmap.org/traces/new');
-    launchUrl(osmUrl, mode: LaunchMode.externalApplication);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(
+                color: AppColors.textMuted.withAlpha(60), borderRadius: BorderRadius.circular(2),
+              )),
+              const SizedBox(height: AppSpacing.lg),
+              const Icon(Icons.map, color: AppColors.success, size: 40),
+              const SizedBox(height: AppSpacing.sm),
+              Text('ENRIQUECER OpenStreetMap', style: AppTypography.h2.copyWith(color: AppColors.textPrimary)),
+              const SizedBox(height: AppSpacing.sm),
+              Text('Tu ruta ayuda a mejorar el mapa colombiano',
+                style: AppTypography.body.copyWith(color: AppColors.textMuted),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              // Option 1: Upload to OSM
+              SizedBox(
+                width: double.infinity, height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Clipboard.setData(ClipboardData(text: gpx));
+                    launchUrl(
+                      Uri.parse('https://www.openstreetmap.org/traces/new'),
+                      mode: LaunchMode.externalApplication,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('✅ GPX copiado. Subilo en openstreetmap.org')),
+                    );
+                  },
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 20),
+                  label: const Text('SUBIR TRAZA A OSM (GPX)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success, foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              // Option 2: Copy GPX
+              SizedBox(
+                width: double.infinity, height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Clipboard.setData(ClipboardData(text: gpx));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('📋 GPX copiado al portapapeles')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 20),
+                  label: const Text('COPIAR GPX', style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              // Option 3: OSM Note
+              SizedBox(
+                width: double.infinity, height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () => _createOsmNote(state, ctx),
+                  icon: const Icon(Icons.push_pin_outlined, size: 20),
+                  label: const Text('REPORTAR RUTA FALTANTE (OSM Note)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.secondary,
+                    side: const BorderSide(color: AppColors.secondary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createOsmNote(TrackerRecording state, BuildContext ctx) async {
+    Navigator.pop(ctx);
+    if (state.points.isEmpty) return;
+
+    // Use center point of route for the note location
+    final avgLat = state.points.map((p) => p.latitude).reduce((a, b) => a + b) / state.points.length;
+    final avgLng = state.points.map((p) => p.longitude).reduce((a, b) => a + b) / state.points.length;
+    final start = state.points.first;
+    final end = state.points.last;
+
+    final comment = Uri.encodeComponent(
+      'Ruta de moto grabada con AsfaltoClub. '
+      '${state.distanceKm.toStringAsFixed(1)}km, ${state.points.length} puntos GPS. '
+      'Desde (${start.latitude.toStringAsFixed(4)}, ${start.longitude.toStringAsFixed(4)}) '
+      'hasta (${end.latitude.toStringAsFixed(4)}, ${end.longitude.toStringAsFixed(4)}). '
+      'Por favor revisar si esta vía existe en OSM. #AsfaltoClub #Colombia',
+    );
+    final url = Uri.parse(
+      'https://www.openstreetmap.org/note/new?lat=$avgLat&lon=$avgLng&text=$comment',
+    );
+
+    HapticFeedback.mediumImpact();
+    await launchUrl(url, mode: LaunchMode.externalApplication);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content:
-              Text('🌍 Sube tu traza GPX a openstreetmap.org/traces/new')),
+      const SnackBar(content: Text('📍 OSM Note abierto — completá el reporte')),
     );
   }
 

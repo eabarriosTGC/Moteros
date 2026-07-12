@@ -27,7 +27,12 @@ class ClanBloc extends Bloc<ClanEvent, ClanState> {
           .order('created_at', ascending: false);
       emit(ClansLoaded(clans: (response as List).cast<Map<String, dynamic>>()));
     } catch (e) {
-      emit(ClanError(e.toString()));
+      final msg = e.toString();
+      if (msg.contains('does not exist') || msg.contains('relation') || msg.contains('42P01')) {
+        emit(const ClansLoaded(clans: []));
+      } else {
+        emit(ClanError(e.toString()));
+      }
     }
   }
 
@@ -177,7 +182,7 @@ class ClanBloc extends Bloc<ClanEvent, ClanState> {
     try {
       // Search user by email
       final userResp = await Supabase.instance.client
-          .from('profiles')
+          .from('users')
           .select('id')
           .eq('email', event.emailOrUsername)
           .maybeSingle();
@@ -185,7 +190,7 @@ class ClanBloc extends Bloc<ClanEvent, ClanState> {
       if (userResp == null) {
         // Try by username
         final userResp2 = await Supabase.instance.client
-            .from('profiles')
+            .from('users')
             .select('id')
             .eq('username', event.emailOrUsername)
             .maybeSingle();

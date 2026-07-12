@@ -59,6 +59,8 @@ final class RaidActive extends RaidState {
   final List<Map<String, dynamic>> participants;
   final String? alertMessage;
   final Color? alertColor;
+  final int antiCheatFlags;
+  final bool isFlagged;
 
   const RaidActive({
     required this.raid,
@@ -71,13 +73,15 @@ final class RaidActive extends RaidState {
     this.participants = const [],
     this.alertMessage,
     this.alertColor,
+    this.antiCheatFlags = 0,
+    this.isFlagged = false,
   });
 
   @override
   List<Object?> get props => [
     raid, myStats, ranking, speed, distanceToDest,
     elapsedSeconds, checkpointsPassed, participants,
-    alertMessage, alertColor,
+    alertMessage, alertColor, antiCheatFlags, isFlagged,
   ];
 }
 

@@ -25,7 +25,8 @@ import 'features/places/domain/usecases/get_nearby_places.dart';
 import 'features/places/presentation/bloc/places_bloc.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/raids/presentation/bloc/raid_bloc.dart';
-import 'features/raids/presentation/screens/create_raid_screen.dart';
+import 'features/raids/presentation/screens/raid_list_screen.dart';
+import 'features/refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'features/clans/presentation/bloc/clan_bloc.dart';
 import 'features/clans/presentation/screens/clan_list_screen.dart';
 import 'features/patches/presentation/bloc/patches_bloc.dart';
@@ -51,15 +52,10 @@ class MoterosApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: authBloc),
-        BlocProvider(
-          create: (_) => DashboardBloc(apiClient: apiClient),
-        ),
-        BlocProvider(
-          create: (_) => ChallengesBloc(apiClient: apiClient),
-        ),
-        BlocProvider(
-          create: (_) => RefugiosBloc(),
-        ),
+        BlocProvider(create: (_) => DashboardBloc(apiClient: apiClient)),
+        BlocProvider(create: (_) => ChallengesBloc(apiClient: apiClient)),
+        BlocProvider(create: (_) => RefugiosBloc()),
+        BlocProvider(create: (_) => MotoposadasBloc()),
         BlocProvider(
           create: (_) => PlacesBloc(
             getNearbyPlaces: GetNearbyPlacesUseCase(
@@ -83,23 +79,13 @@ class MoterosApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (_) => AdminBloc(
-            manageAllies: ManageAlliesUseCase(
-              AdminRemoteDataSource(apiClient),
-            ),
+            manageAllies: ManageAlliesUseCase(AdminRemoteDataSource(apiClient)),
           ),
         ),
-        BlocProvider(
-          create: (_) => RaidBloc(),
-        ),
-        BlocProvider(
-          create: (_) => ClanBloc(),
-        ),
-        BlocProvider(
-          create: (_) => PatchesBloc(),
-        ),
-        BlocProvider(
-          create: (_) => TrackerBloc(),
-        ),
+        BlocProvider(create: (_) => RaidBloc()),
+        BlocProvider(create: (_) => ClanBloc()),
+        BlocProvider(create: (_) => PatchesBloc()),
+        BlocProvider(create: (_) => TrackerBloc()),
       ],
       child: MaterialApp(
         title: 'AsfaltoClub',
@@ -137,11 +123,9 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   void _openScanner() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const QrScannerScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
   }
 
   @override
@@ -151,7 +135,7 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
       extendBody: true,
       body: const MainShell(
         dashboard: DashboardScreen(),
-        raidScreen: CreateRaidScreen(),
+        raidScreen: RaidListScreen(),
         refugiosScreen: RefugiosScreen(),
         clanScreen: ClanListScreen(),
         profileScreen: ProfileScreen(),

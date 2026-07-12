@@ -65,9 +65,10 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomNav() {
+    // 4 nav items + center FAB (Refugio moved to Profile menu)
     return Container(
-      height: AppSpacing.bottomNavHeight + 16, // extra for FAB overlap
-      padding: EdgeInsets.only(
+      height: AppSpacing.bottomNavHeight + 16,
+      padding: const EdgeInsets.only(
         left: AppSpacing.md,
         right: AppSpacing.md,
         top: AppSpacing.sm,
@@ -81,7 +82,6 @@ class _MainShellState extends State<MainShell> {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NavItem(
             icon: AppIcons.dashboard,
@@ -95,14 +95,8 @@ class _MainShellState extends State<MainShell> {
             isSelected: _currentTab == AppTab.raid,
             onTap: () => _onTabSelected(AppTab.raid),
           ),
-          // Center FAB spacer
-          const SizedBox(width: AppSpacing.fabSize + 8),
-          _NavItem(
-            icon: AppIcons.shelter,
-            label: 'Refugio',
-            isSelected: _currentTab == AppTab.refugios,
-            onTap: () => _onTabSelected(AppTab.refugios),
-          ),
+          // FAB sits here (center)
+          const SizedBox(width: AppSpacing.fabSize),
           _NavItem(
             icon: AppIcons.clan,
             label: 'Clan',

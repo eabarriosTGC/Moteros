@@ -34,7 +34,13 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
           .order('created_at', ascending: false);
       emit(RaidsLoaded(raids: (response as List).cast<Map<String, dynamic>>()));
     } catch (e) {
-      emit(RaidError(e.toString()));
+      final msg = e.toString();
+      // If table doesn't exist, show empty state instead of error
+      if (msg.contains('does not exist') || msg.contains('relation') || msg.contains('42P01')) {
+        emit(const RaidsLoaded(raids: []));
+      } else {
+        emit(RaidError(msg));
+      }
     }
   }
 
@@ -64,11 +70,15 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
           orElse: () => <String, dynamic>{},
         );
         final ranking = _buildRanking(participants);
+        final antiCheatFlags = (myStats['anti_cheat_flags'] as int?) ?? 0;
+        final isFlagged = (myStats['is_flagged'] as bool?) ?? false;
         emit(RaidActive(
           raid: raid,
           myStats: myStats,
           ranking: ranking,
           participants: participants,
+          antiCheatFlags: antiCheatFlags,
+          isFlagged: isFlagged,
         ));
         _startLiveTimer(emit, raid);
       } else if (raid['status'] == 'completed') {
@@ -309,6 +319,8 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
               : alert?.contains('Peligro') == true
                   ? const Color(0xFFFF2D55)
                   : null,
+          antiCheatFlags: current.antiCheatFlags,
+          isFlagged: current.isFlagged,
         ));
       }
     });

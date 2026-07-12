@@ -11,6 +11,8 @@ import '../../../../core/theme/design_tokens.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
+import 'raid_stats_screen.dart';
+import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 
 class RaidLiveScreen extends StatefulWidget {
   final String raidId;
@@ -33,10 +35,10 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    _alertSlide = Tween<Offset>(
-      begin: const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _alertController, curve: Curves.easeOutBack));
+    _alertSlide = Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+        .animate(
+          CurvedAnimation(parent: _alertController, curve: Curves.easeOutBack),
+        );
   }
 
   @override
@@ -61,14 +63,19 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
         if (state is RaidActive) {
           // Trigger alert animation
           if (state.alertMessage != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) => _showAlert(state.alertMessage!));
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _showAlert(state.alertMessage!),
+            );
           }
           return _buildLiveScreen(state);
         }
         if (state is RaidCompleted || state is RaidStatsLoaded) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushReplacementNamed(context, '/raid/stats',
-              arguments: widget.raidId,
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RaidStatsScreen(raidId: widget.raidId),
+              ),
             );
           });
         }
@@ -79,12 +86,22 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.error,
+                    size: 48,
+                  ),
                   const SizedBox(height: AppSpacing.md),
-                  Text('Error', style: AppTypography.h2.copyWith(color: AppColors.error)),
+                  Text(
+                    'Error',
+                    style: AppTypography.h2.copyWith(color: AppColors.error),
+                  ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(state.message,
-                    style: AppTypography.body.copyWith(color: AppColors.textMuted),
+                  Text(
+                    state.message,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textMuted,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -107,9 +124,7 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
         child: Stack(
           children: [
             // Full screen map (simulated)
-            Positioned.fill(
-              child: _buildMapBackground(),
-            ),
+            Positioned.fill(child: _buildMapBackground()),
 
             // Alert overlay
             if (state.alertMessage != null)
@@ -126,15 +141,18 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
                         vertical: AppSpacing.sm,
                       ),
                       decoration: BoxDecoration(
-                        color: (state.alertColor ?? AppColors.success).withAlpha(30),
+                        color: (state.alertColor ?? AppColors.success)
+                            .withAlpha(30),
                         borderRadius: AppRadius.mdCircular,
                         border: Border.all(
-                          color: (state.alertColor ?? AppColors.success).withAlpha(120),
+                          color: (state.alertColor ?? AppColors.success)
+                              .withAlpha(120),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: (state.alertColor ?? AppColors.success).withAlpha(60),
+                            color: (state.alertColor ?? AppColors.success)
+                                .withAlpha(60),
                             blurRadius: 20,
                             spreadRadius: 2,
                           ),
@@ -166,13 +184,64 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
                 ),
               ),
 
+            // Anti-cheat warning bar
+            if (state.antiCheatFlags > 0 || state.isFlagged)
+              Positioned(
+                top: 10,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: state.isFlagged
+                          ? AppColors.error.withAlpha(40)
+                          : AppColors.warning.withAlpha(30),
+                      borderRadius: AppRadius.mdCircular,
+                      border: Border.all(
+                        color: (state.isFlagged
+                                ? AppColors.error
+                                : AppColors.warning)
+                            .withAlpha(120),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          state.isFlagged
+                              ? Icons.gpp_bad
+                              : Icons.warning_amber_rounded,
+                          color: state.isFlagged
+                              ? AppColors.error
+                              : AppColors.warning,
+                          size: 16,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          state.isFlagged
+                              ? '🚫 RAID FLAGEADO — XP retenido'
+                              : '⚠️ ${state.antiCheatFlags} flag(s) anti-cheat',
+                          style: AppTypography.caption.copyWith(
+                            color: state.isFlagged
+                                ? AppColors.error
+                                : AppColors.warning,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
             // Top bar — speed, heading, distance, elapsed
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _buildTopBar(state),
-            ),
+            Positioned(top: 0, left: 0, right: 0, child: _buildTopBar(state)),
 
             // Bottom stats
             Positioned(
@@ -189,6 +258,49 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
               right: 0,
               child: _buildBottomBar(state),
             ),
+
+            // SOS floating button
+            Positioned(
+              bottom: 70,
+              right: AppSpacing.sm,
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.heavyImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SafeModeScreen(raidId: int.tryParse(widget.raidId)),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 56, height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF3B30), Color(0xFFFF6B6B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withAlpha(80),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text('SOS', style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    )),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -204,11 +316,17 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
 
   Widget _buildTopBar(RaidActive state) {
     final elapsed = Duration(seconds: state.elapsedSeconds);
-    final timeStr = '${elapsed.inMinutes.toString().padLeft(2, '0')}:'
+    final timeStr =
+        '${elapsed.inMinutes.toString().padLeft(2, '0')}:'
         '${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -226,9 +344,17 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
           // Speed
           _buildMetric('${state.speed.round()}', 'KM/H', AppColors.primary),
           // Heading
-          _buildMetric('N ${state.elapsedSeconds % 360}°', 'HEADING', AppColors.secondary),
+          _buildMetric(
+            'N ${state.elapsedSeconds % 360}°',
+            'HEADING',
+            AppColors.secondary,
+          ),
           // Distance
-          _buildMetric('${state.distanceToDest.toStringAsFixed(1)}', 'KM', AppColors.success),
+          _buildMetric(
+            '${state.distanceToDest.toStringAsFixed(1)}',
+            'KM',
+            AppColors.success,
+          ),
           // Elapsed
           _buildMetric(timeStr, 'TIEMPO', AppColors.textSecondary),
         ],
@@ -240,13 +366,15 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(value,
+        Text(
+          value,
           style: AppTypography.monoSmall.copyWith(
             color: color,
             fontWeight: FontWeight.w700,
           ),
         ),
-        Text(label,
+        Text(
+          label,
           style: AppTypography.caption.copyWith(
             color: color.withAlpha(150),
             letterSpacing: 1.5,
@@ -273,9 +401,24 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _statItem(Icons.speed_outlined, '${state.speed.round()}', 'ACTUAL', AppColors.primary),
-              _statItem(Icons.route_outlined, '${state.distanceToDest.toStringAsFixed(1)}', 'KM REC', AppColors.secondary),
-              _statItem(Icons.flag_outlined, '${state.checkpointsPassed}', 'CP', AppColors.success),
+              _statItem(
+                Icons.speed_outlined,
+                '${state.speed.round()}',
+                'ACTUAL',
+                AppColors.primary,
+              ),
+              _statItem(
+                Icons.route_outlined,
+                '${state.distanceToDest.toStringAsFixed(1)}',
+                'KM REC',
+                AppColors.secondary,
+              ),
+              _statItem(
+                Icons.flag_outlined,
+                '${state.checkpointsPassed}',
+                'CP',
+                AppColors.success,
+              ),
             ],
           ),
         ),
@@ -292,7 +435,8 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('RANKING',
+              Text(
+                'RANKING',
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textMuted,
                   letterSpacing: 2,
@@ -318,7 +462,10 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
         Icon(icon, color: color, size: AppSpacing.iconSm),
         const SizedBox(height: AppSpacing.xs),
         Text(value, style: AppTypography.monoSmall.copyWith(color: color)),
-        Text(label, style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
+        Text(
+          label,
+          style: AppTypography.caption.copyWith(color: AppColors.textMuted),
+        ),
       ],
     );
   }
@@ -346,14 +493,16 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
       child: Row(
         children: [
           Container(
-            width: 28, height: 28,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: medalColor.withAlpha(25),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: medalColor.withAlpha(60)),
             ),
             child: Center(
-              child: Text(medal,
+              child: Text(
+                medal,
                 style: AppTypography.caption.copyWith(
                   color: medalColor,
                   fontWeight: FontWeight.w700,
@@ -365,7 +514,9 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
           Expanded(
             child: Text(
               participant['user_id']?.toString().substring(0, 8) ?? 'Rider',
-              style: AppTypography.bodySmall.copyWith(color: AppColors.textPrimary),
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           Text(
@@ -379,7 +530,12 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
 
   Widget _buildBottomBar(RaidActive state) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xl),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -441,7 +597,8 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 48, height: 48,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: color.withAlpha(20),
               shape: BoxShape.circle,
@@ -477,7 +634,8 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: AppColors.textMuted.withAlpha(60),
                 borderRadius: BorderRadius.circular(2),
@@ -488,7 +646,9 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
               children: [
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.input,
                       borderRadius: BorderRadius.circular(AppRadius.full),
@@ -496,7 +656,9 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
                     ),
                     child: TextField(
                       controller: controller,
-                      style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
                       decoration: const InputDecoration(
                         hintText: 'Mensaje rápido...',
                         border: InputBorder.none,
@@ -517,7 +679,8 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: const BoxDecoration(
                     color: AppColors.secondary,
                     shape: BoxShape.circle,
@@ -551,30 +714,37 @@ class _RaidLiveScreenState extends State<RaidLiveScreen>
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
-        title: Text('ABANDONAR RAID',
+        title: Text(
+          'ABANDONAR RAID',
           style: AppTypography.h3.copyWith(color: AppColors.error),
         ),
-        content: Text('¿Seguro que quieres abandonar el raid?',
+        content: Text(
+          '¿Seguro que quieres abandonar el raid?',
           style: AppTypography.body.copyWith(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('CANCELAR',
+            child: Text(
+              'CANCELAR',
               style: AppTypography.button.copyWith(color: AppColors.textMuted),
             ),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-              context.read<RaidBloc>().add(CompleteRaid(
-                raidId: widget.raidId,
-                stats: {'did_not_finish': true, 'xp_earned': 0},
-              ));
+              final userId =
+                  Supabase.instance.client.auth.currentUser?.id ?? '';
+              context.read<RaidBloc>().add(
+                CompleteRaid(
+                  raidId: widget.raidId,
+                  stats: {'did_not_finish': true, 'xp_earned': 0},
+                ),
+              );
               Navigator.pop(context);
             },
-            child: Text('ABANDONAR',
+            child: Text(
+              'ABANDONAR',
               style: AppTypography.button.copyWith(color: AppColors.error),
             ),
           ),
@@ -611,26 +781,34 @@ class _RoadMapPainter extends CustomPainter {
     final path = Path()
       ..moveTo(size.width * 0.1, size.height * 0.85)
       ..cubicTo(
-        size.width * 0.3, size.height * 0.7,
-        size.width * 0.5, size.height * 0.5,
-        size.width * 0.7, size.height * 0.4,
+        size.width * 0.3,
+        size.height * 0.7,
+        size.width * 0.5,
+        size.height * 0.5,
+        size.width * 0.7,
+        size.height * 0.4,
       )
       ..cubicTo(
-        size.width * 0.8, size.height * 0.35,
-        size.width * 0.85, size.height * 0.25,
-        size.width * 0.9, size.height * 0.15,
+        size.width * 0.8,
+        size.height * 0.35,
+        size.width * 0.85,
+        size.height * 0.25,
+        size.width * 0.9,
+        size.height * 0.15,
       );
     canvas.drawPath(path, routePaint);
 
     // Start point
     canvas.drawCircle(
-      Offset(size.width * 0.1, size.height * 0.85), 6,
+      Offset(size.width * 0.1, size.height * 0.85),
+      6,
       Paint()..color = AppColors.success,
     );
 
     // End point
     canvas.drawCircle(
-      Offset(size.width * 0.9, size.height * 0.15), 6,
+      Offset(size.width * 0.9, size.height * 0.15),
+      6,
       Paint()..color = AppColors.primary,
     );
 
@@ -639,13 +817,18 @@ class _RoadMapPainter extends CustomPainter {
       ..color = AppColors.secondary
       ..style = PaintingStyle.fill;
     canvas.drawCircle(
-      Offset(size.width * 0.4, size.height * 0.55), 5, dotPaint);
+      Offset(size.width * 0.4, size.height * 0.55),
+      5,
+      dotPaint,
+    );
     canvas.drawCircle(
-      Offset(size.width * 0.55, size.height * 0.45), 5,
+      Offset(size.width * 0.55, size.height * 0.45),
+      5,
       Paint()..color = AppColors.secondary.withAlpha(150),
     );
     canvas.drawCircle(
-      Offset(size.width * 0.3, size.height * 0.65), 5,
+      Offset(size.width * 0.3, size.height * 0.65),
+      5,
       Paint()..color = AppColors.secondary.withAlpha(100),
     );
   }
