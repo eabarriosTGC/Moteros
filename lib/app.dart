@@ -28,6 +28,10 @@ import 'features/raids/presentation/bloc/raid_bloc.dart';
 import 'features/raids/presentation/screens/create_raid_screen.dart';
 import 'features/clans/presentation/bloc/clan_bloc.dart';
 import 'features/clans/presentation/screens/clan_list_screen.dart';
+import 'features/patches/presentation/bloc/patches_bloc.dart';
+import 'features/tracker/presentation/screens/route_tracker_screen.dart';
+import 'features/alerts/presentation/screens/radar_screen.dart';
+import 'features/settings/presentation/screens/settings_screen.dart';
 import 'features/validation/data/datasources/validation_remote_datasource.dart';
 import 'features/validation/domain/usecases/validate_visit.dart';
 import 'features/validation/presentation/bloc/validation_bloc.dart';
@@ -89,6 +93,12 @@ class MoterosApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (_) => ClanBloc(),
+        ),
+        BlocProvider(
+          create: (_) => PatchesBloc(),
+        ),
+        BlocProvider(
+          create: (_) => TrackerBloc(),
         ),
       ],
       child: MaterialApp(

@@ -9,6 +9,8 @@ import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../../../validation/presentation/screens/qr_scanner_screen.dart';
+import '../../../alerts/presentation/screens/radar_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
@@ -109,8 +111,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           IconButton(
             icon: const Icon(AppIcons.settings),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen())),
-            tooltip: 'Modo Conducción',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            tooltip: 'Configuración',
           ),
         ],
       ),
@@ -129,6 +131,32 @@ class _DashboardScreenState extends State<DashboardScreen>
               state.isBigButtons ? _buildBigActions(context) : _buildActionsRow(context),
               const SizedBox(height: AppSpacing.lg),
               _sectionHeader('RADAR DE ALERTAS'),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('',
+                        style: AppTypography.bodySmall
+                            .copyWith(color: AppColors.textMuted)),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      _tap();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RadarScreen()),
+                      );
+                    },
+                    child: Text('VER TODAS',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        )),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.sm),
               ...state.alerts.map((a) => Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),

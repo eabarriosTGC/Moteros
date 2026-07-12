@@ -47,6 +47,43 @@ class ClanBloc extends Bloc<ClanEvent, ClanState> {
           .eq('clan_id', event.clanId);
       final members = (membersResp as List).cast<Map<String, dynamic>>();
 
+      // ── Real stats from Supabase tables (best-effort) ──
+      int totalRaids = (clan['total_raids'] as int?) ?? 0;
+      int totalXp = (clan['total_xp'] as int?) ?? 0;
+      double totalKm = (clan['total_km'] as num?)?.toDouble() ?? 0;
+
+      try {
+        // Try to fetch total raids count
+        final raidsResp = await Supabase.instance.client
+            .from('raids')
+            .select('id')
+            .eq('clan_id', event.clanId);
+        totalRaids = (raidsResp as List).length;
+      } catch (_) {}
+
+      try {
+        // Try to fetch total XP for all members
+        if (members.isNotEmpty) {
+          final memberIds =
+              members.map((m) => m['user_id'] as String).toList();
+          for (final uid in memberIds) {
+            final xpResp = await Supabase.instance.client
+                .from('user_xp')
+                .select('total_xp')
+                .eq('user_id', uid)
+                .maybeSingle();
+            if (xpResp != null) {
+              totalXp += (xpResp['total_xp'] as int? ?? 0);
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Update clan map with real stats
+      clan['total_raids'] = totalRaids;
+      clan['total_xp'] = totalXp;
+      clan['total_km'] = totalKm;
+
       final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
       final myMembership = members.firstWhere(
         (m) => m['user_id'] == userId,
@@ -146,18 +183,33 @@ class ClanBloc extends Bloc<ClanEvent, ClanState> {
           .maybeSingle();
 
       if (userResp == null) {
-        emit(const ClanError('Usuario no encontrado'));
-        return;
+        // Try by username
+        final userResp2 = await Supabase.instance.client
+            .from('profiles')
+            .select('id')
+            .eq('username', event.emailOrUsername)
+            .maybeSingle();
+
+        if (userResp2 == null) {
+          emit(const ClanError('Usuario no encontrado'));
+          return;
+        }
+        final userId = (userResp2 as Map<String, dynamic>)['id'] as String;
+        await Supabase.instance.client.from('clan_members').insert({
+          'clan_id': event.clanId,
+          'user_id': userId,
+          'role': 'recruit',
+          'level': 1,
+        });
+      } else {
+        final userId = (userResp as Map<String, dynamic>)['id'] as String;
+        await Supabase.instance.client.from('clan_members').insert({
+          'clan_id': event.clanId,
+          'user_id': userId,
+          'role': 'recruit',
+          'level': 1,
+        });
       }
-
-      final userId = (userResp as Map<String, dynamic>)['id'] as String;
-
-      await Supabase.instance.client.from('clan_members').insert({
-        'clan_id': event.clanId,
-        'user_id': userId,
-        'role': 'rider',
-        'level': 1,
-      });
 
       add(LoadClan(clanId: event.clanId));
     } catch (e) {

@@ -11,6 +11,7 @@ import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../patches/presentation/screens/patches_screen.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../../../chat/presentation/screens/direct_messages_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -118,9 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _item(AppIcons.group, 'Comunidad', sub: 'Buscar y seguir moteros', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityScreen()))),
       _item(AppIcons.shield, 'Modo Conducción', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()))),
       _item(AppIcons.settings, 'Configuración', onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚙️ Próximamente')),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
       }),
     ]);
   }
