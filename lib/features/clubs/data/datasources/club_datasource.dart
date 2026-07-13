@@ -7,11 +7,18 @@ class ClubDatasource {
   ClubDatasource(this._client);
 
   Future<List<Map<String, dynamic>>> getClubs() async {
-    final response = await _client
-        .from('clubs')
-        .select('*, club_members(*)')
-        .order('created_at', ascending: false);
-    return (response as List).cast<Map<String, dynamic>>();
+    try {
+      final response = await _client
+          .from('clubs')
+          .select('*, club_members(*)')
+          .order('created_at', ascending: false);
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      if ('$e'.contains('does not exist') || '$e'.contains('42P01')) {
+        return [];
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getClub(int clubId) async {

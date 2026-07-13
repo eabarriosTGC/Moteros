@@ -6,7 +6,12 @@ class GetMileageUseCase {
   GetMileageUseCase(this._client);
 
   Future<Map<String, dynamic>?> call(String userId) async {
-    final response = await _client.from('user_mileage').select().eq('user_id', userId).maybeSingle();
-    return response as Map<String, dynamic>?;
+    try {
+      final response = await _client.from('user_mileage').select().eq('user_id', userId).maybeSingle();
+      return response as Map<String, dynamic>?;
+    } catch (e) {
+      if ('$e'.contains('does not exist') || '$e'.contains('42P01')) return null;
+      rethrow;
+    }
   }
 }

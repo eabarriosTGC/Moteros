@@ -433,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: _actionBtn(
           context,
           AppIcons.qrScan,
-          'Escanear',
+          'Scan',
           AppColors.primary,
         ),
       ),
@@ -453,7 +453,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _bigActionBtn(
         context,
         AppIcons.qrScan,
-        'Escanear QR',
+        'Scan QR',
         'Registra tu visita',
         AppColors.primary,
       ),
@@ -484,7 +484,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   ) => ElevatedButton.icon(
     onPressed: () {
       _tap();
-      if (label == 'Escanear') {
+      if (label == 'Scan') {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const QrScannerScreen()),
@@ -523,7 +523,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     child: ElevatedButton(
       onPressed: () {
         _tap();
-        if (title.startsWith('Escanear')) {
+        if (title.startsWith('Scan')) {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const QrScannerScreen()),

@@ -66,34 +66,61 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   }
 
   Future<void> _start(StartRecording event, Emitter<TrackerState> emit) async {
-    _points = [];
-    _maxSpeed = 0;
-    _startedAt = DateTime.now();
-    HapticFeedback.mediumImpact();
-
-    final pos = await Geolocator.getCurrentPosition();
-    _points.add(LatLng(pos.latitude, pos.longitude));
-
-    emit(TrackerRecording(points: List.from(_points)));
-
-    _sub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.best,
-        distanceFilter: 10,
-      ),
-    ).listen((pos) {
-      if (!isClosed) {
-        _points.add(LatLng(pos.latitude, pos.longitude));
-        if (pos.speed > _maxSpeed) _maxSpeed = pos.speed;
-        final dist = _calcDistance(_points);
-        final dur = DateTime.now().difference(_startedAt!).inSeconds;
-        final avg = dur > 0 ? (dist / dur * 3.6) : 0.0;
-        emit(TrackerRecording(
-          points: List.from(_points), distanceKm: dist,
-          durationSec: dur, avgSpeed: avg, maxSpeed: _maxSpeed * 3.6,
-        ));
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        emit(TrackerIdle());
+        return;
       }
-    });
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied) {
+          emit(TrackerIdle());
+          return;
+        }
+      }
+      if (perm == LocationPermission.deniedForever) {
+        emit(TrackerIdle());
+        return;
+      }
+
+      _points = [];
+      _maxSpeed = 0;
+      _startedAt = DateTime.now();
+      HapticFeedback.mediumImpact();
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      _points.add(LatLng(pos.latitude, pos.longitude));
+
+      emit(TrackerRecording(points: List.from(_points)));
+
+      _sub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 10,
+        ),
+      ).listen((pos) {
+        if (!isClosed) {
+          _points.add(LatLng(pos.latitude, pos.longitude));
+          if (pos.speed > _maxSpeed) _maxSpeed = pos.speed;
+          final dist = _calcDistance(_points);
+          final dur = DateTime.now().difference(_startedAt!).inSeconds;
+          final avg = dur > 0 ? (dist / dur * 3.6) : 0.0;
+          emit(TrackerRecording(
+            points: List.from(_points), distanceKm: dist,
+            durationSec: dur, avgSpeed: avg, maxSpeed: _maxSpeed * 3.6,
+          ));
+        }
+      });
+    } catch (e) {
+      emit(TrackerIdle());
+    }
   }
 
   void _stop(StopRecording event, Emitter<TrackerState> emit) {

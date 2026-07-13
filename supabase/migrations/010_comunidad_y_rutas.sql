@@ -17,6 +17,9 @@ BEGIN;
 ALTER TABLE IF EXISTS clans RENAME TO clubs;
 ALTER TABLE IF EXISTS clan_members RENAME TO club_members;
 
+-- Renombrar columnas clan_id → club_id
+ALTER TABLE club_members RENAME COLUMN clan_id TO club_id;
+
 -- 1.2 Añadir nuevos campos a clubs
 ALTER TABLE clubs ADD COLUMN IF NOT EXISTS total_km DOUBLE PRECISION DEFAULT 0;
 ALTER TABLE clubs ADD COLUMN IF NOT EXISTS total_challenges_completed INT DEFAULT 0;
@@ -215,7 +218,8 @@ ALTER TABLE places ADD COLUMN IF NOT EXISTS is_verified       BOOLEAN DEFAULT FA
 ALTER TABLE places ADD COLUMN IF NOT EXISTS verified_at       TIMESTAMPTZ;
 ALTER TABLE places ADD COLUMN IF NOT EXISTS verified_by       UUID REFERENCES users(id) ON DELETE SET NULL;
 
-ALTER TABLE places ADD CONSTRAINT IF NOT EXISTS chk_place_type CHECK (
+ALTER TABLE places DROP CONSTRAINT IF EXISTS chk_place_type;
+ALTER TABLE places ADD CONSTRAINT chk_place_type CHECK (
     is_workshop OR is_hospital OR is_motoposada OR is_gas_station OR is_tourist_spot
 );
 
@@ -282,8 +286,12 @@ CREATE TABLE IF NOT EXISTS leaderboard_entries (
     club_id         BIGINT REFERENCES clubs(id) ON DELETE SET NULL,
     snapshot_date   DATE NOT NULL DEFAULT CURRENT_DATE,
     created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(period, scope, COALESCE(scope_id, 0), rank, snapshot_date)
+    UNIQUE(period, scope, scope_id, rank, snapshot_date)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lb_unique_null_scope
+    ON leaderboard_entries(period, scope, rank, snapshot_date)
+    WHERE scope_id IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_lb_period_scope ON leaderboard_entries(period, scope, snapshot_date DESC);
 CREATE INDEX IF NOT EXISTS idx_lb_user_period ON leaderboard_entries(user_id, period);
@@ -304,40 +312,41 @@ ORDER BY m.created_at ASC;
 -- Premio Anual candidates (5 categories)
 CREATE OR REPLACE VIEW premio_anual_candidates AS
 -- most_km: from user_mileage
-SELECT 'most_km' AS category, u.id AS user_id, u.username,
-       um.total_km AS metric_value, c.name AS club_name
-FROM users u JOIN user_mileage um ON um.user_id = u.id
-LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
-LEFT JOIN clubs c ON c.id = cm.club_id WHERE um.total_km > 0
-ORDER BY um.total_km DESC LIMIT 10
+(SELECT 'most_km' AS category, u.id AS user_id, u.username,
+        um.total_km AS metric_value, c.name AS club_name
+ FROM users u JOIN user_mileage um ON um.user_id = u.id
+ LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
+ LEFT JOIN clubs c ON c.id = cm.club_id WHERE um.total_km > 0
+ ORDER BY um.total_km DESC LIMIT 10)
 UNION ALL
 -- most_places: from visits
-SELECT 'most_places', u.id, u.username, COUNT(DISTINCT v.place_id)::INT, c.name
-FROM users u JOIN visits v ON v.user_id = u.id
-LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
-LEFT JOIN clubs c ON c.id = cm.club_id
-GROUP BY u.id, u.username, c.name ORDER BY metric_value DESC LIMIT 10
+(SELECT 'most_places', u.id, u.username, COUNT(DISTINCT v.place_id)::INT, c.name
+ FROM users u JOIN visits v ON v.user_id = u.id
+ LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
+ LEFT JOIN clubs c ON c.id = cm.club_id
+ GROUP BY u.id, u.username, c.name ORDER BY COUNT(DISTINCT v.place_id) DESC LIMIT 10)
 UNION ALL
 -- best_presidente: club challenges + km/100
-SELECT 'best_presidente', u.id, u.username,
-       COALESCE(c.total_challenges_completed + c.total_km::INT / 100, 0), c.name
-FROM users u JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
-JOIN clubs c ON c.id = cm.club_id ORDER BY metric_value DESC LIMIT 10
+(SELECT 'best_presidente', u.id, u.username,
+        COALESCE(c.total_challenges_completed + c.total_km::INT / 100, 0) AS metric_value, c.name
+ FROM users u JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
+ JOIN clubs c ON c.id = cm.club_id ORDER BY metric_value DESC LIMIT 10)
 UNION ALL
 -- most_challenges: from club_challenge_progress
-SELECT 'most_challenges', u.id, u.username, cc.completed_count::INT, c.name
-FROM users u
-LEFT JOIN (SELECT user_id, COUNT(*) AS completed_count FROM club_challenge_progress WHERE completed = TRUE GROUP BY user_id) cc ON cc.user_id = u.id
-LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
-LEFT JOIN clubs c ON c.id = cm.club_id ORDER BY metric_value DESC LIMIT 10
+(SELECT 'most_challenges', u.id, u.username, cc.completed_count::INT, c.name
+ FROM users u
+ LEFT JOIN (SELECT user_id, COUNT(*) AS completed_count FROM club_challenge_progress WHERE completed = TRUE GROUP BY user_id) cc ON cc.user_id = u.id
+ LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
+ LEFT JOIN clubs c ON c.id = cm.club_id
+ ORDER BY cc.completed_count DESC NULLS LAST LIMIT 10)
 UNION ALL
 -- best_rookie: users registered this year by XP
-SELECT 'best_rookie', u.id, u.username, ux.total_xp, c.name
-FROM users u JOIN user_xp ux ON ux.user_id = u.id
-LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
-LEFT JOIN clubs c ON c.id = cm.club_id
-WHERE u.created_at >= DATE_TRUNC('year', CURRENT_DATE)
-ORDER BY ux.total_xp DESC LIMIT 10;
+(SELECT 'best_rookie', u.id, u.username, ux.total_xp, c.name
+ FROM users u JOIN user_xp ux ON ux.user_id = u.id
+ LEFT JOIN club_members cm ON cm.user_id = u.id AND cm.role = 'presidente'
+ LEFT JOIN clubs c ON c.id = cm.club_id
+ WHERE u.created_at >= DATE_TRUNC('year', CURRENT_DATE)
+ ORDER BY ux.total_xp DESC LIMIT 10);
 
 -- ============================================================
 -- PARTE 7: Triggers y funciones
@@ -473,7 +482,7 @@ AS $$
             (wp.value->>'lat')::DOUBLE PRECISION,
             (wp.value->>'lng')::DOUBLE PRECISION,
             m.lat, m.lng
-        ) / 1000.0
+        ) / 1000.0 AS distance_km
     FROM motoposadas m
     CROSS JOIN LATERAL jsonb_array_elements(p_waypoints) WITH ORDINALITY AS wp(value, idx)
     WHERE m.is_active = TRUE

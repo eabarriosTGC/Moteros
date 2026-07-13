@@ -117,12 +117,14 @@ class _MainShellState extends State<MainShell> {
     ];
 
     return Container(
-      height: AppSpacing.bottomNavHeight + 16,
-      padding: const EdgeInsets.only(
+      height: AppSpacing.bottomNavHeight +
+          MediaQuery.of(context).padding.bottom +
+          8,
+      padding: EdgeInsets.only(
         left: AppSpacing.md,
         right: AppSpacing.md,
         top: AppSpacing.sm,
-        bottom: AppSpacing.sm,
+        bottom: MediaQuery.of(context).padding.bottom + 4,
       ),
       decoration: const BoxDecoration(
         color: AppColors.surface,
