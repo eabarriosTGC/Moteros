@@ -26,6 +26,8 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
     on<UpdateChallengeProgress>(_onUpdateChallengeProgress);
     on<LoadClubRanks>(_onLoadClubRanks);
     on<LoadClubChallenges>(_onLoadClubChallenges);
+    // Access Code events
+    on<JoinClubWithCode>(_onJoinWithCode);
   }
 
   Future<void> _onLoadClubs(LoadClubs event, Emitter<ClubState> emit) async {
@@ -113,6 +115,7 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
         'is_public': event.isPublic,
         'logo_url': event.logoUrl,
         'founder_id': userId,
+        'requires_approval': event.requiresApproval,
       }).select().single();
 
       final club = response as Map<String, dynamic>;
@@ -339,6 +342,35 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
           .select()
           .eq('club_id', event.clubId);
       emit(ClubChallengesLoaded(challenges: (response as List).cast<Map<String, dynamic>>()));
+    } catch (e) {
+      emit(ClubError(e.toString()));
+    }
+  }
+
+  // --- Access Code Handlers ---
+
+  Future<void> _onJoinWithCode(JoinClubWithCode event, Emitter<ClubState> emit) async {
+    emit(ClubLoading());
+    try {
+      final club = await Supabase.instance.client
+          .from('clubs')
+          .select()
+          .eq('join_code', event.code.toUpperCase())
+          .maybeSingle();
+
+      if (club == null) {
+        emit(const ClubError('Código inválido. Verificá e intentá de nuevo.'));
+        return;
+      }
+
+      final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+      await Supabase.instance.client.from('club_members').insert({
+        'club_id': club['id'],
+        'user_id': userId,
+        'role': 'aspirante',
+      });
+
+      emit(ClubJoined());
     } catch (e) {
       emit(ClubError(e.toString()));
     }

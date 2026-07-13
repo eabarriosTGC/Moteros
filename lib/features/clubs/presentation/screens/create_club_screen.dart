@@ -23,6 +23,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   final _tagController = TextEditingController();
   bool _isPublic = true;
   bool _isLoading = false;
+  bool _requiresApproval = false;
   String? _logoUrl;
 
   @override
@@ -38,13 +39,96 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
       listener: (context, state) {
         if (state is ClubCreated) {
           HapticFeedback.mediumImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('🎉 ¡Club creado con éxito!'),
-              backgroundColor: AppColors.success,
+          final club = state.club;
+          final code = club['join_code'] as String? ?? '---';
+          final reqApproval = club['requires_approval'] == true;
+
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+              title: Text('🎉 Club creado!',
+                style: AppTypography.h2.copyWith(color: AppColors.success),
+                textAlign: TextAlign.center,
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.input,
+                      borderRadius: AppRadius.mdCircular,
+                      border: Border.all(color: AppColors.primary.withAlpha(60)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.vpn_key, color: AppColors.primary, size: AppSpacing.iconSm),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text('Código de acceso: $code',
+                          style: AppTypography.monoSmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Compartí este código con los miembros que quieras invitar',
+                    style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (reqApproval) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withAlpha(15),
+                        borderRadius: AppRadius.smCircular,
+                        border: Border.all(color: AppColors.warning.withAlpha(40)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.warning, size: 16),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'El club requiere aprobación del admin antes de estar activo',
+                              style: AppTypography.bodySmall.copyWith(color: AppColors.warning),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context); // close dialog
+                    Navigator.pop(context, club); // pop screen
+                  },
+                  child: Text('OK',
+                    style: AppTypography.button.copyWith(color: AppColors.primary),
+                  ),
+                ),
+              ],
             ),
           );
-          Navigator.pop(context, state.club);
         }
         if (state is ClubError) {
           setState(() => _isLoading = false);
@@ -102,10 +186,16 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
-                  // Public/Private
+                  // Visibility
                   _sectionLabel('VISIBILIDAD'),
                   const SizedBox(height: AppSpacing.sm),
                   _buildVisibilityToggle(),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Admin approval toggle
+                  _sectionLabel('CONTROL DE ACCESO'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _buildApprovalToggle(),
                   const SizedBox(height: AppSpacing.xxl),
 
                   // Create button
@@ -233,6 +323,48 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
     );
   }
 
+  Widget _buildApprovalToggle() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.input,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _requiresApproval ? Icons.admin_panel_settings : Icons.person_add_alt_1_outlined,
+            color: _requiresApproval ? AppColors.warning : AppColors.textMuted,
+            size: AppSpacing.iconSm,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Requiere aprobación del admin',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                ),
+                Text(
+                  _requiresApproval ? 'Los miembros nuevos necesitan aprobación' : 'Entrada libre',
+                  style: AppTypography.caption.copyWith(color: AppColors.textMuted),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _requiresApproval,
+            onChanged: (v) => setState(() => _requiresApproval = v),
+            activeColor: AppColors.warning,
+            inactiveTrackColor: AppColors.trackInactive,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCreateButton() {
     return SizedBox(
       width: double.infinity,
@@ -288,6 +420,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
       tag: tag,
       isPublic: _isPublic,
       logoUrl: _logoUrl,
+      requiresApproval: _requiresApproval,
     ));
   }
 }

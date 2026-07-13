@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/network/api_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/main_shell.dart';
+import 'core/widgets/community_tab_screen.dart';
 import 'core/widgets/scanner_fab.dart';
 import 'features/admin/data/datasources/admin_remote_datasource.dart';
 import 'features/admin/domain/usecases/manage_allies.dart';
@@ -16,7 +17,6 @@ import 'features/validation/presentation/screens/qr_scanner_screen.dart';
 import 'features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import 'features/challenges/presentation/bloc/challenges_bloc.dart';
 import 'features/refugios/presentation/bloc/refugios_bloc.dart';
-import 'features/refugios/presentation/screens/refugios_screen.dart';
 import 'features/membership/data/datasources/membership_remote_datasource.dart';
 import 'features/membership/domain/usecases/activate_membership.dart';
 import 'features/membership/presentation/bloc/membership_bloc.dart';
@@ -28,19 +28,14 @@ import 'features/raids/presentation/bloc/raid_bloc.dart';
 import 'features/raids/presentation/screens/raid_list_screen.dart';
 import 'features/refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'features/clubs/presentation/bloc/club_bloc.dart';
-import 'features/clubs/presentation/screens/club_list_screen.dart';
 import 'features/patches/presentation/bloc/patches_bloc.dart';
 import 'features/tracker/presentation/screens/route_tracker_screen.dart';
-import 'features/alerts/presentation/screens/radar_screen.dart';
-import 'features/settings/presentation/screens/settings_screen.dart';
 import 'features/validation/data/datasources/validation_remote_datasource.dart';
 import 'features/validation/domain/usecases/validate_visit.dart';
 import 'features/validation/presentation/bloc/validation_bloc.dart';
 import 'features/routes/presentation/bloc/route_bloc.dart';
 import 'features/mileage/presentation/bloc/mileage_bloc.dart';
 import 'features/progression/presentation/bloc/leaderboard_bloc.dart';
-import 'features/routes/presentation/screens/route_list_screen.dart';
-import 'features/mileage/presentation/screens/mileage_screen.dart';
 
 class MoterosApp extends StatelessWidget {
   final ApiClient apiClient;
@@ -141,12 +136,8 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
       body: const MainShell(
         dashboard: DashboardScreen(),
         raidScreen: RaidListScreen(),
-        refugiosScreen: RefugiosScreen(),
-        clanScreen: ClubListScreen(),
         profileScreen: ProfileScreen(),
-        routeScreen: RouteListScreen(),
-        mileageScreen: MileageScreen(),
-        leaderboardScreen: null, // handled within progression tab
+        communityScreen: CommunityTabScreen(),
         initialTab: AppTab.dashboard,
       ),
       floatingActionButton: Padding(

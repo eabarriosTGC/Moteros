@@ -1,14 +1,12 @@
 /// Main navigation shell with custom bottom nav bar.
-/// Extended for F-30 (routes), F-34 (mileage), F-35 (leaderboard).
+/// Redesigned: 4 tabs (Inicio, Raids, Comunidad, Perfil) + center FAB.
 library;
 
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
-import '../theme/app_icons.dart';
-import '../widgets/scanner_fab.dart';
 
 /// Tab index mapping
-enum AppTab { dashboard, raid, scanner, refugios, clan, profile, routes, mileage }
+enum AppTab { dashboard, raid, scannerPlaceholder, community, profile }
 
 class MainShell extends StatefulWidget {
   const MainShell({
@@ -16,22 +14,14 @@ class MainShell extends StatefulWidget {
     required this.dashboard,
     required this.raidScreen,
     required this.profileScreen,
-    required this.refugiosScreen,
-    required this.clanScreen,
-    this.routeScreen,
-    this.mileageScreen,
-    this.leaderboardScreen,
+    required this.communityScreen,
     this.initialTab = AppTab.dashboard,
   });
 
   final Widget dashboard;
   final Widget raidScreen;
   final Widget profileScreen;
-  final Widget refugiosScreen;
-  final Widget clanScreen;
-  final Widget? routeScreen;
-  final Widget? mileageScreen;
-  final Widget? leaderboardScreen;
+  final Widget communityScreen;
   final AppTab initialTab;
 
   @override
@@ -58,14 +48,11 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(
         index: _currentTab.index,
         children: [
-          widget.dashboard,
-          widget.raidScreen,
-          const SizedBox.shrink(), // Scanner placeholder (never shown)
-          widget.refugiosScreen,
-          widget.clanScreen,
-          widget.profileScreen,
-          widget.routeScreen ?? const SizedBox.shrink(),
-          widget.mileageScreen ?? const SizedBox.shrink(),
+          widget.dashboard,                // 0: Inicio
+          widget.raidScreen,               // 1: Raids
+          const SizedBox.shrink(),         // 2: FAB placeholder (never shown)
+          widget.communityScreen,          // 3: Comunidad
+          widget.profileScreen,            // 4: Perfil
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -73,58 +60,15 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomNav() {
-    final items = <Widget>[
-      _NavItem(
-        icon: AppIcons.dashboard,
-        label: 'Tablero',
-        isSelected: _currentTab == AppTab.dashboard,
-        onTap: () => _onTabSelected(AppTab.dashboard),
-      ),
-      _NavItem(
-        icon: AppIcons.raid,
-        label: 'Raid',
-        isSelected: _currentTab == AppTab.raid,
-        onTap: () => _onTabSelected(AppTab.raid),
-      ),
-      // FAB sits here (center)
-      const SizedBox(width: AppSpacing.fabSize),
-      _NavItem(
-        icon: AppIcons.clan,
-        label: 'Club',
-        isSelected: _currentTab == AppTab.clan,
-        onTap: () => _onTabSelected(AppTab.clan),
-      ),
-      if (widget.routeScreen != null)
-        _NavItem(
-          icon: Icons.route_outlined,
-          label: 'Rutas',
-          isSelected: _currentTab == AppTab.routes,
-          onTap: () => _onTabSelected(AppTab.routes),
-        ),
-      if (widget.mileageScreen != null)
-        _NavItem(
-          icon: Icons.speed_outlined,
-          label: 'KM',
-          isSelected: _currentTab == AppTab.mileage,
-          onTap: () => _onTabSelected(AppTab.mileage),
-        ),
-      _NavItem(
-        icon: AppIcons.profile,
-        label: 'Perfil',
-        isSelected: _currentTab == AppTab.profile,
-        onTap: () => _onTabSelected(AppTab.profile),
-      ),
-    ];
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Container(
-      height: AppSpacing.bottomNavHeight +
-          MediaQuery.of(context).padding.bottom +
-          8,
+      height: AppSpacing.bottomNavHeight + safeBottom + 8,
       padding: EdgeInsets.only(
         left: AppSpacing.md,
         right: AppSpacing.md,
         top: AppSpacing.sm,
-        bottom: MediaQuery.of(context).padding.bottom + 4,
+        bottom: safeBottom + 4,
       ),
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -134,7 +78,38 @@ class _MainShellState extends State<MainShell> {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: items,
+        children: [
+          // Tab 0: Inicio
+          _NavItem(
+            icon: Icons.home_rounded,
+            label: 'Inicio',
+            isSelected: _currentTab == AppTab.dashboard,
+            onTap: () => _onTabSelected(AppTab.dashboard),
+          ),
+          // Tab 1: Raids
+          _NavItem(
+            icon: Icons.flag_rounded,
+            label: 'Raids',
+            isSelected: _currentTab == AppTab.raid,
+            onTap: () => _onTabSelected(AppTab.raid),
+          ),
+          // Tab 2: FAB placeholder (spacer)
+          const SizedBox(width: AppSpacing.fabSize),
+          // Tab 3: Comunidad
+          _NavItem(
+            icon: Icons.groups_rounded,
+            label: 'Comunidad',
+            isSelected: _currentTab == AppTab.community,
+            onTap: () => _onTabSelected(AppTab.community),
+          ),
+          // Tab 4: Perfil
+          _NavItem(
+            icon: Icons.person_rounded,
+            label: 'Perfil',
+            isSelected: _currentTab == AppTab.profile,
+            onTap: () => _onTabSelected(AppTab.profile),
+          ),
+        ],
       ),
     );
   }

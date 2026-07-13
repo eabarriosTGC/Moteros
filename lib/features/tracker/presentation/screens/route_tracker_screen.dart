@@ -53,9 +53,10 @@ final class SaveRoute extends TrackerEvent { final String name; SaveRoute(this.n
 final class LoadSavedRoutes extends TrackerEvent {}
 
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
-  StreamSubscription<Position>? _sub;
-  List<LatLng> _points = [];
   DateTime? _startedAt;
+  List<LatLng> _points = [];
+  StreamSubscription<Position>? _sub;
+  Timer? _ticker;
   double _maxSpeed = 0;
 
   TrackerBloc() : super(TrackerIdle()) {
@@ -99,6 +100,23 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       _points.add(LatLng(pos.latitude, pos.longitude));
 
       emit(TrackerRecording(points: List.from(_points)));
+
+      // Tick every second so timer updates even without GPS movement
+      _ticker?.cancel();
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!isClosed && _startedAt != null) {
+          final dur = DateTime.now().difference(_startedAt!).inSeconds;
+          final dist = _calcDistance(_points);
+          final avg = dur > 0 ? (dist / dur * 3.6) : 0.0;
+          emit(TrackerRecording(
+            points: List.from(_points),
+            distanceKm: dist,
+            durationSec: dur,
+            avgSpeed: avg,
+            maxSpeed: _maxSpeed * 3.6,
+          ));
+        }
+      });
 
       _sub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(

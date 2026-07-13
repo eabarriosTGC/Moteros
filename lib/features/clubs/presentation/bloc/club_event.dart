@@ -27,16 +27,18 @@ final class CreateClub extends ClubEvent {
   final String tag;
   final bool isPublic;
   final String? logoUrl;
+  final bool requiresApproval;
 
   const CreateClub({
     required this.name,
     required this.tag,
     this.isPublic = true,
     this.logoUrl,
+    this.requiresApproval = false,
   });
 
   @override
-  List<Object?> get props => [name, tag, isPublic, logoUrl];
+  List<Object?> get props => [name, tag, isPublic, logoUrl, requiresApproval];
 }
 
 final class JoinClub extends ClubEvent {
@@ -224,4 +226,13 @@ final class LoadChallengeProgress extends ClubEvent {
 
   @override
   List<Object?> get props => [challengeId];
+}
+
+// --- Access Code Events ---
+
+final class JoinClubWithCode extends ClubEvent {
+  final String code;
+  const JoinClubWithCode({required this.code});
+  @override
+  List<Object?> get props => [code];
 }

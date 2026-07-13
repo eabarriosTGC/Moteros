@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/widgets/map_picker_screen.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
@@ -21,20 +22,57 @@ class CreateRaidScreen extends StatefulWidget {
 class _CreateRaidScreenState extends State<CreateRaidScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _originController = TextEditingController(text: '4.60971, -74.08175');
-  final _destController = TextEditingController(text: '4.69127, -74.04583');
   late DateTime _selectedDate;
-  String _selectedMode = 'Free Ride';
+  String _selectedMode = 'Aventura';
   bool _isPublic = true;
   bool _isLoading = false;
 
+  // Origin coordinates
+  double? _originLat;
+  double? _originLng;
+  String _originLabel = '';
+
+  // Destination coordinates
+  double? _destLat;
+  double? _destLng;
+  String _destLabel = '';
+
   final _gameModes = [
-    'Free Ride',
-    'Rally',
-    'Ruta Gótica',
-    'Convoy',
-    'Sobrevivencia',
+    'Aventura',
+    'Velocidad',
+    'Precisión',
+    'Supervivencia',
+    'Exploración',
   ];
+
+  /// Game mode metadata for info bottom sheet
+  static const _modeInfo = {
+    'Aventura': {
+      'icon': Icons.landscape,
+      'desc':
+          'Todos contra el camino. Gana quien más puntos acumule en checkpoints. Cooperativo y competitivo.',
+    },
+    'Velocidad': {
+      'icon': Icons.speed,
+      'desc':
+          'Llega primero a la meta. Puro sprint, el más rápido gana.',
+    },
+    'Precisión': {
+      'icon': Icons.track_changes,
+      'desc':
+          'El que más cerca pase por los puntos de control sin desviarse. Puntería y navegación.',
+    },
+    'Supervivencia': {
+      'icon': Icons.shield,
+      'desc':
+          'El último en pie. Pierde el que llegue último a cada checkpoint.',
+    },
+    'Exploración': {
+      'icon': Icons.explore,
+      'desc':
+          'Descubre la mayor cantidad de lugares en el mapa. Sin ruta fija.',
+    },
+  };
 
   @override
   void initState() {
@@ -45,9 +83,140 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    _originController.dispose();
-    _destController.dispose();
     super.dispose();
+  }
+
+  void _showModeInfo(String mode) {
+    final info = _modeInfo[mode]!;
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.metallicDark,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Mode header
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(25),
+                    borderRadius: AppRadius.mdCircular,
+                  ),
+                  child: Icon(
+                    info['icon'] as IconData,
+                    color: AppColors.primary,
+                    size: AppSpacing.iconLg,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mode.toUpperCase(),
+                        style: AppTypography.h3.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'MODO DE JUEGO',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            // Description card
+            Container(
+              width: double.infinity,
+              padding: AppSpacing.cardPadding,
+              decoration: BoxDecoration(
+                color: AppColors.input,
+                borderRadius: AppRadius.mdCircular,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppColors.primary,
+                    size: AppSpacing.iconSm,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      info['desc'] as String,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openMapPicker({
+    required double? initialLat,
+    required double? initialLng,
+    required String title,
+    required void Function(double lat, double lng) onPicked,
+  }) async {
+    HapticFeedback.lightImpact();
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPickerScreen(
+          initialLatitude: initialLat,
+          initialLongitude: initialLng,
+          title: title,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      final lat = (result['latitude'] as num).toDouble();
+      final lng = (result['longitude'] as num).toDouble();
+      onPicked(lat, lng);
+    }
   }
 
   @override
@@ -102,23 +271,65 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
-                  // Origin
+                  // Origin — Map picker button
                   _sectionLabel('ORIGEN'),
                   const SizedBox(height: AppSpacing.sm),
-                  _buildInput(
-                    controller: _originController,
-                    hint: 'Latitud, Longitud',
-                    icon: Icons.location_on_outlined,
+                  _buildLocationPicker(
+                    label: _originLabel.isNotEmpty
+                        ? _originLabel
+                        : '📍 Seleccionar en mapa',
+                    hasValue: _originLat != null,
+                    onTap: () => _openMapPicker(
+                      initialLat: _originLat,
+                      initialLng: _originLng,
+                      title: 'Seleccionar origen',
+                      onPicked: (lat, lng) {
+                        setState(() {
+                          _originLat = lat;
+                          _originLng = lng;
+                          _originLabel =
+                              '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+                        });
+                      },
+                    ),
+                    onClear: _originLat != null
+                        ? () => setState(() {
+                              _originLat = null;
+                              _originLng = null;
+                              _originLabel = '';
+                            })
+                        : null,
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
-                  // Destination
+                  // Destination — Map picker button
                   _sectionLabel('DESTINO'),
                   const SizedBox(height: AppSpacing.sm),
-                  _buildInput(
-                    controller: _destController,
-                    hint: 'Latitud, Longitud',
-                    icon: Icons.flag_outlined,
+                  _buildLocationPicker(
+                    label: _destLabel.isNotEmpty
+                        ? _destLabel
+                        : '📍 Seleccionar en mapa',
+                    hasValue: _destLat != null,
+                    onTap: () => _openMapPicker(
+                      initialLat: _destLat,
+                      initialLng: _destLng,
+                      title: 'Seleccionar destino',
+                      onPicked: (lat, lng) {
+                        setState(() {
+                          _destLat = lat;
+                          _destLng = lng;
+                          _destLabel =
+                              '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+                        });
+                      },
+                    ),
+                    onClear: _destLat != null
+                        ? () => setState(() {
+                              _destLat = null;
+                              _destLng = null;
+                              _destLabel = '';
+                            })
+                        : null,
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
@@ -198,47 +409,145 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
     );
   }
 
+  Widget _buildLocationPicker({
+    required String label,
+    required bool hasValue,
+    required VoidCallback onTap,
+    VoidCallback? onClear,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.input,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(
+          color: hasValue ? AppColors.primary : AppColors.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: AppRadius.mdCircular,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        hasValue
+                            ? Icons.location_on
+                            : Icons.map_outlined,
+                        color: hasValue
+                            ? AppColors.primary
+                            : AppColors.textMuted,
+                        size: AppSpacing.iconSm,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: AppTypography.body.copyWith(
+                            color: hasValue
+                                ? AppColors.textPrimary
+                                : AppColors.textMuted,
+                            fontFamily: hasValue ? 'SpaceGrotesk' : 'DMSans',
+                            fontWeight:
+                                hasValue ? FontWeight.w500 : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (onClear != null)
+            IconButton(
+              onPressed: onClear,
+              icon: const Icon(Icons.close, size: 18),
+              color: AppColors.textMuted,
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              constraints: const BoxConstraints(),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildModeSelector() {
     return Wrap(
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
       children: _gameModes.map((mode) {
         final isSelected = _selectedMode == mode;
-        return GestureDetector(
-          onTap: () => setState(() => _selectedMode = mode),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.primary.withAlpha(20)
-                  : AppColors.input,
-              borderRadius: AppRadius.mdCircular,
-              border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.border,
-                width: isSelected ? 1.5 : 1,
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: () => setState(() => _selectedMode = mode),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary.withAlpha(20)
+                      : AppColors.input,
+                  borderRadius: AppRadius.mdCircular,
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : AppColors.border,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primaryGlow,
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  mode.toUpperCase(),
+                  style: AppTypography.buttonSmall.copyWith(
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
               ),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primaryGlow,
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
             ),
-            child: Text(
-              mode.toUpperCase(),
-              style: AppTypography.buttonSmall.copyWith(
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            // Info button
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => _showModeInfo(mode),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textMuted,
+                  size: 14,
+                ),
               ),
             ),
-          ),
+          ],
         );
       }).toList(),
     );
@@ -417,36 +726,38 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
       return;
     }
 
+    if (_originLat == null || _originLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecciona el origen en el mapa'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_destLat == null || _destLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecciona el destino en el mapa'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
-
-    // Parse coordinates
-    final originParts = _originController.text
-        .split(',')
-        .map((s) => double.tryParse(s.trim()))
-        .toList();
-    final destParts = _destController.text
-        .split(',')
-        .map((s) => double.tryParse(s.trim()))
-        .toList();
 
     context.read<RaidBloc>().add(
       CreateRaid(
         title: _titleController.text.trim(),
-        origin: _originController.text.trim(),
-        originLat: originParts.length >= 2 && originParts[0] != null
-            ? originParts[0]!
-            : 4.60971,
-        originLng: originParts.length >= 2 && originParts[1] != null
-            ? originParts[1]!
-            : -74.08175,
-        destination: _destController.text.trim(),
-        destLat: destParts.length >= 2 && destParts[0] != null
-            ? destParts[0]!
-            : 4.69127,
-        destLng: destParts.length >= 2 && destParts[1] != null
-            ? destParts[1]!
-            : -74.04583,
+        origin: '$_originLat, $_originLng',
+        originLat: _originLat!,
+        originLng: _originLng!,
+        destination: '$_destLat, $_destLng',
+        destLat: _destLat!,
+        destLng: _destLng!,
         gameMode: _selectedMode,
         dateTime: _selectedDate,
         isPublic: _isPublic,

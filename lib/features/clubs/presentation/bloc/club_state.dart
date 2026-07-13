@@ -76,6 +76,12 @@ final class MemberPromoted extends ClubState {
   List<Object?> get props => [memberName, newRole];
 }
 
+final class ClubJoined extends ClubState {
+  const ClubJoined();
+  @override
+  List<Object?> get props => [];
+}
+
 final class ClubError extends ClubState {
   final String message;
   const ClubError(this.message);
