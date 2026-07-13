@@ -12,7 +12,7 @@ BEGIN
     FOR t IN
         SELECT unnest(ARRAY['users', 'user_follows', 'memberships', 'places', 'visits',
             'allies', 'evidence_photos', 'saved_routes', 'road_alerts', 'challenges',
-            'user_challenges', 'patches', 'user_patches', 'clans', 'clan_members',
+            'user_challenges', 'patches', 'user_patches', 'clans', 'clan_members', 'clubs', 'club_members',
             'raids', 'raid_participants', 'raid_checkpoints', 'raid_checkpoint_verifications',
             'raid_messages', 'clan_messages', 'user_xp', 'achievements', 'user_achievements',
             'leaderboard_snapshots', 'drive_scores', 'voice_channels', 'mentor_relationships',

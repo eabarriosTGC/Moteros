@@ -1,5 +1,5 @@
 /// Main navigation shell with custom bottom nav bar.
-/// The center button is a motorcycle-start-button styled QR scanner FAB.
+/// Extended for F-30 (routes), F-34 (mileage), F-35 (leaderboard).
 library;
 
 import 'package:flutter/material.dart';
@@ -8,7 +8,7 @@ import '../theme/app_icons.dart';
 import '../widgets/scanner_fab.dart';
 
 /// Tab index mapping
-enum AppTab { dashboard, raid, scanner, refugios, clan, profile }
+enum AppTab { dashboard, raid, scanner, refugios, clan, profile, routes, mileage }
 
 class MainShell extends StatefulWidget {
   const MainShell({
@@ -18,6 +18,9 @@ class MainShell extends StatefulWidget {
     required this.profileScreen,
     required this.refugiosScreen,
     required this.clanScreen,
+    this.routeScreen,
+    this.mileageScreen,
+    this.leaderboardScreen,
     this.initialTab = AppTab.dashboard,
   });
 
@@ -26,6 +29,9 @@ class MainShell extends StatefulWidget {
   final Widget profileScreen;
   final Widget refugiosScreen;
   final Widget clanScreen;
+  final Widget? routeScreen;
+  final Widget? mileageScreen;
+  final Widget? leaderboardScreen;
   final AppTab initialTab;
 
   @override
@@ -58,6 +64,8 @@ class _MainShellState extends State<MainShell> {
           widget.refugiosScreen,
           widget.clanScreen,
           widget.profileScreen,
+          widget.routeScreen ?? const SizedBox.shrink(),
+          widget.mileageScreen ?? const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -65,7 +73,49 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomNav() {
-    // 4 nav items + center FAB (Refugio moved to Profile menu)
+    final items = <Widget>[
+      _NavItem(
+        icon: AppIcons.dashboard,
+        label: 'Tablero',
+        isSelected: _currentTab == AppTab.dashboard,
+        onTap: () => _onTabSelected(AppTab.dashboard),
+      ),
+      _NavItem(
+        icon: AppIcons.raid,
+        label: 'Raid',
+        isSelected: _currentTab == AppTab.raid,
+        onTap: () => _onTabSelected(AppTab.raid),
+      ),
+      // FAB sits here (center)
+      const SizedBox(width: AppSpacing.fabSize),
+      _NavItem(
+        icon: AppIcons.clan,
+        label: 'Club',
+        isSelected: _currentTab == AppTab.clan,
+        onTap: () => _onTabSelected(AppTab.clan),
+      ),
+      if (widget.routeScreen != null)
+        _NavItem(
+          icon: Icons.route_outlined,
+          label: 'Rutas',
+          isSelected: _currentTab == AppTab.routes,
+          onTap: () => _onTabSelected(AppTab.routes),
+        ),
+      if (widget.mileageScreen != null)
+        _NavItem(
+          icon: Icons.speed_outlined,
+          label: 'KM',
+          isSelected: _currentTab == AppTab.mileage,
+          onTap: () => _onTabSelected(AppTab.mileage),
+        ),
+      _NavItem(
+        icon: AppIcons.profile,
+        label: 'Perfil',
+        isSelected: _currentTab == AppTab.profile,
+        onTap: () => _onTabSelected(AppTab.profile),
+      ),
+    ];
+
     return Container(
       height: AppSpacing.bottomNavHeight + 16,
       padding: const EdgeInsets.only(
@@ -82,34 +132,7 @@ class _MainShellState extends State<MainShell> {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavItem(
-            icon: AppIcons.dashboard,
-            label: 'Tablero',
-            isSelected: _currentTab == AppTab.dashboard,
-            onTap: () => _onTabSelected(AppTab.dashboard),
-          ),
-          _NavItem(
-            icon: AppIcons.raid,
-            label: 'Raid',
-            isSelected: _currentTab == AppTab.raid,
-            onTap: () => _onTabSelected(AppTab.raid),
-          ),
-          // FAB sits here (center)
-          const SizedBox(width: AppSpacing.fabSize),
-          _NavItem(
-            icon: AppIcons.clan,
-            label: 'Clan',
-            isSelected: _currentTab == AppTab.clan,
-            onTap: () => _onTabSelected(AppTab.clan),
-          ),
-          _NavItem(
-            icon: AppIcons.profile,
-            label: 'Perfil',
-            isSelected: _currentTab == AppTab.profile,
-            onTap: () => _onTabSelected(AppTab.profile),
-          ),
-        ],
+        children: items,
       ),
     );
   }

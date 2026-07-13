@@ -26,11 +26,33 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   int _followers = 0, _following = 0;
   XpData? _xpData;
+  String _displayName = '';
+  String _email = '';
+  String _avatarUrl = '';
 
   @override
   void initState() {
     super.initState();
+    _loadUser();
     _loadData();
+  }
+
+  void _loadUser() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    _email = user.email ?? '';
+    _avatarUrl = user.userMetadata?['avatar_url'] as String? ?? '';
+    // Derive display name from email prefix or user_metadata
+    final metaName = user.userMetadata?['full_name'] as String? ??
+                     user.userMetadata?['name'] as String?;
+    if (metaName != null && metaName.isNotEmpty) {
+      _displayName = metaName;
+    } else {
+      _displayName = _email.split('@').first
+          .split('.')
+          .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+          .join(' ');
+    }
   }
 
   Future<void> _loadData() async {
@@ -85,12 +107,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildHeader() {
+    final displayName = _displayName.isNotEmpty ? _displayName : 'Motero';
+    final email = _email.isNotEmpty ? _email : 'cargando...';
     return Column(children: [
-      Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary, width: 2.5), color: AppColors.surface, boxShadow: AppShadows.amberGlow),
-        child: const Icon(AppIcons.profile, color: AppColors.primary, size: 40)),
+      Container(width: 80, height: 80,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.primary, width: 2.5),
+          color: AppColors.surface,
+          boxShadow: AppShadows.amberGlow,
+          image: _avatarUrl.isNotEmpty
+              ? DecorationImage(image: NetworkImage(_avatarUrl), fit: BoxFit.cover)
+              : null,
+        ),
+        child: _avatarUrl.isEmpty
+            ? const Icon(AppIcons.profile, color: AppColors.primary, size: 40)
+            : null,
+      ),
       const SizedBox(height: 8),
-      Text('Usuario de Prueba', style: AppTypography.h2.copyWith(color: AppColors.textPrimary, letterSpacing: 1)),
-      Text('test@moteros.app', style: AppTypography.body.copyWith(color: AppColors.textMuted)),
+      Text(displayName, style: AppTypography.h2.copyWith(color: AppColors.textPrimary, letterSpacing: 1)),
+      Text(email, style: AppTypography.body.copyWith(color: AppColors.textMuted)),
       const SizedBox(height: 12),
     ]);
   }

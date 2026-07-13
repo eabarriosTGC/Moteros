@@ -1,7 +1,6 @@
 /// Map Explorer — "Mapa de Conquistas" redesign.
 /// Dark tiles + filter chips + redesigned markers + premium bottom sheet.
 library;
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,27 +12,39 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../../../core/theme/app_buttons.dart';
 import '../../../admin/presentation/screens/admin_panel_screen.dart';
 import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../validation/presentation/screens/qr_scanner_screen.dart';
-import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../domain/entities/place_entity.dart';
 import '../bloc/places_bloc.dart';
 import '../bloc/places_event.dart';
 import '../bloc/places_state.dart';
 
-/// Category filter mapping
+/// Category filter mapping — extended with place type boolean filters
 enum PlaceFilter {
   all('Todos', null),
-  rest('Descanse', ['hotel', 'moto_posada']),
-  eat('Tanquee', ['restaurante']),
-  repair('Desvare', ['taller', 'grua']),
-  view('Mirador', ['mirador']);
+  workshop('Taller 🔧', 'workshop'),
+  hospital('Hospital 🏥', 'hospital'),
+  gasStation('Gasolinera ⛽', 'gas_station'),
+  tourist('Turístico 🗺️', 'tourist_spot'),
+  motoposada('Motoposada 🏠', 'moto_posada');
 
   final String label;
-  final List<String>? categories;
-  const PlaceFilter(this.label, this.categories);
+  final String? typeKey;
+  const PlaceFilter(this.label, this.typeKey);
+
+  /// Check if a PlaceEntity matches this filter
+  bool matches(PlaceEntity place) {
+    if (this == PlaceFilter.all) return true;
+    return switch (typeKey) {
+      'workshop' => place.isWorkshop,
+      'hospital' => place.isHospital,
+      'gas_station' => place.isGasStation,
+      'tourist_spot' => place.isTouristSpot,
+      'moto_posada' => place.isMotoposada,
+      _ => false,
+    };
+  }
 }
 
 class MapExplorerScreen extends StatefulWidget {
@@ -47,6 +58,8 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   LatLng? _currentPosition;
   PlaceFilter _activeFilter = PlaceFilter.all;
 
+  static const LatLng _defaultCenter = LatLng(4.5709, -74.2973); // Bogotá, Colombia
+
   @override
   void initState() {
     super.initState();
@@ -56,26 +69,73 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   Future<void> _getCurrentPosition() async {
     try {
       final enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) return;
+      if (!enabled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📍 Activa el GPS para ver tu ubicación en el mapa'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
-        if (perm == LocationPermission.denied) return;
+        if (perm == LocationPermission.denied) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📍 Sin permiso de ubicación — no podemos mostrarte en el mapa'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
       }
-      if (perm == LocationPermission.deniedForever) return;
-      final pos = await Geolocator.getCurrentPosition();
+      if (perm == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('📍 Permiso de ubicación denegado permanentemente. Actívalo en Ajustes'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Ajustes',
+              onPressed: () => Geolocator.openAppSettings(),
+            ),
+          ),
+        );
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
       if (!mounted) return;
       setState(() => _currentPosition = LatLng(pos.latitude, pos.longitude));
       context.read<PlacesBloc>().add(LoadNearbyPlaces(
             latitude: pos.latitude,
             longitude: pos.longitude,
           ));
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      // Fallback: try last known position
+      try {
+        final lastPos = await Geolocator.getLastKnownPosition();
+        if (lastPos != null && mounted) {
+          setState(() => _currentPosition = LatLng(lastPos.latitude, lastPos.longitude));
+        }
+      } catch (_) {}
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ No se pudo obtener ubicación: $e')),
+      );
+    }
   }
 
   List<PlaceEntity> _filteredPlaces(List<PlaceEntity> all) {
-    if (_activeFilter == PlaceFilter.all) return all;
-    return all.where((p) => _activeFilter.categories!.contains(p.category)).toList();
+    return all.where((p) => _activeFilter.matches(p)).toList();
   }
 
   IconData _categoryIcon(String category) => switch (category) {
@@ -346,15 +406,13 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             ],
           ),
           body: Stack(children: [
-            // Map
-            _currentPosition == null
-              ? const Center(child: CircularProgressIndicator())
-              : FlutterMap(
-                  options: MapOptions(
-                    initialCenter: _currentPosition!,
-                    initialZoom: 14, minZoom: 6, maxZoom: 18,
-                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
-                  ),
+            // Map — always rendered, even without GPS
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: _currentPosition ?? _defaultCenter,
+                initialZoom: 14, minZoom: 6, maxZoom: 18,
+                interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+              ),
                   children: [
                     // Dark tile layer with offline cache support
                     TileLayer(
@@ -381,9 +439,10 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                           ),
                         ),
                       ),
-                    // User location dot
-                    MarkerLayer(markers: [
-                      Marker(point: _currentPosition!, width: 22, height: 22,
+                    // User location dot (only when GPS available)
+                    if (_currentPosition != null)
+                      MarkerLayer(markers: [
+                        Marker(point: _currentPosition!, width: 22, height: 22,
                         child: Container(
                           decoration: BoxDecoration(
                             color: AppColors.secondary, shape: BoxShape.circle,

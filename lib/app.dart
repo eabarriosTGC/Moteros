@@ -27,8 +27,8 @@ import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/raids/presentation/bloc/raid_bloc.dart';
 import 'features/raids/presentation/screens/raid_list_screen.dart';
 import 'features/refugios/presentation/bloc/motoposadas_bloc.dart';
-import 'features/clans/presentation/bloc/clan_bloc.dart';
-import 'features/clans/presentation/screens/clan_list_screen.dart';
+import 'features/clubs/presentation/bloc/club_bloc.dart';
+import 'features/clubs/presentation/screens/club_list_screen.dart';
 import 'features/patches/presentation/bloc/patches_bloc.dart';
 import 'features/tracker/presentation/screens/route_tracker_screen.dart';
 import 'features/alerts/presentation/screens/radar_screen.dart';
@@ -36,6 +36,11 @@ import 'features/settings/presentation/screens/settings_screen.dart';
 import 'features/validation/data/datasources/validation_remote_datasource.dart';
 import 'features/validation/domain/usecases/validate_visit.dart';
 import 'features/validation/presentation/bloc/validation_bloc.dart';
+import 'features/routes/presentation/bloc/route_bloc.dart';
+import 'features/mileage/presentation/bloc/mileage_bloc.dart';
+import 'features/progression/presentation/bloc/leaderboard_bloc.dart';
+import 'features/routes/presentation/screens/route_list_screen.dart';
+import 'features/mileage/presentation/screens/mileage_screen.dart';
 
 class MoterosApp extends StatelessWidget {
   final ApiClient apiClient;
@@ -83,9 +88,13 @@ class MoterosApp extends StatelessWidget {
           ),
         ),
         BlocProvider(create: (_) => RaidBloc()),
-        BlocProvider(create: (_) => ClanBloc()),
+        BlocProvider(create: (_) => ClubBloc()),
         BlocProvider(create: (_) => PatchesBloc()),
         BlocProvider(create: (_) => TrackerBloc()),
+        // New F-29 to F-35 BLoCs
+        BlocProvider(create: (_) => RouteBloc()),
+        BlocProvider(create: (_) => MileageBloc()),
+        BlocProvider(create: (_) => LeaderboardBloc()),
       ],
       child: MaterialApp(
         title: 'AsfaltoClub',
@@ -102,7 +111,6 @@ class MoterosApp extends StatelessWidget {
             if (state is Authenticated) {
               return const _AuthenticatedShell();
             }
-            // Unauthenticated or AuthError → show login
             return const LoginScreen();
           },
         ),
@@ -111,7 +119,6 @@ class MoterosApp extends StatelessWidget {
   }
 }
 
-/// Wraps the authenticated experience: MainShell + ScannerFab overlay.
 class _AuthenticatedShell extends StatefulWidget {
   const _AuthenticatedShell();
 
@@ -123,9 +130,7 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   void _openScanner() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
   }
 
   @override
@@ -137,8 +142,11 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
         dashboard: DashboardScreen(),
         raidScreen: RaidListScreen(),
         refugiosScreen: RefugiosScreen(),
-        clanScreen: ClanListScreen(),
+        clanScreen: ClubListScreen(),
         profileScreen: ProfileScreen(),
+        routeScreen: RouteListScreen(),
+        mileageScreen: MileageScreen(),
+        leaderboardScreen: null, // handled within progression tab
         initialTab: AppTab.dashboard,
       ),
       floatingActionButton: Padding(
