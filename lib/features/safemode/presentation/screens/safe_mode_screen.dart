@@ -4,11 +4,10 @@ library;
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
-import '../../../../core/theme/app_icons.dart';
 import '../../../../core/services/sos_service.dart';
+import '../../../../core/services/crash_detection_service.dart';
 
 class SafeModeScreen extends StatefulWidget {
   final int? raidId;
@@ -24,17 +23,56 @@ class _SafeModeScreenState extends State<SafeModeScreen>
   late Animation<double> _speedAnim;
   double _simulatedSpeed = 0;
   final _sosService = SosService(Supabase.instance.client);
+  late final CrashDetectionService _crashService;
   bool _sosSending = false;
+  int? _crashCountdown;
+  bool _crashDetectionActive = false;
 
   @override
   void initState() {
     super.initState();
+    _crashService = CrashDetectionService(_sosService)
+      ..onMonitoring = () {
+        if (mounted) setState(() {
+          _crashCountdown = null;
+          _crashDetectionActive = true;
+        });
+      }
+      ..onCountdown = (s) {
+        if (mounted) setState(() => _crashCountdown = s);
+      }
+      ..onSosSent = () {
+        if (mounted) setState(() => _crashCountdown = null);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('🚨 Caída detectada. SOS enviado con tu ubicación.'),
+            backgroundColor: AppColors.error,
+            duration: Duration(seconds: 5),
+          ));
+        }
+      }
+      ..onCancelled = () {
+        if (mounted) setState(() => _crashCountdown = null);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ SOS cancelado'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ));
+        }
+      };
+
     _speedController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
     _speedAnim = CurvedAnimation(parent: _speedController, curve: Curves.easeInOut);
     _simulateSpeed();
+
+    // Start crash detection
+    _crashService.start(raidId: widget.raidId).then((ok) {
+      if (mounted) setState(() => _crashDetectionActive = ok);
+    });
   }
 
   void _simulateSpeed() {
@@ -49,6 +87,7 @@ class _SafeModeScreenState extends State<SafeModeScreen>
   @override
   void dispose() {
     _speedController.dispose();
+    _crashService.dispose();
     super.dispose();
   }
 
@@ -172,15 +211,83 @@ class _SafeModeScreenState extends State<SafeModeScreen>
           // GPS indicator
           Positioned(top: MediaQuery.of(context).padding.top + 8, left: 16,
             child: Row(children: [
-              Container(width: 8, height: 8, decoration: const BoxDecoration(
-                color: AppColors.success, shape: BoxShape.circle,
+              Container(width: 8, height: 8, decoration: BoxDecoration(
+                color: _crashDetectionActive ? AppColors.success : Colors.orange,
+                shape: BoxShape.circle,
               )),
               const SizedBox(width: 6),
-              const Text('GPS ACTIVO', style: TextStyle(
-                color: AppColors.success, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1,
+              Text(_crashDetectionActive ? 'GPS ACTIVO' : 'GPS...',
+                style: TextStyle(
+                  color: _crashDetectionActive ? AppColors.success : Colors.orange,
+                  fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1,
+                ),
+              ),
+            ]),
+          ),
+
+          // Crash detection indicator
+          Positioned(top: MediaQuery.of(context).padding.top + 8, right: 16,
+            child: Row(children: [
+              Icon(
+                _crashDetectionActive ? Icons.shield_rounded : Icons.shield_outlined,
+                color: _crashDetectionActive ? AppColors.success : Colors.white38,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text('DETECCIÓN', style: TextStyle(
+                color: _crashDetectionActive ? AppColors.success : Colors.white38,
+                fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1,
               )),
             ]),
           ),
+
+          // Crash countdown overlay
+          if (_crashCountdown != null)
+            Positioned.fill(
+              child: Material(
+                color: Colors.black87,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                        color: Colors.redAccent, size: 64),
+                      const SizedBox(height: 16),
+                      const Text('🚨 ¡POSIBLE CAÍDA DETECTADA!',
+                        style: TextStyle(
+                          color: Colors.white, fontSize: 20,
+                          fontWeight: FontWeight.w900, letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('SOS automático en ${_crashCountdown}s',
+                        style: const TextStyle(
+                          color: Colors.white70, fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: 240, height: 56,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _crashService.cancelSos(),
+                          icon: const Icon(Icons.check_circle, size: 24),
+                          label: const Text('ESTOY BIEN', style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800,
+                          )),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ]),
       ),
     );

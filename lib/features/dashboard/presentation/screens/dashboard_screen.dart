@@ -1,14 +1,22 @@
-/// Dashboard — redesigned with animated km counter, 2×2 action grid & recent raids.
+/// Dashboard — redesigned with animated km counter, 2×2+ action grid & recent raids.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../places/presentation/screens/map_explorer_screen.dart';
 import '../../../membership/presentation/screens/membership_screen.dart';
+import '../../../economy/presentation/screens/shop_screen.dart';
+import '../../../economy/presentation/widgets/coins_badge.dart';
+import '../../../economy/presentation/bloc/shop_bloc.dart';
+import '../../../economy/presentation/bloc/shop_event.dart';
+import '../../../economy/presentation/bloc/shop_state.dart';
+import '../../../battle_pass/presentation/screens/battle_pass_screen.dart';
+import '../../../showcase/presentation/screens/showcase_profile_screen.dart';
 import '../../../raids/presentation/bloc/raid_bloc.dart';
 import '../../../raids/presentation/bloc/raid_event.dart';
 import '../../../raids/presentation/bloc/raid_state.dart';
@@ -48,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardBloc>().add(LoadDashboard(userId: 1));
       context.read<RaidBloc>().add(const LoadRaids());
+      context.read<ShopBloc>().add(const LoadShop());
     });
   }
 
@@ -116,10 +125,10 @@ class _DashboardScreenState extends State<DashboardScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppSpacing.md),
-              // ── Animated km counter ──
+              // ── Animated km counter + coins badge ──
               _buildKmHeader(state),
               const SizedBox(height: AppSpacing.xl),
-              // ── 2×2 Action grid ──
+              // ── 3-row Action grid ──
               _buildActionGrid(context),
               const SizedBox(height: AppSpacing.xl),
               // ── Próximos raids ──
@@ -139,41 +148,86 @@ class _DashboardScreenState extends State<DashboardScreen>
     final displayKm = (_kmAnimation.value * state.totalKm).round();
     return Column(
       children: [
-        AnimatedBuilder(
-          animation: _kmAnimation,
-          builder: (context, child) => Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.xl,
-              horizontal: AppSpacing.md,
+        Stack(
+          children: [
+            AnimatedBuilder(
+              animation: _kmAnimation,
+              builder: (context, child) => Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppSpacing.xl,
+                  horizontal: AppSpacing.md,
+                ),
+                decoration: BoxDecoration(
+                  gradient: AppGradients.cardHighlight,
+                  borderRadius: AppRadius.lgCircular,
+                  border: Border.all(color: AppColors.primary.withAlpha(30), width: 1),
+                ),
+                child: Column(
+                  children: [
+                    // Large animated km number
+                    Text(
+                      '$displayKm',
+                      style: AppTypography.monoLarge.copyWith(
+                        color: AppColors.primary,
+                        fontSize: 56,
+                      ),
+                    ),
+                    Text(
+                      'KM',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 14,
+                        letterSpacing: 4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            decoration: BoxDecoration(
-              gradient: AppGradients.cardHighlight,
-              borderRadius: AppRadius.lgCircular,
-              border: Border.all(color: AppColors.primary.withAlpha(30), width: 1),
+            // Coins badge top-right of the km card
+            Positioned(
+              top: 12,
+              right: 12,
+              child: BlocBuilder<ShopBloc, ShopState>(
+                builder: (context, shopState) {
+                  final coins = shopState is ShopLoaded ? shopState.coins : 0;
+                  return CoinsBadge(coins: coins);
+                },
+              ),
             ),
-            child: Column(
-              children: [
-                // Large animated km number
-                Text(
-                  '$displayKm',
-                  style: AppTypography.monoLarge.copyWith(
+            // Quick profile link (avatar circle) top-left
+            Positioned(
+              top: 12,
+              left: 12,
+              child: GestureDetector(
+                onTap: () {
+                  _tap();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ShowcaseProfileScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surface,
+                    border: Border.all(color: AppColors.primary, width: 1.5),
+                  ),
+                  child: const Icon(
+                    Icons.person,
                     color: AppColors.primary,
-                    fontSize: 56,
+                    size: 20,
                   ),
                 ),
-                Text(
-                  'KM',
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 14,
-                    letterSpacing: 4,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
         const SizedBox(height: AppSpacing.sm),
         // Subtitle with stats
@@ -185,11 +239,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // ── 2×2 Action grid ──
+  // ── 3-row Action grid ──
 
   Widget _buildActionGrid(BuildContext context) {
     return Column(
       children: [
+        // Row 1: MAPA, RUTA
         Row(
           children: [
             Expanded(child: _actionCard(
@@ -212,6 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
+        // Row 2: AUXILIO, TIENDA
         Row(
           children: [
             Expanded(child: _actionCard(
@@ -227,8 +283,31 @@ class _DashboardScreenState extends State<DashboardScreen>
               context,
               icon: Icons.store_rounded,
               label: 'TIENDA',
-              subtitle: 'Membresía',
+              subtitle: 'Cosméticos',
               color: AppColors.info,
+              screen: const ShopScreen(),
+            )),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        // Row 3: PASE, MEMBRESÍA
+        Row(
+          children: [
+            Expanded(child: _actionCard(
+              context,
+              icon: Icons.card_membership_rounded,
+              label: 'PASE',
+              subtitle: 'Battle Pass',
+              color: AppColors.secondary,
+              screen: const BattlePassScreen(),
+            )),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: _actionCard(
+              context,
+              icon: AppIcons.fuel,
+              label: 'MEMBRESÍA',
+              subtitle: 'Ver plan',
+              color: AppColors.primary,
               screen: const MembershipScreen(),
             )),
           ],

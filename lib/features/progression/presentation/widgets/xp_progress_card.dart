@@ -1,4 +1,4 @@
-/// XpProgressCard — Reusable widget showing level, XP bar, streak.
+/// XpProgressCard — Reusable widget showing level, XP bar, streak, coins & shop.
 /// Fetches data directly from Supabase (no BLoC needed for read-only display).
 library;
 
@@ -84,12 +84,14 @@ class XpProgressCard extends StatelessWidget {
   final XpData data;
   final VoidCallback? onAchievementsTap;
   final VoidCallback? onLeaderboardTap;
+  final VoidCallback? onShopTap;
 
   const XpProgressCard({
     super.key,
     required this.data,
     this.onAchievementsTap,
     this.onLeaderboardTap,
+    this.onShopTap,
   });
 
   @override
@@ -107,7 +109,6 @@ class XpProgressCard extends StatelessWidget {
           // Level + XP row
           Row(
             children: [
-              // Level badge
               _levelBadge(),
               const SizedBox(width: AppSpacing.md),
               Expanded(child: _xpInfo()),
@@ -119,12 +120,28 @@ class XpProgressCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           // Stats row
           _statsRow(),
+          const SizedBox(height: AppSpacing.sm),
+          // Coins + TIENDA button
+          _coinsRow(),
           if (onAchievementsTap != null || onLeaderboardTap != null) ...[
             const SizedBox(height: AppSpacing.sm),
             _actionsRow(),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _coinsRow() {
+    return Row(
+      children: [
+        Icon(Icons.monetization_on, color: AppColors.primary, size: 20),
+        const SizedBox(width: 4),
+        Text('${data.coins}',
+          style: AppTypography.h3.copyWith(color: AppColors.primary)),
+        const Spacer(),
+        _actionBtn(Icons.store_rounded, 'TIENDA', AppColors.primary, onShopTap),
+      ],
     );
   }
 
@@ -243,6 +260,15 @@ class XpProgressCard extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _actionBtn(IconData icon, String label, Color color, VoidCallback? onTap) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+      style: TextButton.styleFrom(foregroundColor: color),
     );
   }
 }

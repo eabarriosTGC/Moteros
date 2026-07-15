@@ -15,6 +15,9 @@ import '../../../../core/theme/app_icons.dart';
 import '../../../admin/presentation/screens/admin_panel_screen.dart';
 import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../validation/presentation/screens/qr_scanner_screen.dart';
+import '../../../refugios/presentation/screens/create_motoposada_screen.dart';
+import '../../../refugios/presentation/screens/my_motoposada_screen.dart';
+import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../../domain/entities/place_entity.dart';
 import '../bloc/places_bloc.dart';
 import '../bloc/places_event.dart';
@@ -467,6 +470,45 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             // Loading overlay
             if (state is PlacesLoading)
               Container(color: AppColors.overlay, child: const Center(child: CircularProgressIndicator())),
+
+            // ── Refugios Action Bar ──
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: Container(
+                padding: EdgeInsets.only(
+                  left: AppSpacing.md, right: AppSpacing.md,
+                  top: AppSpacing.sm,
+                  bottom: MediaQuery.of(context).padding.bottom + 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withAlpha(220),
+                  border: Border(top: BorderSide(color: AppColors.border.withAlpha(60))),
+                ),
+                child: Row(children: [
+                  // SOS button
+                  GestureDetector(
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen())),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFFFF3B30), Color(0xFFFF6B6B)]),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [BoxShadow(color: Colors.red.withAlpha(60), blurRadius: 8, spreadRadius: 1)],
+                      ),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.warning, color: Colors.white, size: 18),
+                        SizedBox(width: 4),
+                        Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1)),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  // Ofrecer motoposada
+                  _barBtn(Icons.home_outlined, 'OFRECER', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateMotoposadaScreen()))),
+                  _barBtn(Icons.list_alt, 'MIS PUB.', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyMotoposadaScreen()))),
+                ]),
+              ),
+            ),
           ]),
         );
       },
@@ -511,6 +553,25 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             boxShadow: [BoxShadow(color: color.withAlpha(50), blurRadius: 8, spreadRadius: 2)],
           ),
           child: Icon(_categoryIcon(place.category), color: color, size: AppSpacing.iconSm),
+        ),
+      ),
+    );
+  }
+
+  Widget _barBtn(IconData icon, String label, VoidCallback onTap) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: TextButton.icon(
+          onPressed: onTap,
+          icon: Icon(icon, size: 16),
+          label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            backgroundColor: AppColors.primary.withAlpha(10),
+          ),
         ),
       ),
     );

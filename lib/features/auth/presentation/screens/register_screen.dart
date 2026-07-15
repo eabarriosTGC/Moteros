@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../../core/theme/design_tokens.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -16,23 +17,70 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  final _inviteCodeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _codeValid = false;
+  String? _codeClubName;
+  bool _checkingCode = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
+    _inviteCodeController.dispose();
     super.dispose();
   }
 
   void _onRegister() {
     if (_formKey.currentState?.validate() ?? false) {
+      if (!_codeValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Validá el código de invitación primero')),
+        );
+        return;
+      }
       context.read<AuthBloc>().add(RegisterRequested(
             email: _emailController.text.trim(),
             password: _passwordController.text,
             fullName: _nameController.text.trim(),
           ));
+    }
+  }
+
+  Future<void> _validateCode() async {
+    final code = _inviteCodeController.text.trim();
+    if (code.length < 4) return;
+    setState(() => _checkingCode = true);
+    try {
+      final result = await Supabase.instance.client.functions.invoke(
+        'validate-invite-code',
+        body: {'code': code},
+      );
+      final data = result.data as Map<String, dynamic>;
+      if (data['valid'] == true) {
+        setState(() {
+          _codeValid = true;
+          _codeClubName = data['club_name'] as String?;
+        });
+      } else {
+        setState(() {
+          _codeValid = false;
+          _codeClubName = null;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('❌ Código inválido')),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _codeValid = false;
+        _codeClubName = null;
+      });
+    } finally {
+      if (mounted) setState(() => _checkingCode = false);
     }
   }
 
@@ -134,6 +182,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         : null,
                     onFieldSubmitted: (_) => _onRegister(),
                   ),
+                  const SizedBox(height: 16),
+                  // Invite code
+                  Row(children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _inviteCodeController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Código de invitación',
+                          hintText: 'Ej: ABC12345',
+                          hintStyle: const TextStyle(color: AppColors.textDisabled),
+                          prefixIcon: const Icon(Icons.vpn_key, color: AppColors.textMuted),
+                          suffixIcon: _checkingCode
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(width: 18, height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2)),
+                                )
+                              : (_codeValid
+                                  ? const Icon(Icons.check_circle, color: AppColors.success)
+                                  : null),
+                          filled: true, fillColor: AppColors.input,
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        onChanged: (_) {
+                          if (_codeValid) setState(() { _codeValid = false; _codeClubName = null; });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _checkingCode ? null : _validateCode,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _codeValid ? AppColors.success : AppColors.primary,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+                        ),
+                        child: const Text('VALIDAR', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    ),
+                  ]),
+                  if (_codeClubName != null) ...[
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      const Icon(Icons.check, color: AppColors.success, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Club: $_codeClubName',
+                        style: const TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ]),
+                  ],
                   const SizedBox(height: 24),
                   // Register button
                   BlocBuilder<AuthBloc, AuthState>(

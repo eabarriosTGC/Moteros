@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'core/network/api_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/main_shell.dart';
@@ -12,6 +13,7 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
+import 'features/auth/presentation/screens/onboarding_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'features/validation/presentation/screens/qr_scanner_screen.dart';
 import 'features/dashboard/presentation/bloc/dashboard_bloc.dart';
@@ -36,6 +38,9 @@ import 'features/validation/presentation/bloc/validation_bloc.dart';
 import 'features/routes/presentation/bloc/route_bloc.dart';
 import 'features/mileage/presentation/bloc/mileage_bloc.dart';
 import 'features/progression/presentation/bloc/leaderboard_bloc.dart';
+import 'features/economy/presentation/bloc/shop_bloc.dart';
+import 'features/battle_pass/presentation/bloc/battle_pass_bloc.dart';
+import 'features/showcase/presentation/bloc/showcase_bloc.dart';
 
 class MoterosApp extends StatelessWidget {
   final ApiClient apiClient;
@@ -90,6 +95,10 @@ class MoterosApp extends StatelessWidget {
         BlocProvider(create: (_) => RouteBloc()),
         BlocProvider(create: (_) => MileageBloc()),
         BlocProvider(create: (_) => LeaderboardBloc()),
+        // ── Economy, Battle Pass & Showcase ──
+        BlocProvider(create: (_) => ShopBloc()),
+        BlocProvider(create: (_) => BattlePassBloc()),
+        BlocProvider(create: (_) => ShowcaseBloc()),
       ],
       child: MaterialApp(
         title: 'AsfaltoClub',
@@ -123,6 +132,28 @@ class _AuthenticatedShell extends StatefulWidget {
 
 class _AuthenticatedShellState extends State<_AuthenticatedShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool? _onboardingComplete;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
+    final done = meta?['onboarding_complete'] == true;
+    if (mounted) setState(() => _onboardingComplete = done);
+  }
+
+  Future<void> _showOnboarding() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+    );
+    if (result == true && mounted) {
+      setState(() => _onboardingComplete = true);
+    }
+  }
 
   void _openScanner() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
@@ -130,6 +161,26 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Onboarding gate — show onboarding if not yet completed
+    if (_onboardingComplete == false) {
+      // Show onboarding in a non-blocking way
+      Future.microtask(() {
+        if (mounted) _showOnboarding();
+      });
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0A0F),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Still loading onboarding status
+    if (_onboardingComplete == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0A0A0F),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       key: _scaffoldKey,
       extendBody: true,

@@ -3,7 +3,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../theme/design_tokens.dart';
+import '../../features/economy/presentation/widgets/coins_badge.dart';
+import '../../features/economy/presentation/bloc/shop_bloc.dart';
+import '../../features/economy/presentation/bloc/shop_event.dart';
+import '../../features/economy/presentation/bloc/shop_state.dart';
 
 /// Tab index mapping
 enum AppTab { dashboard, raid, scannerPlaceholder, community, profile }
@@ -35,6 +40,9 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _currentTab = widget.initialTab;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ShopBloc>().add(const LoadShop());
+    });
   }
 
   void _onTabSelected(AppTab tab) {
@@ -45,14 +53,33 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: _currentTab.index,
+      body: Stack(
         children: [
-          widget.dashboard,                // 0: Inicio
-          widget.raidScreen,               // 1: Raids
-          const SizedBox.shrink(),         // 2: FAB placeholder (never shown)
-          widget.communityScreen,          // 3: Comunidad
-          widget.profileScreen,            // 4: Perfil
+          IndexedStack(
+            index: _currentTab.index,
+            children: [
+              widget.dashboard,                // 0: Inicio
+              widget.raidScreen,               // 1: Raids
+              const SizedBox.shrink(),         // 2: FAB placeholder (never shown)
+              widget.communityScreen,          // 3: Comunidad
+              widget.profileScreen,            // 4: Perfil
+            ],
+          ),
+          // ── Coins badge floating top-right ──
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: BlocBuilder<ShopBloc, ShopState>(
+              builder: (context, state) {
+                final coins = state is ShopLoaded ? state.coins : 0;
+                return CoinsBadge(
+                  coins: coins,
+                  fontSize: 13,
+                  onTap: () => context.read<ShopBloc>().add(const RefreshCoins()),
+                );
+              },
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
