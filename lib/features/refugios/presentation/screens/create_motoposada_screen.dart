@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/widgets/map_picker_screen.dart';
 import '../bloc/motoposadas_bloc.dart';
 import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
@@ -22,12 +23,13 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _rulesController = TextEditingController();
-  final _latController = TextEditingController(text: '4.60971');
-  final _lngController = TextEditingController(text: '-74.08175');
   final _addressController = TextEditingController();
   String _type = 'casa';
   String _visibility = 'public';
   int _maxGuests = 1;
+  double _lat = 4.60971;
+  double _lng = -74.08175;
+  String _locationLabel = 'Seleccionar en el mapa';
 
   final _types = ['casa', 'parqueadero', 'garage'];
   final _visibilities = ['public', 'clan_only', 'clan_specific'];
@@ -37,8 +39,6 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
     _titleController.dispose();
     _descController.dispose();
     _rulesController.dispose();
-    _latController.dispose();
-    _lngController.dispose();
     _addressController.dispose();
     super.dispose();
   }
@@ -52,8 +52,8 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
       rules: _rulesController.text.trim(),
-      lat: double.tryParse(_latController.text.trim()) ?? 4.60971,
-      lng: double.tryParse(_lngController.text.trim()) ?? -74.08175,
+      lat: _lat,
+      lng: _lng,
       address: _addressController.text.trim(),
       maxGuests: _maxGuests,
       visibility: _visibility,
@@ -114,15 +114,38 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
 
                   Row(children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      _label('LATITUD'),
+                      _label('UBICACIÓN'),
                       const SizedBox(height: AppSpacing.sm),
-                      _input(_latController, '4.60971', Icons.my_location, small: true),
-                    ])),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      _label('LONGITUD'),
-                      const SizedBox(height: AppSpacing.sm),
-                      _input(_lngController, '-74.08175', Icons.my_location, small: true),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push<List<double>>(
+                              context,
+                              MaterialPageRoute(builder: (_) => MapPickerScreen(
+                                initialLat: _lat,
+                                initialLng: _lng,
+                              )),
+                            );
+                            if (result != null && result.length == 2) {
+                              setState(() {
+                                _lat = result[0];
+                                _lng = result[1];
+                                _locationLabel = '${result[0].toStringAsFixed(5)}, ${result[1].toStringAsFixed(5)}';
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.map, color: AppColors.primary),
+                          label: Text(_locationLabel,
+                            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primary),
+                            shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
                     ])),
                   ]),
                   const SizedBox(height: AppSpacing.lg),

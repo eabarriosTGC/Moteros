@@ -60,6 +60,7 @@ class MapExplorerScreen extends StatefulWidget {
 class _MapExplorerScreenState extends State<MapExplorerScreen> {
   LatLng? _currentPosition;
   PlaceFilter _activeFilter = PlaceFilter.all;
+  final MapController _mapController = MapController();
 
   static const LatLng _defaultCenter = LatLng(4.5709, -74.2973); // Bogotá, Colombia
 
@@ -118,6 +119,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       );
       if (!mounted) return;
       setState(() => _currentPosition = LatLng(pos.latitude, pos.longitude));
+      _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
       context.read<PlacesBloc>().add(LoadNearbyPlaces(
             latitude: pos.latitude,
             longitude: pos.longitude,
@@ -128,7 +130,9 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       try {
         final lastPos = await Geolocator.getLastKnownPosition();
         if (lastPos != null && mounted) {
-          setState(() => _currentPosition = LatLng(lastPos.latitude, lastPos.longitude));
+          final ll = LatLng(lastPos.latitude, lastPos.longitude);
+          setState(() => _currentPosition = ll);
+          _mapController.move(ll, 15);
         }
       } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(
@@ -411,6 +415,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
           body: Stack(children: [
             // Map — always rendered, even without GPS
             FlutterMap(
+              mapController: _mapController,
               options: MapOptions(
                 initialCenter: _currentPosition ?? _defaultCenter,
                 initialZoom: 14, minZoom: 6, maxZoom: 18,
