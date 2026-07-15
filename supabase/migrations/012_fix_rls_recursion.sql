@@ -24,4 +24,8 @@ CREATE POLICY rp_insert_public ON raid_participants
 -- leia raid_participants dentro de raid_participants
 DROP POLICY IF EXISTS rp_select_raid_participants ON raid_participants;
 
+-- Remove: raids_select_participant causaba recursion cruzada con
+-- rp_select_raid_host (raids → raid_participants → raids → ∞)
+DROP POLICY IF EXISTS raids_select_participant ON raids;
+
 COMMIT;
