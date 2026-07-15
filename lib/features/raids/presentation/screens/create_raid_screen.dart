@@ -202,20 +202,17 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
     required void Function(double lat, double lng) onPicked,
   }) async {
     HapticFeedback.lightImpact();
-    final result = await Navigator.push<Map<String, dynamic>>(
+    final result = await Navigator.push<List<double>>(
       context,
       MaterialPageRoute(
         builder: (_) => MapPickerScreen(
-          initialLatitude: initialLat,
-          initialLongitude: initialLng,
-          title: title,
+          initialLat: initialLat ?? 4.60971,
+          initialLng: initialLng ?? -74.08175,
         ),
       ),
     );
-    if (result != null && mounted) {
-      final lat = (result['latitude'] as num).toDouble();
-      final lng = (result['longitude'] as num).toDouble();
-      onPicked(lat, lng);
+    if (result != null && result.length == 2 && mounted) {
+      onPicked(result[0], result[1]);
     }
   }
 
