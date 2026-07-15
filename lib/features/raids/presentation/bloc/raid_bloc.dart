@@ -113,18 +113,16 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
       final response = await Supabase.instance.client.from('raids').insert({
-        'title': event.title,
-        'origin': event.origin,
         'origin_lat': event.originLat,
         'origin_lng': event.originLng,
-        'destination': event.destination,
         'dest_lat': event.destLat,
         'dest_lng': event.destLng,
-        'game_mode': event.gameMode,
-        'date_time': event.dateTime.toIso8601String(),
+        'mode': event.gameMode,
+        'scheduled_at': event.dateTime.toIso8601String(),
         'is_public': event.isPublic,
         'host_id': userId,
         'status': 'lobby',
+        'description': event.title,
       }).select().single();
 
       final raid = response as Map<String, dynamic>;
