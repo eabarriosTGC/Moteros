@@ -225,7 +225,7 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => RaidLobbyScreen(raidId: state.raid['id']),
+              builder: (_) => RaidLobbyScreen(raidId: '${state.raid['id']}'),
             ),
           );
         }
