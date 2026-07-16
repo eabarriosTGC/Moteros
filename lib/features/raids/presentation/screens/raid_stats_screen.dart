@@ -130,7 +130,7 @@ class _RaidStatsScreenState extends State<RaidStatsScreen>
                 ),
               ),
               Text(
-                state.raid['title'] ?? 'Raid',
+                state.raid['description'] ?? 'Raid',
                 style: AppTypography.h3.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xl),

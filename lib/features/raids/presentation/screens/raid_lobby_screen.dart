@@ -14,7 +14,15 @@ import 'raid_live_screen.dart';
 
 class RaidLobbyScreen extends StatefulWidget {
   final String raidId;
-  const RaidLobbyScreen({super.key, required this.raidId});
+  final Map<String, dynamic>? initialRaid;
+  final List<Map<String, dynamic>>? initialParticipants;
+
+  const RaidLobbyScreen({
+    super.key,
+    required this.raidId,
+    this.initialRaid,
+    this.initialParticipants,
+  });
 
   @override
   State<RaidLobbyScreen> createState() => _RaidLobbyScreenState();
@@ -24,10 +32,16 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
   final _chatController = TextEditingController();
   final _chatScrollController = ScrollController();
   final List<ChatMessage> _chatMessages = [];
+  Map<String, dynamic>? _localRaid;
+  List<Map<String, dynamic>>? _localParticipants;
+  bool _hasLoadedLocally = false;
 
   @override
   void initState() {
     super.initState();
+    _localRaid = widget.initialRaid;
+    _localParticipants = widget.initialParticipants;
+    _hasLoadedLocally = widget.initialRaid != null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RaidBloc>().add(LoadRaidById(raidId: widget.raidId));
     });
@@ -44,6 +58,16 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
   Widget build(BuildContext context) {
     return BlocBuilder<RaidBloc, RaidState>(
       builder: (context, state) {
+        // Use local data from create flow if available while DB query runs
+        if (state is RaidLoading && _hasLoadedLocally) {
+          return _buildLobby(RaidLobby(
+            raid: _localRaid!,
+            participants: _localParticipants ?? [],
+            isHost: true,
+            allReady: (_localParticipants?.length ?? 0) > 0 &&
+                (_localParticipants?.every((p) => p['is_ready'] == true) ?? false),
+          ));
+        }
         if (state is RaidLoading) {
           return const Scaffold(
             backgroundColor: AppColors.background,
@@ -120,11 +144,11 @@ class _RaidLobbyScreenState extends State<RaidLobbyScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              raid['title'] ?? 'RAID',
+              raid['description'] ?? 'RAID',
               style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
             ),
             Text(
-              '${raid['game_mode'] ?? 'Free Ride'} · ${_formatDate(raid['date_time'])}',
+              '${raid['mode'] ?? 'Free Ride'} · ${_formatDate(raid['scheduled_at'])}',
               style: AppTypography.caption.copyWith(color: AppColors.textMuted),
             ),
           ],

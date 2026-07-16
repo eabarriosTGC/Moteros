@@ -225,7 +225,13 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => RaidLobbyScreen(raidId: '${state.raid['id']}'),
+              builder: (_) => RaidLobbyScreen(
+                raidId: '${state.raid['id']}',
+                initialRaid: state.raid,
+                initialParticipants: [
+                  {'user_id': Supabase.instance.client.auth.currentUser?.id ?? '', 'is_ready': true},
+                ],
+              ),
             ),
           );
         }

@@ -395,8 +395,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildDashboardRaidCard(Map<String, dynamic> raid) {
-    final title = raid['title'] ?? 'Raid';
-    final gameMode = raid['game_mode'] ?? 'Free Ride';
+    final title = raid['description'] ?? 'Raid';
+    final gameMode = raid['mode'] ?? 'Free Ride';
     final status = raid['status'] ?? 'lobby';
     final raidId = raid['id']?.toString() ?? '';
     final participants = (raid['raid_participants'] as List?)?.length ?? 0;

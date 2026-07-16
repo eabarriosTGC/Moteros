@@ -278,9 +278,9 @@ class _RaidListScreenState extends State<RaidListScreen> {
   }
 
   Widget _buildRaidCard(Map<String, dynamic> raid, String category) {
-    final title = raid['title'] ?? 'Raid sin nombre';
-    final gameMode = raid['game_mode'] ?? 'Free Ride';
-    final dateTime = raid['date_time'];
+    final title = raid['description'] ?? 'Raid sin nombre';
+    final gameMode = raid['mode'] ?? 'Free Ride';
+    final dateTime = raid['scheduled_at'];
     final participantCount = (raid['raid_participants'] as List?)?.length ?? 0;
     final isPublic = raid['is_public'] as bool? ?? true;
     final raidId = raid['id']?.toString() ?? '';
