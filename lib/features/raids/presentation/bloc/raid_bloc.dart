@@ -132,7 +132,6 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
         'raid_id': raid['id'],
         'user_id': userId,
         'is_ready': true,
-        'position': 1,
       });
 
       emit(RaidLobby(
