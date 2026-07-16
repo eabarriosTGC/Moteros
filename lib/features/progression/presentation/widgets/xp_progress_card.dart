@@ -75,7 +75,7 @@ Future<XpData> fetchXpData(String userId) async {
     longestStreak: (resp['longest_streak'] as int?) ?? 0,
     raidsCompleted: (resp['raids_completed'] as int?) ?? 0,
     checkpointsCaptured: (resp['checkpoints_captured'] as int?) ?? 0,
-    kmTraveled: (resp['km_traveled'] as double?) ?? 0.0,
+    kmTraveled: (resp['km_traveled'] as num?)?.toDouble() ?? 0.0,
     coins: (resp['coins'] as int?) ?? 0,
   );
 }
