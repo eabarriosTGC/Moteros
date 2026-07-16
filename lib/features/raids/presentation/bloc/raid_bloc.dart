@@ -8,6 +8,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'raid_event.dart';
 import 'raid_state.dart';
 
+/// Map UI display names to DB mode codes.
+const _modeToDb = <String, String>{
+  'Aventura': 'aventura',
+  'Velocidad': 'velocidad',
+  'Precisión': 'precision',
+  'Supervivencia': 'sobrevivencia',
+  'Exploración': 'exploracion',
+};
+
+String _mapGameMode(String display) => _modeToDb[display] ?? 'aventura';
+
 class RaidBloc extends Bloc<RaidEvent, RaidState> {
   StreamSubscription? _realtimeSubscription;
   Timer? _liveTimer;
@@ -117,7 +128,7 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
         'origin_lng': event.originLng,
         'dest_lat': event.destLat,
         'dest_lng': event.destLng,
-        'mode': event.gameMode,
+        'mode': _mapGameMode(event.gameMode),
         'scheduled_at': event.dateTime.toIso8601String(),
         'is_public': event.isPublic,
         'host_id': userId,
