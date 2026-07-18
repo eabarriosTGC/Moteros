@@ -72,10 +72,7 @@ class _RaidListScreenState extends State<RaidListScreen> {
           if (state is RaidError) {
             return _buildError(state.message);
           }
-          // RaidInitial or others — trigger load
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.read<RaidBloc>().add(const LoadRaids());
-          });
+          // Don't interfere with detail screens (RaidLobby, RaidActive, etc.)
           return const SizedBox.shrink();
         },
       ),
@@ -85,7 +82,7 @@ class _RaidListScreenState extends State<RaidListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateRaidScreen()),
-          );
+          ).then((_) => context.read<RaidBloc>().add(const LoadRaids()));
         },
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnAmber,
@@ -419,26 +416,29 @@ class _RaidListScreenState extends State<RaidListScreen> {
     if (raidId.isEmpty) return;
     HapticFeedback.lightImpact();
 
+    Future<void>? navigation;
     switch (category) {
       case 'lobby':
-        Navigator.push(
+        navigation = Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => RaidLobbyScreen(raidId: raidId)),
         );
         break;
       case 'active':
-        Navigator.push(
+        navigation = Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => RaidLiveScreen(raidId: raidId)),
         );
         break;
       case 'completed':
-        Navigator.push(
+        navigation = Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => RaidStatsScreen(raidId: raidId)),
         );
         break;
     }
+    // Reload list when returning from detail screen
+    navigation?.then((_) => context.read<RaidBloc>().add(const LoadRaids()));
   }
 
   String _formatDate(dynamic dateStr) {

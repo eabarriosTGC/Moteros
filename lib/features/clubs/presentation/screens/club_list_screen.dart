@@ -72,14 +72,8 @@ class _ClubListScreenState extends State<ClubListScreen> {
             ),
           );
         }
-        // ClubInitial — trigger load
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          context.read<ClubBloc>().add(LoadClubs());
-        });
-        return const Scaffold(
-          backgroundColor: AppColors.background,
-          body: Center(child: Text('Cargando...', style: TextStyle(color: AppColors.textMuted))),
-        );
+        // Don't interfere with detail screens (ClubLoaded, etc.)
+        return const SizedBox.shrink();
       },
     );
   }
@@ -146,7 +140,7 @@ class _ClubListScreenState extends State<ClubListScreen> {
                       MaterialPageRoute(
                         builder: (_) => ClubScreen(clubId: club['id'] as int),
                       ),
-                    );
+                    ).then((_) => context.read<ClubBloc>().add(LoadClubs()));
                   },
                 );
               },
@@ -157,7 +151,7 @@ class _ClubListScreenState extends State<ClubListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateClubScreen()),
-          );
+          ).then((_) => context.read<ClubBloc>().add(LoadClubs()));
         },
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnAmber,
