@@ -1,5 +1,5 @@
 // supabase/functions/finish-raid/index.ts
-// Finaliza un raid: calcula XP por modo, streaks, bonus, anti-cheat.
+// Finaliza un raid: calcula XP + COINS por modo, streaks, bonus, anti-cheat.
 // Solo el host puede ejecutar.
 //
 // Deploy: supabase functions deploy finish-raid --project-ref <ref>
@@ -28,12 +28,17 @@ serve(async (req) => {
   if (raid.host_id !== user.id) return new Response(JSON.stringify({ error: 'Solo el host puede finalizar' }), { status: 403 })
   if (raid.status !== 'active') return new Response(JSON.stringify({ error: 'Raid no está activo' }), { status: 400 })
 
-  // 2. XP base por modo
+  // 2. XP base por modo (nuevos modos UI)
   const xpTable: Record<string, number> = {
-    free_ride: 10, rally: 25, ruta_gotica: 15,
-    convoy: 15, sobrevivencia: 40, guerra_clanes: 20,
+    aventura: 15, velocidad: 25, precision: 20,
+    sobrevivencia: 40, exploracion: 10,
+  }
+  const coinTable: Record<string, number> = {
+    aventura: 10, velocidad: 15, precision: 12,
+    sobrevivencia: 25, exploracion: 5,
   }
   const baseXp = xpTable[raid.mode] || 10
+  const baseCoins = coinTable[raid.mode] || 5
 
   // 3. Obtener total de checkpoints para bonus
   const { count: totalCheckpoints } = await supabase
@@ -48,51 +53,66 @@ serve(async (req) => {
     .eq('raid_id', raid_id)
 
   let totalXpDistributed = 0
+  let totalCoinsDistributed = 0
   let participantsCompleted = 0
-  const participantResults: Array<{ user_id: string; xp_earned: number; position?: number }> = []
+  const participantResults: Array<{ user_id: string; xp_earned: number; coins_earned: number; position?: number }> = []
   const rallyTimes: Array<{ user_id: string; time_seconds: number }> = []
 
   for (const p of participants || []) {
     if (!p.is_completed) continue
 
     let xp = baseXp
+    let coins = baseCoins
     const streak = p.user_xp?.current_streak || 0
     const lastDate = p.user_xp?.last_raid_date
 
     // Bonus: todos los checkpoints
     if (totalCheckpoints && p.checkpoints_taken >= totalCheckpoints) {
       xp += 50
+      coins += 20
     }
 
     // Bonus: primer raid del día
     if (!lastDate || lastDate < new Date().toISOString().slice(0, 10)) {
       xp += 20
+      coins += 5
     }
 
-    // Multiplicador de racha
+    // Multiplicador de racha (XP only)
     if (streak >= 7) xp *= 3
     else if (streak >= 3) xp *= 2
 
-    // Bonus nocturno (+15%)
-    if (raid.is_night_raid) xp = Math.round(xp * 1.15)
+    // Bonus nocturno (+15% XP, +10% coins)
+    if (raid.is_night_raid) {
+      xp = Math.round(xp * 1.15)
+      coins = Math.round(coins * 1.1)
+    }
 
     // Rally: guardar tiempo para clasificación
     if (raid.mode === 'rally') {
       rallyTimes.push({ user_id: p.user_id, time_seconds: p.time_seconds })
     }
 
-    // Anti-cheat: si está flagged, retener XP
+    // Anti-cheat: si está flagged, retener todo
     if (p.is_flagged) {
       xp = 0
+      coins = 0
     }
 
     // Otorgar XP
     if (xp > 0) {
       await supabase.rpc('award_xp', { p_user_id: p.user_id, p_xp: xp })
-      await supabase.from('raid_participants')
-        .update({ xp_earned: xp })
-        .eq('id', p.id)
     }
+
+    // Otorgar COINS
+    if (coins > 0) {
+      await supabase.rpc('award_coins', { p_user_id: p.user_id, p_coins: coins })
+    }
+
+    // Actualizar raid_participants
+    await supabase.from('raid_participants')
+      .update({ xp_earned: xp })
+      .eq('id', p.id)
 
     // Actualizar km_traveled en user_xp
     if (p.km_traveled > 0) {
@@ -103,8 +123,9 @@ serve(async (req) => {
     }
 
     totalXpDistributed += xp
+    totalCoinsDistributed += coins
     participantsCompleted++
-    participantResults.push({ user_id: p.user_id, xp_earned: xp })
+    participantResults.push({ user_id: p.user_id, xp_earned: xp, coins_earned: coins })
   }
 
   // 5. Rally: asignar posiciones por precisión ETA
@@ -123,9 +144,10 @@ serve(async (req) => {
         .eq('raid_id', raid_id)
         .eq('user_id', rallyTimes[i].user_id)
 
-      // Ganador recibe +50 XP extra
+      // Ganador recibe +50 XP + 20 coins extra
       if (i === 0) {
         await supabase.rpc('award_xp', { p_user_id: rallyTimes[i].user_id, p_xp: 50 })
+        await supabase.rpc('award_coins', { p_user_id: rallyTimes[i].user_id, p_coins: 20 })
       }
     }
   }
@@ -142,6 +164,7 @@ serve(async (req) => {
   return new Response(JSON.stringify({
     completed: true,
     xp_distributed: totalXpDistributed,
+    coins_distributed: totalCoinsDistributed,
     participants_completed: participantsCompleted,
   }), { status: 200 })
 })

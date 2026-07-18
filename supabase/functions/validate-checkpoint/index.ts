@@ -168,16 +168,25 @@ serve(async (req) => {
   // 8. Actualizar contador de checkpoints
   await supabase.rpc('increment_checkpoints', { p_participant_id: participant.id })
 
-  // 9. Calcular XP
+  // 9. Calcular XP y COINS
   let xpAwarded = 30  // base por checkpoint
-  if (cp.is_hidden) xpAwarded += 30   // bonus oculto (Ruta Gótica)
-  if (photo_url) xpAwarded += 10      // bonus por foto
+  let coinsAwarded = 5 // base coins por checkpoint
+  if (cp.is_hidden) {
+    xpAwarded += 30   // bonus oculto (Ruta Gótica)
+    coinsAwarded += 10
+  }
+  if (photo_url) {
+    xpAwarded += 10      // bonus por foto
+    coinsAwarded += 3
+  }
 
   await supabase.rpc('award_xp', { p_user_id: user.id, p_xp: xpAwarded })
+  await supabase.rpc('award_coins', { p_user_id: user.id, p_coins: coinsAwarded })
 
   return new Response(JSON.stringify({
     valid: true,
     xp_awarded: xpAwarded,
+    coins_awarded: coinsAwarded,
     distance_meters: distance,
     message: 'Checkpoint validado ✓',
   }), { status: 200 })

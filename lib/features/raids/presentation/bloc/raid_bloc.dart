@@ -242,17 +242,9 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
     try {
       _liveTimer?.cancel();
 
-      await Supabase.instance.client
-          .from('raids')
-          .update({'status': 'completed'})
-          .eq('id', event.raidId);
-
-      // Insert results
-      await Supabase.instance.client.from('raid_results').insert({
-        'raid_id': event.raidId,
-        'user_id': Supabase.instance.client.auth.currentUser?.id ?? '',
-        ...event.stats,
-        'xp_earned': event.stats['xp_earned'] ?? 100,
+      // Call finish-raid Edge Function (calculates XP + coins server-side)
+      await Supabase.instance.client.functions.invoke('finish-raid', body: {
+        'raid_id': int.tryParse(event.raidId),
       });
 
       add(LoadRaidStats(raidId: event.raidId));
