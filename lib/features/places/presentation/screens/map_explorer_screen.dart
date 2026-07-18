@@ -9,6 +9,7 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
@@ -393,16 +394,22 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty || _selectedPosition == null) return;
               try {
-                await context.read<ApiClient>().post('/import/manual', data: {
+                await Supabase.instance.client.from('places').insert({
                   'name': nameCtrl.text.trim(),
                   'category': category,
                   'latitude': _selectedPosition!.latitude,
                   'longitude': _selectedPosition!.longitude,
                 });
-                Navigator.pop(ctx);
-                _selectedPosition = null;
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) setState(() => _selectedPosition = null);
                 _getCurrentPosition(); // refresh
-              } catch (_) {}
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+                  );
+                }
+              }
             },
             child: const Text('Guardar'),
           ),
