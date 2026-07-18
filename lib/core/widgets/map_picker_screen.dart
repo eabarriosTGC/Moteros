@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../services/geocoding_service.dart';
+import '../services/offline_map_service.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final double initialLat;
@@ -215,6 +216,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   ),
                   children: [
                     TileLayer(
+                      tileProvider: OfflineMapService.tileProvider(),
                       urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                       subdomains: const ['a', 'b', 'c'],
                     ),

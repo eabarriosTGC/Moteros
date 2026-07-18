@@ -13,6 +13,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/services/offline_map_service.dart';
 import '../bloc/route_bloc.dart';
 import '../bloc/route_event.dart';
 
@@ -419,6 +420,7 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
             ),
             children: [
               TileLayer(
+                tileProvider: OfflineMapService.tileProvider(),
                 urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c'],
                 userAgentPackageName: 'com.moteros.moteros_app',

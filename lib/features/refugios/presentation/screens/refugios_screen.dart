@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/offline_map_service.dart';
 import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../bloc/refugios_bloc.dart';
 import '../bloc/refugios_event.dart';
@@ -111,6 +112,7 @@ class _RefugiosScreenState extends State<RefugiosScreen>
           options: MapOptions(initialCenter: center, initialZoom: 11, minZoom: 5, maxZoom: 16),
           children: [
             TileLayer(
+              tileProvider: OfflineMapService.tileProvider(),
               urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
               subdomains: const ['a', 'b', 'c'],
               userAgentPackageName: 'com.moteros.moteros_app',

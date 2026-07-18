@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/services/offline_map_service.dart';
 import '../bloc/route_bloc.dart';
 import '../bloc/route_event.dart';
 import '../bloc/route_state.dart';
@@ -137,6 +138,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                     ),
                     children: [
                       TileLayer(
+                        tileProvider: OfflineMapService.tileProvider(),
                         urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                         subdomains: const ['a', 'b', 'c'],
                         userAgentPackageName: 'com.moteros.moteros_app',

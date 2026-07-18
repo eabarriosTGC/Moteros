@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/services/offline_map_service.dart';
 
 /// Haversine distance in km
 double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
@@ -294,6 +295,7 @@ class _RadarScreenState extends State<RadarScreen> {
               ),
               children: [
                 TileLayer(
+                  tileProvider: OfflineMapService.tileProvider(),
                   urlTemplate:
                       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.asfaltoclub.moteros',

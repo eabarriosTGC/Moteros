@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.moteros.moteros_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -40,4 +40,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Force the required AndroidX versions for objectbox compatibility
+    implementation("androidx.core:core:1.13.1")
+    implementation("androidx.arch.core:core-runtime:2.2.0")
+    implementation("androidx.window.extensions.core:core:1.0.0")
 }

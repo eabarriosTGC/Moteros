@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/offline_map_service.dart';
 import '../../../admin/presentation/screens/admin_panel_screen.dart';
 import '../../../membership/presentation/screens/membership_screen.dart';
 import '../../../validation/presentation/screens/qr_scanner_screen.dart';
@@ -424,6 +425,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                   children: [
                     // Dark tile layer with offline cache support
                     TileLayer(
+                      tileProvider: OfflineMapService.tileProvider(),
                       urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
                       subdomains: const ['a', 'b', 'c'],
                       userAgentPackageName: 'com.moteros.moteros_app',
