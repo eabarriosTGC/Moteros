@@ -60,6 +60,7 @@ class MapExplorerScreen extends StatefulWidget {
 
 class _MapExplorerScreenState extends State<MapExplorerScreen> {
   LatLng? _currentPosition;
+  LatLng? _selectedPosition;
   PlaceFilter _activeFilter = PlaceFilter.all;
   final MapController _mapController = MapController();
 
@@ -353,21 +354,53 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase()))).toList(),
               onChanged: (v) => category = v ?? 'otro',
             ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.input,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.touch_app, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedPosition != null
+                          ? '📍 ${_selectedPosition!.latitude.toStringAsFixed(4)}, ${_selectedPosition!.longitude.toStringAsFixed(4)}'
+                          : 'Toca el mapa para elegir ubicación',
+                      style: TextStyle(
+                        color: _selectedPosition != null ? AppColors.textPrimary : AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  if (_selectedPosition != null)
+                    GestureDetector(
+                      onTap: () => setState(() => _selectedPosition = null),
+                      child: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
+                    ),
+                ],
+              ),
+            ),
           ]),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () async {
-              if (nameCtrl.text.trim().isEmpty || _currentPosition == null) return;
+              if (nameCtrl.text.trim().isEmpty || _selectedPosition == null) return;
               try {
                 await context.read<ApiClient>().post('/import/manual', data: {
                   'name': nameCtrl.text.trim(),
                   'category': category,
-                  'latitude': _currentPosition!.latitude,
-                  'longitude': _currentPosition!.longitude,
+                  'latitude': _selectedPosition!.latitude,
+                  'longitude': _selectedPosition!.longitude,
                 });
                 Navigator.pop(ctx);
+                _selectedPosition = null;
                 _getCurrentPosition(); // refresh
               } catch (_) {}
             },
@@ -421,6 +454,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                 initialCenter: _currentPosition ?? _defaultCenter,
                 initialZoom: 14, minZoom: 6, maxZoom: 18,
                 interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                onTap: (_, latLng) => setState(() => _selectedPosition = latLng),
               ),
                   children: [
                     // Dark tile layer with offline cache support
@@ -462,6 +496,22 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                         ),
                       ),
                     ]),
+                    // Selected place marker (tapped location)
+                    if (_selectedPosition != null)
+                      MarkerLayer(markers: [
+                        Marker(point: _selectedPosition!, width: 36, height: 36,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.primary, shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(color: AppColors.primary.withAlpha(150), blurRadius: 12, spreadRadius: 2),
+                              ],
+                            ),
+                            child: const Icon(Icons.add_location, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ]),
                   ],
                 ),
 
