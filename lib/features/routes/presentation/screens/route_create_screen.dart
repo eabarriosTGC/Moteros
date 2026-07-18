@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/widgets/map_picker_screen.dart';
 import '../bloc/route_bloc.dart';
 import '../bloc/route_event.dart';
 import '../bloc/route_state.dart';
@@ -24,8 +25,8 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
 
   // Waypoints
   final List<Map<String, dynamic>> _waypoints = [];
-  final _latController = TextEditingController();
-  final _lngController = TextEditingController();
+  double? _pickedLat;
+  double? _pickedLng;
   final _wpNameController = TextEditingController();
   final _wpDurationController = TextEditingController();
   String _stopType = 'parada';
@@ -34,19 +35,36 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _latController.dispose();
-    _lngController.dispose();
     _wpNameController.dispose();
     _wpDurationController.dispose();
     super.dispose();
   }
 
+  Future<void> _openMapPicker() async {
+    HapticFeedback.lightImpact();
+    final result = await Navigator.push<List<double>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPickerScreen(
+          initialLat: _pickedLat ?? 4.60971,
+          initialLng: _pickedLng ?? -74.08175,
+        ),
+      ),
+    );
+    if (result != null && result.length == 2 && mounted) {
+      setState(() {
+        _pickedLat = result[0];
+        _pickedLng = result[1];
+      });
+    }
+  }
+
   void _addWaypoint() {
-    final lat = double.tryParse(_latController.text);
-    final lng = double.tryParse(_lngController.text);
+    final lat = _pickedLat;
+    final lng = _pickedLng;
     if (lat == null || lng == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa coordenadas válidas (lat, lng)')),
+        const SnackBar(content: Text('Selecciona un punto en el mapa primero')),
       );
       return;
     }
@@ -58,9 +76,9 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
         'stop_type': _stopType,
         'duration_min': int.tryParse(_wpDurationController.text),
       });
+      _pickedLat = null;
+      _pickedLng = null;
     });
-    _latController.clear();
-    _lngController.clear();
     _wpNameController.clear();
     _wpDurationController.clear();
   }
@@ -389,25 +407,45 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
                   children: [
                     Text('AGREGAR PUNTO', style: AppTypography.caption.copyWith(color: AppColors.textMuted, letterSpacing: 1.5)),
                     const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSmallField(
-                            controller: _latController,
-                            hint: 'Latitud',
-                            keyboardType: TextInputType.number,
+                    // Map picker button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openMapPicker(),
+                        icon: const Icon(Icons.map_outlined, size: AppSpacing.iconSm),
+                        label: Text(
+                          _pickedLat != null
+                              ? '📍 ${_pickedLat!.toStringAsFixed(6)}, ${_pickedLng!.toStringAsFixed(6)}'
+                              : '📍 Seleccionar en mapa',
+                          style: AppTypography.body.copyWith(
+                            color: _pickedLat != null ? AppColors.textPrimary : AppColors.textMuted,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: _buildSmallField(
-                            controller: _lngController,
-                            hint: 'Longitud',
-                            keyboardType: TextInputType.number,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: AppColors.input,
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(
+                            color: _pickedLat != null ? AppColors.primary : AppColors.border,
                           ),
+                          shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                         ),
-                      ],
+                      ),
                     ),
+                    if (_pickedLat != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      TextButton.icon(
+                        onPressed: () => setState(() {
+                          _pickedLat = null;
+                          _pickedLng = null;
+                        }),
+                        icon: const Icon(Icons.close, size: 14, color: AppColors.error),
+                        label: Text('Quitar punto',
+                          style: AppTypography.caption.copyWith(color: AppColors.error),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.sm),
                     _buildSmallField(
                       controller: _wpNameController,
