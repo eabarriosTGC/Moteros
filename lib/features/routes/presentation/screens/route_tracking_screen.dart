@@ -63,7 +63,8 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
   bool _autoFollow = true;
 
   // Camera offset: user icon sits at ~35% from bottom of screen
-  static const double _camOffsetFraction = 0.18;
+  // Varies with zoom — at zoom 15, screen ≈ 0.04° lat, so offset ≈ 0.006°
+  static double _camOffset(double zoom) => 0.0004 * (20 - zoom).clamp(4, 18);
 
   LatLng get _initialCenter {
     if (_plannedRoute.isNotEmpty) return _plannedRoute.first;
@@ -78,10 +79,9 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
 
   /// Computes a camera target so the user's position renders
   /// in the lower third of the screen (more route ahead visible).
-  LatLng _offsetCamera(LatLng pos) {
-    // At zoom 15, screen height ≈ 0.04° lat. Offset north by fraction.
+  LatLng _offsetCamera(LatLng pos, {double zoom = 15}) {
     return LatLng(
-      pos.latitude + _camOffsetFraction,
+      pos.latitude + _camOffset(zoom),
       pos.longitude,
     );
   }
