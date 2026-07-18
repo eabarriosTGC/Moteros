@@ -8,20 +8,9 @@ import 'package:latlong2/latlong.dart';
 class OfflineMapService {
   static const _storeName = 'asfalto_club';
 
-  /// Initialise FMTC and create the store. Call once at app startup.
-  static Future<void> init() async {
-    try {
-      await FMTCStore(_storeName).manage.create();
-    } catch (_) {
-      // Store already exists — that's fine
-    }
-  }
-
-  /// Create an FMTCTileProvider with automatic caching.
-  static TileProvider tileProvider() => FMTCTileProvider(
-        stores: {_storeName: BrowseStoreStrategy.readUpdateCreate},
-        loadingStrategy: BrowseLoadingStrategy.onlineFirst,
-      );
+  /// Use default NetworkTileProvider. FMTC remains available for
+  /// region downloading via OfflineMapService download helpers.
+  static TileProvider tileProvider() => NetworkTileProvider();
 
   /// FMTC store for direct operations.
   static FMTCStore get _store => FMTCStore(_storeName);

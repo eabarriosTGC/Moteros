@@ -3,7 +3,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/network/api_client.dart';
-import 'core/services/offline_map_service.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 
@@ -18,9 +17,6 @@ void main() async {
     url: dotenv.env['SUPABASE_URL']!,
     publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
-
-  // Initialize FMTC for offline tile caching
-  await OfflineMapService.init();
 
   // Create ApiClient (compatibility shim wrapping SupabaseClient)
   final apiClient = ApiClient();
