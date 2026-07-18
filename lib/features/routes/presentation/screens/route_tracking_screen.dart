@@ -53,6 +53,17 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
   final MapController _mapController = MapController();
   bool _autoFollow = true;
 
+  LatLng get _initialCenter {
+    if (_plannedRoute.isNotEmpty) return _plannedRoute.first;
+    if (_currentPosition != null) return _currentPosition!;
+    return const LatLng(4.5709, -74.2973); // Bogotá fallback
+  }
+
+  double get _initialZoom {
+    if (_plannedRoute.length >= 2) return 11;
+    return 14;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,7 +83,10 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
     // If we already have waypoints, use them
     if (widget.initialWaypoints != null && widget.initialWaypoints!.length >= 2) {
       _plannedRoute = widget.initialWaypoints!;
-      if (mounted) setState(() => _loadingRoute = false);
+      if (mounted) {
+        setState(() => _loadingRoute = false);
+        _mapController.move(_plannedRoute.first, 11);
+      }
       return;
     }
 
@@ -102,7 +116,12 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
       }).whereType<LatLng>().toList();
     } catch (_) {}
 
-    if (mounted) setState(() => _loadingRoute = false);
+    if (mounted) {
+      setState(() => _loadingRoute = false);
+      if (_plannedRoute.isNotEmpty) {
+        _mapController.move(_plannedRoute.first, 11);
+      }
+    }
   }
 
   @override
@@ -333,9 +352,9 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: _currentPosition ?? const LatLng(4.5709, -74.2973),
-              initialZoom: 14,
-              minZoom: 3,
+              initialCenter: _initialCenter,
+              initialZoom: _initialZoom,
+              minZoom: 5,
               maxZoom: 18,
               interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
               onMapEvent: (event) {
