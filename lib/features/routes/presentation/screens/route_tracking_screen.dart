@@ -1,4 +1,5 @@
-/// Route Tracking Screen — live GPS tracking with OSM map and polyline recording.
+/// Route Tracking Screen — live GPS tracking with OSM map, planned route,
+/// real-time position, and auto-follow camera.
 library;
 
 import 'dart:async';
@@ -8,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../bloc/route_bloc.dart';
 import '../bloc/route_event.dart';
@@ -17,7 +19,14 @@ enum _TrackingState { idle, recording, paused }
 
 class RouteTrackingScreen extends StatefulWidget {
   final int? routeId;
-  const RouteTrackingScreen({super.key, this.routeId});
+  /// Pre-loaded waypoints so we can draw the route immediately
+  final List<LatLng>? initialWaypoints;
+
+  const RouteTrackingScreen({
+    super.key,
+    this.routeId,
+    this.initialWaypoints,
+  });
 
   @override
   State<RouteTrackingScreen> createState() => _RouteTrackingScreenState();
@@ -36,12 +45,19 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
   double _maxSpeed = 0;
   double _totalDistance = 0;
   LatLng? _currentPosition;
+
+  // Planned route
+  List<LatLng> _plannedRoute = [];
+  bool _loadingRoute = true;
+
   final MapController _mapController = MapController();
+  bool _autoFollow = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadPlannedRoute();
   }
 
   @override
@@ -50,6 +66,43 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
     _stopRecording();
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadPlannedRoute() async {
+    // If we already have waypoints, use them
+    if (widget.initialWaypoints != null && widget.initialWaypoints!.length >= 2) {
+      _plannedRoute = widget.initialWaypoints!;
+      if (mounted) setState(() => _loadingRoute = false);
+      return;
+    }
+
+    // Otherwise load from DB
+    if (widget.routeId == null) {
+      if (mounted) setState(() => _loadingRoute = false);
+      return;
+    }
+
+    try {
+      final resp = await Supabase.instance.client
+          .from('routes')
+          .select('waypoints')
+          .eq('id', widget.routeId!)
+          .single();
+
+      final data = resp as Map<String, dynamic>;
+      final wps = data['waypoints'] as List? ?? [];
+      _plannedRoute = wps.map((wp) {
+        if (wp is Map<String, dynamic>) {
+          return LatLng(
+            (wp['lat'] as num).toDouble(),
+            (wp['lng'] as num).toDouble(),
+          );
+        }
+        return null;
+      }).whereType<LatLng>().toList();
+    } catch (_) {}
+
+    if (mounted) setState(() => _loadingRoute = false);
   }
 
   @override
@@ -100,14 +153,19 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
       final point = LatLng(pos.latitude, pos.longitude);
       _tracePoints.add(point);
       _currentPosition = point;
-      _currentSpeed = pos.speed * 3.6; // m/s to km/h
+      _currentSpeed = pos.speed * 3.6;
+
       if (pos.speed > _maxSpeed) _maxSpeed = pos.speed * 3.6;
 
-      // Calculate distance from last point
       if (_tracePoints.length >= 2) {
         final last = _tracePoints[_tracePoints.length - 2];
-        final dist = Distance().distance(last, point) / 1000; // km
+        final dist = Distance().distance(last, point) / 1000;
         _totalDistance += dist;
+      }
+
+      // Auto-follow camera
+      if (_autoFollow && _currentPosition != null) {
+        _mapController.move(_currentPosition!, 15);
       }
 
       setState(() {});
@@ -151,6 +209,11 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
         final dist = Distance().distance(last, point) / 1000;
         _totalDistance += dist;
       }
+
+      if (_autoFollow && _currentPosition != null) {
+        _mapController.move(_currentPosition!, 15);
+      }
+
       setState(() {});
     });
 
@@ -172,7 +235,6 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
     _positionSub = null;
     HapticFeedback.heavyImpact();
 
-    // Save to route history if we have a routeId
     if (widget.routeId != null && _tracePoints.length >= 2) {
       final trace = _tracePoints.map((p) => [p.latitude, p.longitude]).toList();
       context.read<RouteBloc>().add(CompleteRouteEvent(
@@ -181,7 +243,7 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
             actualKm: _totalDistance,
             actualDurationMin: _elapsed.inMinutes,
             tracePolyline: trace,
-            deviationKm: _totalDistance * 0.1, // rough estimate
+            deviationKm: _totalDistance * 0.1,
           ));
     }
 
@@ -230,6 +292,16 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
           ),
         ),
         actions: [
+          if (_plannedRoute.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                Icons.my_location,
+                color: _autoFollow ? AppColors.primary : AppColors.textMuted,
+                size: 20,
+              ),
+              tooltip: 'Auto-seguir',
+              onPressed: () => setState(() => _autoFollow = !_autoFollow),
+            ),
           if (_trackingState == _TrackingState.recording)
             Container(
               margin: const EdgeInsets.all(12),
@@ -266,6 +338,12 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
               minZoom: 3,
               maxZoom: 18,
               interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+              onMapEvent: (event) {
+                // Disable auto-follow when user manually pans
+                if (event is MapEventMoveEnd) {
+                  setState(() => _autoFollow = false);
+                }
+              },
             ),
             children: [
               TileLayer(
@@ -273,15 +351,53 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
                 subdomains: const ['a', 'b', 'c'],
                 userAgentPackageName: 'com.moteros.moteros_app',
               ),
-              // Trace polyline
+              // Planned route (pre-defined waypoints)
+              if (_plannedRoute.length >= 2)
+                PolylineLayer(polylines: [
+                  Polyline(
+                    points: _plannedRoute,
+                    color: AppColors.primary.withAlpha(150),
+                    strokeWidth: 5,
+                  ),
+                ]),
+              // Trace polyline (actual GPS track)
               if (_tracePoints.length >= 2)
                 PolylineLayer(polylines: [
                   Polyline(
                     points: _tracePoints,
-                    color: AppColors.secondary.withAlpha(180),
+                    color: AppColors.secondary.withAlpha(200),
                     strokeWidth: 4,
                   ),
                 ]),
+              // Waypoint markers (start/end)
+              if (_plannedRoute.length >= 2) ...[
+                MarkerLayer(markers: [
+                  Marker(
+                    point: _plannedRoute.first,
+                    width: 28, height: 28,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.success,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.flag, color: Colors.white, size: 14),
+                    ),
+                  ),
+                  Marker(
+                    point: _plannedRoute.last,
+                    width: 28, height: 28,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.location_on, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ]),
+              ],
               // Current position marker
               if (_currentPosition != null)
                 MarkerLayer(markers: [
@@ -294,13 +410,41 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
                         color: AppColors.secondary,
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.textPrimary, width: 3),
-                        boxShadow: AppShadows.cyanGlow,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.secondary.withAlpha(120),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ]),
             ],
           ),
+
+          // Loading indicator
+          if (_loadingRoute)
+            Positioned(
+              top: AppSpacing.sm,
+              left: AppSpacing.sm,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: AppColors.overlay,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: AppSpacing.sm),
+                    Text('Cargando ruta...', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
 
           // Stats overlay
           Positioned(
@@ -318,7 +462,7 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
                 children: [
                   _stat('${_totalDistance.toStringAsFixed(1)}', 'KM'),
                   Container(width: 1, height: 32, color: AppColors.border),
-                  _stat(_formatDuration(_elapsed), 'DURACIÓN'),
+                  _stat(_formatDuration(_elapsed), 'TIEMPO'),
                   Container(width: 1, height: 32, color: AppColors.border),
                   _stat('${_currentSpeed.toStringAsFixed(0)}', 'KM/H'),
                   Container(width: 1, height: 32, color: AppColors.border),

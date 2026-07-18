@@ -325,12 +325,17 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RouteTrackingScreen(routeId: widget.routeId),
-                          ),
-                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RouteTrackingScreen(
+                                routeId: widget.routeId,
+                                initialWaypoints: waypoints.isNotEmpty ? waypoints : null,
+                              ),
+                            ),
+                          );
+                        },
                         icon: const Icon(Icons.play_arrow_rounded, size: AppSpacing.iconSm),
                         label: const Text('INICIAR RUTA'),
                         style: ElevatedButton.styleFrom(
