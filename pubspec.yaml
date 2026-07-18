@@ -47,6 +47,11 @@ dependencies:
   flutter_map_marker_cluster: ^8.2.2
   url_launcher: ^6.3.0
 
+  # Open source mapping stack
+  geocoding: ^5.0.0
+  open_route_service: ^1.2.7
+  http: ^1.2.0
+
   # Supabase (replaces Dio, Firebase, Cloudinary, provider, secure_storage)
   supabase_flutter: ^2.16.0
   flutter_dotenv: ^5.2.1

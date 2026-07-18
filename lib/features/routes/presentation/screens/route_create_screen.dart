@@ -1,11 +1,14 @@
 /// Route Create Screen — waypoint editor with motoposada suggestions.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/widgets/map_picker_screen.dart';
+import '../../../../core/services/geocoding_service.dart';
 import '../bloc/route_bloc.dart';
 import '../bloc/route_event.dart';
 import '../bloc/route_state.dart';
@@ -27,9 +30,15 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
   final List<Map<String, dynamic>> _waypoints = [];
   double? _pickedLat;
   double? _pickedLng;
+  String _pickedAddress = '';
   final _wpNameController = TextEditingController();
   final _wpDurationController = TextEditingController();
   String _stopType = 'parada';
+
+  // Search
+  final _searchController = TextEditingController();
+  List<GeocodingResult> _searchResults = [];
+  Timer? _searchDebounce;
 
   @override
   void dispose() {
@@ -37,6 +46,8 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
     _descriptionController.dispose();
     _wpNameController.dispose();
     _wpDurationController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -55,8 +66,35 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
       setState(() {
         _pickedLat = result[0];
         _pickedLng = result[1];
+        _pickedAddress = '';
       });
+      // Resolve address
+      final addr = await GeocodingService.reverseGeocode(result[0], result[1]);
+      if (mounted) setState(() => _pickedAddress = addr);
     }
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      setState(() => _searchResults = []);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final results = await GeocodingService.searchPlaces(query);
+      if (mounted) setState(() => _searchResults = results);
+    });
+  }
+
+  void _selectSearchResult(GeocodingResult result) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _pickedLat = result.lat;
+      _pickedLng = result.lng;
+      _pickedAddress = result.displayName;
+      _searchResults = [];
+      _searchController.clear();
+    });
   }
 
   void _addWaypoint() {
@@ -415,7 +453,7 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
                         icon: const Icon(Icons.map_outlined, size: AppSpacing.iconSm),
                         label: Text(
                           _pickedLat != null
-                              ? '📍 ${_pickedLat!.toStringAsFixed(6)}, ${_pickedLng!.toStringAsFixed(6)}'
+                              ? '📍 ${_pickedAddress.isNotEmpty ? _pickedAddress : "${_pickedLat!.toStringAsFixed(6)}, ${_pickedLng!.toStringAsFixed(6)}"}'
                               : '📍 Seleccionar en mapa',
                           style: AppTypography.body.copyWith(
                             color: _pickedLat != null ? AppColors.textPrimary : AppColors.textMuted,
@@ -433,6 +471,66 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Place search
+                    TextField(
+                      controller: _searchController,
+                      style: AppTypography.body.copyWith(color: AppColors.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar lugar por nombre...',
+                        hintStyle: AppTypography.body.copyWith(color: AppColors.textMuted),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close, size: 16),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchResults = []);
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: AppColors.input,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: AppSpacing.sm,
+                        ),
+                      ),
+                      onChanged: _onSearchChanged,
+                    ),
+                    if (_searchResults.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 160),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _searchResults.length,
+                          itemBuilder: (_, i) {
+                            final r = _searchResults[i];
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.location_on_outlined,
+                                color: AppColors.primary, size: 18),
+                              title: Text(r.displayName,
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 2, overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _selectSearchResult(r),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                     if (_pickedLat != null) ...[
                       const SizedBox(height: AppSpacing.xs),
                       TextButton.icon(

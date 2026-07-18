@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/widgets/map_picker_screen.dart';
+import '../../../../core/services/geocoding_service.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
@@ -216,6 +217,11 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
     }
   }
 
+  void _resolveAddress(double lat, double lng, void Function(String) onResult) async {
+    final addr = await GeocodingService.reverseGeocode(lat, lng);
+    onResult(addr);
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<RaidBloc, RaidState>(
@@ -288,8 +294,10 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
                         setState(() {
                           _originLat = lat;
                           _originLng = lng;
-                          _originLabel =
-                              '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+                          _originLabel = 'Resolviendo dirección...';
+                        });
+                        _resolveAddress(lat, lng, (addr) {
+                          if (mounted) setState(() => _originLabel = addr);
                         });
                       },
                     ),
@@ -319,8 +327,10 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
                         setState(() {
                           _destLat = lat;
                           _destLng = lng;
-                          _destLabel =
-                              '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+                          _destLabel = 'Resolviendo dirección...';
+                        });
+                        _resolveAddress(lat, lng, (addr) {
+                          if (mounted) setState(() => _destLabel = addr);
                         });
                       },
                     ),
