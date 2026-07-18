@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../sos/presentation/screens/emergency_contact_screen.dart';
+import 'offline_maps_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -165,13 +166,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     String? subtitle,
     required Widget trailing,
+    VoidCallback? onTap,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
-      child: Row(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Row(
         children: [
           Icon(icon,
               color: AppColors.textMuted, size: AppSpacing.iconSm),
@@ -193,6 +198,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(width: AppSpacing.sm),
           trailing,
         ],
+      ),
       ),
     );
   }
@@ -429,6 +435,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         _sectionHeader('ACERCA DE'),
         _sectionCard([
+          _settingRow(
+            icon: Icons.map_outlined,
+            title: 'Mapas Offline',
+            trailing: Icon(Icons.chevron_right,
+                color: AppColors.textMuted, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const OfflineMapsScreen(),
+              ),
+            ),
+          ),
           _settingRow(
             icon: Icons.info_outline,
             title: 'Versión',
