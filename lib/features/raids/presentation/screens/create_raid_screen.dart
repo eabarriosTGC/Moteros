@@ -228,10 +228,8 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
               builder: (_) => RaidLobbyScreen(
                 raidId: '${state.raid['id']}',
                 initialRaid: state.raid,
-                initialParticipants: [
-                  {'user_id': Supabase.instance.client.auth.currentUser?.id ?? '', 'is_ready': true},
-                ],
-              ),
+                initialParticipants: [],
+               ),
             ),
           );
         }
