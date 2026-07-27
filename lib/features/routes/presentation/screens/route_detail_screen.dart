@@ -144,10 +144,9 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                         userAgentPackageName: 'com.moteros.moteros_app',
                       ),
                       // Planned route polyline (road-following if resolved, else straight)
-                      final routePoly = state.resolvedPolyline ?? waypoints;
                       PolylineLayer(polylines: [
                         Polyline(
-                          points: routePoly,
+                          points: state.resolvedPolyline ?? waypoints,
                           color: AppColors.textMuted.withAlpha(120),
                           strokeWidth: 4,
                         ),
