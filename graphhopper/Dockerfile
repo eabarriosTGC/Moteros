@@ -11,11 +11,13 @@ WORKDIR /build
 # Install osmium for extraction
 RUN apt-get update && apt-get install -y osmium-tool && rm -rf /var/lib/apt/lists/*
 
-# Download full Colombia OSM and extract coast region
-RUN wget -q -O colombia-latest.osm.pbf \
+# Download full Colombia OSM and extract coast region (with retry)
+RUN curl -sL --retry 5 --retry-delay 10 \
+    -o colombia-latest.osm.pbf \
     "https://download.geofabrik.de/south-america/colombia-latest.osm.pbf" && \
     osmium extract -b "-78,6.0,-71,12.5" -o colombia-coast.osm.pbf colombia-latest.osm.pbf && \
-    rm colombia-latest.osm.pbf
+    rm colombia-latest.osm.pbf && \
+    ls -lh colombia-coast.osm.pbf
 
 # ── Runtime image ──
 FROM eclipse-temurin:21-jre
