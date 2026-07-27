@@ -11,17 +11,20 @@ GH_JAR="/graphhopper/graphhopper-web.jar"
 # Bounding box: Colombian Caribbean coast + La Guajira + northern interior
 BBOX="-78,6.0,-71,12.5"
 
+# Always start fresh — remove corrupted files from previous runs
+rm -f "$COAST_OSM"
+
 # Download full Colombia OSM — retry once on failure
 download_osm() {
     echo "=== Downloading Colombia OSM (~315MB) ==="
-    if wget -q --show-progress -O "$FULL_OSM" "$OSM_URL"; then
+    if curl -sL --retry 3 --retry-delay 5 -o "$FULL_OSM" "$OSM_URL"; then
         echo "=== Download complete ==="
         return 0
     fi
-    echo "=== Download failed, retrying... ==="
+    echo "=== Download failed, retrying once more... ==="
     rm -f "$FULL_OSM"
-    wget -q --show-progress -O "$FULL_OSM" "$OSM_URL" || {
-        echo "ERROR: Failed to download OSM data after retry"
+    curl -sL --retry 3 --retry-delay 5 -o "$FULL_OSM" "$OSM_URL" || {
+        echo "ERROR: Failed to download OSM data"
         exit 1
     }
 }
