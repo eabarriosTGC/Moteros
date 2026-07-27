@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -y osmium-tool && rm -rf /var/lib/apt/list
 RUN curl -sL --retry 5 --retry-delay 10 -o colombia-latest.osm.pbf \
     "https://download.geofabrik.de/south-america/colombia-latest.osm.pbf" && \
     ls -lh colombia-latest.osm.pbf && \
-    osmium cat -o colombia-coast.osm.pbf colombia-latest.osm.pbf --bbox "-78,6.0,-71,12.5" && \
+    osmium extract -b "-78,6.0,-71,12.5" -o colombia-coast.osm.pbf \
+        --overwrite colombia-latest.osm.pbf && \
     ls -lh colombia-coast.osm.pbf && \
     rm colombia-latest.osm.pbf
 
