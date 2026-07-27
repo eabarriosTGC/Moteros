@@ -20,17 +20,31 @@ BBOX="-78,6.0,-71,12.5"
 if [ ! -f "$FULL_OSM" ]; then
     echo "=== Downloading Colombia OSM (~315MB) ==="
     wget -q --show-progress -O "$FULL_OSM" "$OSM_URL" || {
-        echo "ERROR: Failed to download OSM data"
-        exit 1
+        echo "Retry: deleting incomplete file and re-downloading..."
+        rm -f "$FULL_OSM"
+        wget -q --show-progress -O "$FULL_OSM" "$OSM_URL" || {
+            echo "ERROR: Failed to download OSM data"
+            exit 1
+        }
     }
     echo "=== Download complete ==="
 fi
 
-# Extract coast region if not already extracted
+# Verify OSM file is valid — try osmium extract, delete and retry if corrupted
 if [ ! -f "$COAST_OSM" ]; then
     echo "=== Extracting coast region (bbox: $BBOX) ==="
-    osmium extract -b "$BBOX" -o "$COAST_OSM" "$FULL_OSM"
-    echo "=== Extraction complete ==="
+    if osmium extract -b "$BBOX" -o "$COAST_OSM" "$FULL_OSM" 2>/dev/null; then
+        echo "=== Extraction complete ==="
+    else
+        echo "PBF corruption detected — re-downloading full OSM..."
+        rm -f "$FULL_OSM" "$COAST_OSM"
+        wget -q --show-progress -O "$FULL_OSM" "$OSM_URL" || exit 1
+        echo "=== Retry extraction ==="
+        osmium extract -b "$BBOX" -o "$COAST_OSM" "$FULL_OSM" || {
+            echo "ERROR: Extraction failed even after re-download"
+            exit 1
+        }
+    }
 fi
 
 if [ ! -d "$GRAPH_DIR" ]; then
