@@ -1,10 +1,11 @@
 #!/bin/bash
-# GraphHopper startup — uses israelhikingmap/graphhopper's built-in entrypoint
+# GraphHopper startup — uses the official JAR directly
 # ============================================================
 set -e
 
 OSM_FILE="/data/colombia-latest.osm.pbf"
-GRAPH_HOME="/data/default-gh"
+GRAPH_DIR="/data/graph-cache"
+GH_JAR="/graphhopper/graphhopper-web.jar"
 
 # Download OSM if not cached
 if [ ! -f "$OSM_FILE" ]; then
@@ -16,17 +17,17 @@ if [ ! -f "$OSM_FILE" ]; then
     echo "=== Download complete ==="
 fi
 
-if [ ! -d "$GRAPH_HOME" ] || [ -z "$(ls -A "$GRAPH_HOME" 2>/dev/null)" ]; then
-    echo "=== First run — building graph index (10-30 mins) ==="
+if [ ! -d "$GRAPH_DIR" ]; then
+    mkdir -p "$GRAPH_DIR"
+    echo "=== First run — importing graph (10-30 mins) ==="
 fi
 
 echo "=== Starting GraphHopper ==="
-echo "Config: /data/gh-config.yml"
 echo "OSM: $OSM_FILE"
+echo "Config: /data/gh-config.yml"
 echo "JAVA_OPTS: $JAVA_OPTS"
 
-exec ./graphhopper.sh \
-    -c /data/gh-config.yml \
-    -o "$GRAPH_HOME" \
-    web \
-    -i "$OSM_FILE"
+exec java $JAVA_OPTS \
+    -Ddw.graphhopper.datareader.file="$OSM_FILE" \
+    -Ddw.graphhopper.graph.location="$GRAPH_DIR" \
+    -jar "$GH_JAR" server /data/gh-config.yml
