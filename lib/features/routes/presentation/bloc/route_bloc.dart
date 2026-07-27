@@ -1,13 +1,17 @@
-/// Route BLoC.
+/// Route BLoC — now uses RouteDatasource instead of direct Supabase calls.
 library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/datasources/route_datasource.dart';
 import 'route_event.dart';
 import 'route_state.dart';
 
 class RouteBloc extends Bloc<RouteEvent, RouteState> {
-  RouteBloc() : super(RouteInitial()) {
+  final RouteDatasource _datasource;
+
+  RouteBloc({RouteDatasource? datasource})
+      : _datasource = datasource ?? RouteDatasource(),
+        super(RouteInitial()) {
     on<LoadRoutes>(_onLoadRoutes);
     on<LoadRouteDetail>(_onLoadRouteDetail);
     on<CreateRouteEvent>(_onCreateRoute);
@@ -19,20 +23,10 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
   Future<void> _onLoadRoutes(LoadRoutes event, Emitter<RouteState> emit) async {
     emit(RouteLoading());
     try {
-      final client = Supabase.instance.client;
-      List<Map<String, dynamic>> routes;
-
-      if (event.difficulty != null) {
-        final response = await client.from('routes').select().eq('difficulty', event.difficulty!).order('created_at', ascending: false);
-        routes = (response as List).cast<Map<String, dynamic>>();
-      } else if (event.clubId != null) {
-        final response = await client.from('routes').select().eq('club_id', event.clubId!).order('created_at', ascending: false);
-        routes = (response as List).cast<Map<String, dynamic>>();
-      } else {
-        final response = await client.from('routes').select().order('created_at', ascending: false);
-        routes = (response as List).cast<Map<String, dynamic>>();
-      }
-
+      final routes = await _datasource.getRoutes(
+        difficulty: event.difficulty,
+        clubId: event.clubId,
+      );
       emit(RoutesLoaded(routes: routes));
     } catch (e) {
       emit(RouteError(e.toString()));
@@ -42,19 +36,16 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
   Future<void> _onLoadRouteDetail(LoadRouteDetail event, Emitter<RouteState> emit) async {
     emit(RouteLoading());
     try {
-      final routeResp = await Supabase.instance.client.from('routes').select().eq('id', event.routeId).single();
-      final route = routeResp as Map<String, dynamic>;
+      final route = await _datasource.getRoute(event.routeId);
 
       List<Map<String, dynamic>>? segments;
       try {
-        final segResp = await Supabase.instance.client.from('route_segments').select().eq('route_id', event.routeId).order('segment_order', ascending: true);
-        segments = (segResp as List).cast<Map<String, dynamic>>();
+        segments = await _datasource.getSegments(event.routeId);
       } catch (_) {}
 
       List<Map<String, dynamic>>? history;
       try {
-        final histResp = await Supabase.instance.client.from('route_history').select().eq('route_id', event.routeId).order('completed_at', ascending: false);
-        history = (histResp as List).cast<Map<String, dynamic>>();
+        history = await _datasource.getHistory(event.routeId);
       } catch (_) {}
 
       emit(RouteDetailLoaded(route: route, segments: segments, history: history));
@@ -66,17 +57,15 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
   Future<void> _onCreateRoute(CreateRouteEvent event, Emitter<RouteState> emit) async {
     emit(RouteLoading());
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-      final response = await Supabase.instance.client.from('routes').insert({
-        'created_by': userId,
+      final route = await _datasource.createRoute({
         'title': event.title,
         'description': event.description,
         'waypoints': event.waypoints,
         'difficulty': event.difficulty,
         'is_public': event.isPublic,
         'tags': event.tags ?? [],
-      }).select().single();
-      emit(RouteCreated(route: response as Map<String, dynamic>));
+      });
+      emit(RouteCreated(route: route));
     } catch (e) {
       emit(RouteError(e.toString()));
     }
@@ -84,10 +73,8 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
   Future<void> _onCompleteRoute(CompleteRouteEvent event, Emitter<RouteState> emit) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-      await Supabase.instance.client.from('route_history').insert({
+      await _datasource.completeRoute({
         'route_id': event.routeId,
-        'user_id': userId,
         'started_at': event.startedAt.toUtc().toIso8601String(),
         'completed_at': DateTime.now().toUtc().toIso8601String(),
         'actual_km': event.actualKm,
@@ -105,24 +92,21 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
   Future<void> _onDeleteRoute(DeleteRouteEvent event, Emitter<RouteState> emit) async {
     try {
-      await Supabase.instance.client.from('routes').delete().eq('id', event.routeId);
-      emit(RouteInitial());
+      await _datasource.deleteRoute(event.routeId);
+      add(const LoadRoutes());
     } catch (e) {
       emit(RouteError(e.toString()));
     }
   }
 
-  Future<void> _onSuggestMotoposadas(SuggestMotoposadasEvent event, Emitter<RouteState> emit) async {
+  Future<void> _onSuggestMotoposadas(
+    SuggestMotoposadasEvent event,
+    Emitter<RouteState> emit,
+  ) async {
+    emit(RouteLoading());
     try {
-      final response = await Supabase.instance.client.functions.invoke(
-        'suggest_motoposadas',
-        body: {
-          'waypoints': event.waypoints,
-          'maxDistance': event.maxDistanceKm,
-        },
-      );
-      final data = response.data as Map<String, dynamic>?;
-      emit(MotoposadasSuggested(suggestions: data?['suggestions'] as List<dynamic>? ?? []));
+      final suggestions = await _datasource.suggestMotoposadas(event.waypoints);
+      emit(MotoposadasSuggested(suggestions: suggestions));
     } catch (e) {
       emit(RouteError(e.toString()));
     }

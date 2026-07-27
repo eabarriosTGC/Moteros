@@ -1,18 +1,18 @@
 /// Route Tracker — GPS route recording with live stats and polyline.
-/// Usa Supabase directamente (sin ApiClient).
+/// Now uses LocationTrackingService for unified GPS handling.
 library;
 
 import 'dart:async';
-import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/design_tokens.dart';
-import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/location_tracking_service.dart';
 
 // ── BLoC ──
 
@@ -53,11 +53,7 @@ final class SaveRoute extends TrackerEvent { final String name; SaveRoute(this.n
 final class LoadSavedRoutes extends TrackerEvent {}
 
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
-  DateTime? _startedAt;
-  List<LatLng> _points = [];
-  StreamSubscription<Position>? _sub;
-  Timer? _ticker;
-  double _maxSpeed = 0;
+  final _tracker = LocationTrackingService.instance;
 
   TrackerBloc() : super(TrackerIdle()) {
     on<StartRecording>(_start);
@@ -67,89 +63,31 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   }
 
   Future<void> _start(StartRecording event, Emitter<TrackerState> emit) async {
-    try {
-      final enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) {
-        emit(TrackerIdle());
-        return;
+    final ok = await _tracker.start();
+    if (!ok) return;
+
+    _tracker.onUpdate = (snap) {
+      if (!isClosed) {
+        emit(TrackerRecording(
+          points: List.from(_tracker.tracePoints),
+          distanceKm: snap.distanceKm,
+          durationSec: snap.durationSec,
+          avgSpeed: snap.avgSpeedKmh,
+          maxSpeed: snap.maxSpeedKmh,
+        ));
       }
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-        if (perm == LocationPermission.denied) {
-          emit(TrackerIdle());
-          return;
-        }
-      }
-      if (perm == LocationPermission.deniedForever) {
-        emit(TrackerIdle());
-        return;
-      }
-
-      _points = [];
-      _maxSpeed = 0;
-      _startedAt = DateTime.now();
-      HapticFeedback.mediumImpact();
-
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-      _points.add(LatLng(pos.latitude, pos.longitude));
-
-      emit(TrackerRecording(points: List.from(_points)));
-
-      // Tick every second so timer updates even without GPS movement
-      _ticker?.cancel();
-      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!isClosed && _startedAt != null) {
-          final dur = DateTime.now().difference(_startedAt!).inSeconds;
-          final dist = _calcDistance(_points);
-          final avg = dur > 0 ? (dist / dur * 3.6) : 0.0;
-          emit(TrackerRecording(
-            points: List.from(_points),
-            distanceKm: dist,
-            durationSec: dur,
-            avgSpeed: avg,
-            maxSpeed: _maxSpeed * 3.6,
-          ));
-        }
-      });
-
-      _sub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-          distanceFilter: 10,
-        ),
-      ).listen((pos) {
-        if (!isClosed) {
-          _points.add(LatLng(pos.latitude, pos.longitude));
-          if (pos.speed > _maxSpeed) _maxSpeed = pos.speed;
-          final dist = _calcDistance(_points);
-          final dur = DateTime.now().difference(_startedAt!).inSeconds;
-          final avg = dur > 0 ? (dist / dur * 3.6) : 0.0;
-          emit(TrackerRecording(
-            points: List.from(_points), distanceKm: dist,
-            durationSec: dur, avgSpeed: avg, maxSpeed: _maxSpeed * 3.6,
-          ));
-        }
-      });
-    } catch (e) {
-      emit(TrackerIdle());
-    }
+    };
   }
 
   void _stop(StopRecording event, Emitter<TrackerState> emit) {
-    _sub?.cancel();
-    _sub = null;
-    HapticFeedback.heavyImpact();
+    _tracker.stop();
+    _tracker.onUpdate = null;
+    emit(TrackerIdle());
   }
 
   Future<void> _save(SaveRoute event, Emitter<TrackerState> emit) async {
-    final state = this.state;
-    if (state is! TrackerRecording) return;
+    final current = state;
+    if (current is! TrackerRecording) return;
     final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
     if (userId.isEmpty) return;
 
@@ -157,21 +95,20 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       await Supabase.instance.client.from('saved_routes').insert({
         'user_id': userId,
         'name': event.name,
-        'distance': (state.distanceKm * 1000).round(),
-        'duration': state.durationSec,
-        'avg_speed': state.avgSpeed,
-        'max_speed': state.maxSpeed,
-        'points_count': state.points.length,
-        'polyline': state.points.map((p) => [p.latitude, p.longitude]).toList(),
-        'start_lat': state.points.first.latitude,
-        'start_lng': state.points.first.longitude,
-        'end_lat': state.points.last.latitude,
-        'end_lng': state.points.last.longitude,
-        'started_at': _startedAt?.toUtc().toIso8601String(),
+        'distance': (current.distanceKm * 1000).round(),
+        'duration': current.durationSec,
+        'avg_speed': current.avgSpeed,
+        'max_speed': current.maxSpeed,
+        'points_count': current.points.length,
+        'polyline': current.points.map((p) => [p.latitude, p.longitude]).toList(),
+        'start_lat': current.points.first.latitude,
+        'start_lng': current.points.first.longitude,
+        'end_lat': current.points.last.latitude,
+        'end_lng': current.points.last.longitude,
+        'started_at': _tracker.startedAt?.toUtc().toIso8601String(),
         'ended_at': DateTime.now().toUtc().toIso8601String(),
       });
       emit(TrackerIdle());
-      // Reload saved routes
       add(LoadSavedRoutes());
     } catch (_) {}
   }
@@ -190,21 +127,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         routes: (resp as List).cast<Map<String, dynamic>>(),
       ));
     } catch (_) {}
-  }
-
-  double _calcDistance(List<LatLng> pts) {
-    const distCalc = Distance();
-    double total = 0;
-    for (int i = 1; i < pts.length; i++) {
-      total += distCalc(pts[i - 1], pts[i]);
-    }
-    return total / 1000;
-  }
-
-  @override
-  Future<void> close() {
-    _sub?.cancel();
-    return super.close();
   }
 }
 
@@ -293,500 +215,272 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
     );
   }
 
-  // ── Idle view ──
-  Widget _buildIdleView(TrackerSavedRoutes? savedRoutes) {
-    return SingleChildScrollView(
-      padding: AppSpacing.screenPadding,
-      child: Column(
-        children: [
-          // Start button
-          SizedBox(
-            width: double.infinity,
-            height: 180,
-            child: ElevatedButton(
-              onPressed: () =>
-                  context.read<TrackerBloc>().add(StartRecording()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.success.withAlpha(15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.mdCircular,
-                  side: BorderSide(
-                      color: AppColors.success.withAlpha(80)),
+  // ── Recording view — shows a mini-map with the trace ──
+  Widget _buildRecordingView(TrackerRecording recording) {
+    final center = recording.points.isNotEmpty
+        ? recording.points.first
+        : const LatLng(4.5709, -74.2973);
+
+    return Stack(
+      children: [
+        // Mini-map
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 14,
+            minZoom: 5,
+            maxZoom: 18,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate:
+                  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c'],
+              userAgentPackageName: 'com.moteros.moteros_app',
+            ),
+            if (recording.points.length >= 2)
+              PolylineLayer(polylines: [
+                Polyline(
+                  points: recording.points,
+                  color: AppColors.secondary.withAlpha(200),
+                  strokeWidth: 4,
                 ),
-                elevation: 0,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.success.withAlpha(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.successGlow,
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(AppIcons.gps,
-                        color: AppColors.success, size: 32),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('INICIAR RUTA',
-                      style: AppTypography.h3
-                          .copyWith(color: AppColors.success)),
-                  const SizedBox(height: 4),
-                  Text('GPS grabará tu recorrido en vivo',
-                      style: AppTypography.caption.copyWith(
-                          color: AppColors.textMuted)),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.lg),
-
-          // ── Saved Routes (if available) ──
-          if (savedRoutes != null && savedRoutes.routes.isNotEmpty) ...[
-            Row(
-              children: [
-                Text('RUTAS GUARDADAS',
-                    style: AppTypography.label.copyWith(
-                      color: AppColors.textMuted,
-                      letterSpacing: 1.5,
-                    )),
-                const Spacer(),
-                Text('${savedRoutes.routes.length}',
-                    style: AppTypography.bodySmall
-                        .copyWith(color: AppColors.textMuted)),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ...savedRoutes.routes.map((r) => _buildSavedRouteCard(r)),
+              ]),
           ],
+        ),
 
-          if (savedRoutes == null || savedRoutes.routes.isEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              width: double.infinity,
-              padding: AppSpacing.cardPadding,
-              decoration: BoxDecoration(
-                color: AppColors.overlay,
-                borderRadius: AppRadius.mdCircular,
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.route_outlined,
-                      color: AppColors.textMuted, size: 48),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Sin rutas guardadas aún',
-                      style: AppTypography.body.copyWith(
-                          color: AppColors.textMuted)),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSavedRouteCard(Map<String, dynamic> route) {
-    final name = route['name'] as String? ?? 'Ruta';
-    final distance = ((route['distance'] as num?)?.toDouble() ?? 0) / 1000;
-    final duration = route['duration'] as int? ?? 0;
-    final avgSpeed = (route['avg_speed'] as num?)?.toDouble() ?? 0;
-    final createdAt = route['created_at'] as String? ?? '';
-
-    final durStr = duration > 3600
-        ? '${duration ~/ 3600}h ${(duration % 3600) ~/ 60}m'
-        : '${duration ~/ 60}m ${duration % 60}s';
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: AppSpacing.cardPaddingSm,
-      decoration: BoxDecoration(
-        color: AppColors.overlay,
-        borderRadius: AppRadius.mdCircular,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
+        // Stats overlay
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withAlpha(15),
-              borderRadius: AppRadius.smCircular,
-            ),
-            child: const Icon(AppIcons.route,
-                color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: AppTypography.body.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(
-                  '${distance.toStringAsFixed(2)} km · $durStr · ${avgSpeed.toStringAsFixed(1)} km/h',
-                  style: AppTypography.caption
-                      .copyWith(color: AppColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            createdAt.isNotEmpty
-                ? _formatTime(DateTime.tryParse(createdAt))
-                : '',
-            style: AppTypography.caption
-                .copyWith(color: AppColors.textMuted),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Recording view ──
-  Widget _buildRecordingView(TrackerRecording state) {
-    return Padding(
-      padding: AppSpacing.screenPadding,
-      child: Column(
-        children: [
-          // Status indicator
-          Container(
-            width: double.infinity,
-            padding: AppSpacing.cardPaddingSm,
-            decoration: BoxDecoration(
-              color: AppColors.surface.withAlpha(80),
-              borderRadius: AppRadius.mdCircular,
-              border: Border.all(
-                  color: AppColors.success.withAlpha(50)),
+              color: AppColors.overlay,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border, width: 0.5),
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.success,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.successGlow,
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Text('GRABANDO',
-                    style: AppTypography.button
-                        .copyWith(color: AppColors.success)),
-                const Spacer(),
-                Text(state.durationStr,
-                    style: AppTypography.monoSmall
-                        .copyWith(color: AppColors.primary)),
+                _statCol('DISTANCIA',
+                    '${recording.distanceKm.toStringAsFixed(1)} km'),
+                _statCol('DURACIÓN', recording.durationStr),
+                _statCol('VEL MEDIA',
+                    '${recording.avgSpeed.toStringAsFixed(0)} km/h'),
+                _statCol('MAX',
+                    '${recording.maxSpeed.toStringAsFixed(0)} km/h'),
               ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-
-          // Stats grid
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.6,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _statCard('DISTANCIA',
-                    '${state.distanceKm.toStringAsFixed(2)} km',
-                    Icons.straighten, AppColors.primary),
-                _statCard('VEL. PROMEDIO',
-                    '${state.avgSpeed.toStringAsFixed(1)} km/h',
-                    Icons.speed, AppColors.info),
-                _statCard('VEL. MÁXIMA',
-                    '${state.maxSpeed.toStringAsFixed(1)} km/h',
-                    AppIcons.gps, AppColors.warning),
-                _statCard('PUNTOS GPS',
-                    '${state.points.length}',
-                    AppIcons.location, AppColors.textMuted),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          // Save section
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.input,
-                    borderRadius:
-                        BorderRadius.circular(AppRadius.full),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: TextField(
-                    controller: _nameController,
-                    style: AppTypography.body
-                        .copyWith(color: AppColors.textPrimary),
-                    decoration: const InputDecoration(
-                      hintText: 'Nombre de la ruta',
-                      border: InputBorder.none,
-                      hintStyle:
-                          TextStyle(color: AppColors.textMuted),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: AppColors.success,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.successGlow,
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.save,
-                      color: Colors.black, size: 22),
-                  onPressed: () {
-                    final name = _nameController.text.trim();
-                    context.read<TrackerBloc>().add(SaveRoute(
-                      name.isEmpty
-                          ? 'Ruta ${DateTime.now().day}/${DateTime.now().month}'
-                          : name,
-                    ));
-                    Navigator.pop(context);
-                  },
-                  tooltip: 'GUARDAR',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-
-          // OSM export
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _exportToOsm(state),
-              icon: const Icon(Icons.map, size: AppSpacing.iconSm),
-              label: const Text('SUBIR TRAZA A OpenStreetMap'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.success,
-                side: const BorderSide(color: AppColors.success),
-                minimumSize: const Size(0, 44),
-                shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.smCircular),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statCard(
-      String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: AppSpacing.cardPaddingSm,
-      decoration: BoxDecoration(
-        color: AppColors.surface.withAlpha(80),
-        borderRadius: AppRadius.mdCircular,
-        border: Border.all(color: color.withAlpha(30)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 14),
-              const SizedBox(width: 4),
-              Text(label,
-                  style: AppTypography.caption
-                      .copyWith(color: AppColors.textMuted)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(value,
-              style: AppTypography.monoSmall.copyWith(
-                color: color,
-                fontWeight: FontWeight.w700,
-              )),
-        ],
-      ),
-    );
-  }
-
-  void _exportToOsm(TrackerRecording state) {
-    final now = DateTime.now();
-    final gpx = '''<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="AsfaltoClub" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata>
-    <name>Ruta AsfaltoClub ${now.day}/${now.month}/${now.year}</name>
-    <desc>Ruta grabada con AsfaltoClub - ${state.distanceKm.toStringAsFixed(2)}km, ${state.durationStr}</desc>
-    <time>${now.toUtc().toIso8601String()}</time>
-  </metadata>
-  <trk>
-    <name>Ruta ${now.day}/${now.month}</name>
-    <trkseg>
-${state.points.map((p) => '      <trkpt lat="${p.latitude}" lon="${p.longitude}"></trkpt>').join('\n')}
-    </trkseg>
-  </trk>
-</gpx>''';
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(
-                color: AppColors.textMuted.withAlpha(60), borderRadius: BorderRadius.circular(2),
-              )),
-              const SizedBox(height: AppSpacing.lg),
-              const Icon(Icons.map, color: AppColors.success, size: 40),
-              const SizedBox(height: AppSpacing.sm),
-              Text('ENRIQUECER OpenStreetMap', style: AppTypography.h2.copyWith(color: AppColors.textPrimary)),
-              const SizedBox(height: AppSpacing.sm),
-              Text('Tu ruta ayuda a mejorar el mapa colombiano',
-                style: AppTypography.body.copyWith(color: AppColors.textMuted),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              // Option 1: Upload to OSM
-              SizedBox(
-                width: double.infinity, height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Clipboard.setData(ClipboardData(text: gpx));
-                    launchUrl(
-                      Uri.parse('https://www.openstreetmap.org/traces/new'),
-                      mode: LaunchMode.externalApplication,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('✅ GPX copiado. Subilo en openstreetmap.org')),
-                    );
-                  },
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 20),
-                  label: const Text('SUBIR TRAZA A OSM (GPX)', style: TextStyle(fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success, foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              // Option 2: Copy GPX
-              SizedBox(
-                width: double.infinity, height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Clipboard.setData(ClipboardData(text: gpx));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('📋 GPX copiado al portapapeles')),
-                    );
-                  },
-                  icon: const Icon(Icons.copy, size: 20),
-                  label: const Text('COPIAR GPX', style: TextStyle(fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              // Option 3: OSM Note
-              SizedBox(
-                width: double.infinity, height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () => _createOsmNote(state, ctx),
-                  icon: const Icon(Icons.push_pin_outlined, size: 20),
-                  label: const Text('REPORTAR RUTA FALTANTE (OSM Note)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.secondary,
-                    side: const BorderSide(color: AppColors.secondary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
           ),
         ),
+
+        // Save button
+        Positioned(
+          bottom: 24,
+          left: 24,
+          right: 24,
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _showSaveDialog(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnAmber,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('GUARDAR RUTA',
+                  style: AppTypography.button),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statCol(String label, String value) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value,
+          style: AppTypography.monoSmall.copyWith(
+            color: AppColors.secondary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(label,
+          style: AppTypography.caption.copyWith(
+            color: AppColors.textMuted,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Idle view ──
+  Widget _buildIdleView(TrackerSavedRoutes? savedRoutes) {
+    return PageView(
+      controller: _pageController,
+      onPageChanged: (i) => setState(() => _currentPage = i),
+      children: [
+        _buildRecordTab(),
+        _buildHistoryTab(savedRoutes),
+      ],
+    );
+  }
+
+  Widget _buildRecordTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary, width: 3),
+              color: AppColors.primary.withAlpha(15),
+            ),
+            child: const Icon(Icons.fiber_manual_record,
+                color: AppColors.error, size: 48),
+          ),
+          const SizedBox(height: 24),
+          Text('PULSA PARA GRABAR',
+              style: AppTypography.h2.copyWith(color: AppColors.textPrimary)),
+          const SizedBox(height: 8),
+          Text('Tu ruta se grabará con GPS',
+              style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: 200,
+            child: ElevatedButton(
+              onPressed: () => context.read<TrackerBloc>().add(StartRecording()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.fiber_manual_record, size: 20),
+                  SizedBox(width: 8),
+                  Text('GRABAR', style: AppTypography.button),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _createOsmNote(TrackerRecording state, BuildContext ctx) async {
-    Navigator.pop(ctx);
-    if (state.points.isEmpty) return;
+  Widget _buildHistoryTab(TrackerSavedRoutes? savedRoutes) {
+    final routes = savedRoutes?.routes ?? [];
+    if (routes.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.route_outlined,
+                color: AppColors.textMuted, size: 64),
+            const SizedBox(height: 16),
+            Text('Sin rutas guardadas',
+                style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary)),
+          ],
+        ),
+      );
+    }
 
-    // Use center point of route for the note location
-    final avgLat = state.points.map((p) => p.latitude).reduce((a, b) => a + b) / state.points.length;
-    final avgLng = state.points.map((p) => p.longitude).reduce((a, b) => a + b) / state.points.length;
-    final start = state.points.first;
-    final end = state.points.last;
-
-    final comment = Uri.encodeComponent(
-      'Ruta de moto grabada con AsfaltoClub. '
-      '${state.distanceKm.toStringAsFixed(1)}km, ${state.points.length} puntos GPS. '
-      'Desde (${start.latitude.toStringAsFixed(4)}, ${start.longitude.toStringAsFixed(4)}) '
-      'hasta (${end.latitude.toStringAsFixed(4)}, ${end.longitude.toStringAsFixed(4)}). '
-      'Por favor revisar si esta vía existe en OSM. #AsfaltoClub #Colombia',
-    );
-    final url = Uri.parse(
-      'https://www.openstreetmap.org/note/new?lat=$avgLat&lon=$avgLng&text=$comment',
-    );
-
-    HapticFeedback.mediumImpact();
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('📍 OSM Note abierto — completá el reporte')),
+    return ListView.separated(
+      padding: AppSpacing.screenPadding,
+      itemCount: routes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final r = routes[i];
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border, width: 0.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(r['name'] ?? 'Ruta sin nombre',
+                  style: AppTypography.titleMedium
+                      .copyWith(color: AppColors.textPrimary)),
+              const SizedBox(height: 4),
+              Text(
+                '${(r['distance'] ?? 0) ~/ 1000} km · '
+                '${r['duration'] ?? 0 ~/ 60} min',
+                style: AppTypography.bodySmall
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  String _formatTime(DateTime? dt) {
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'ahora';
-    if (diff.inHours < 1) return '${diff.inMinutes}m';
-    if (diff.inDays < 1) return '${diff.inHours}h';
-    return '${dt.day}/${dt.month}';
+  void _showSaveDialog(BuildContext context) {
+    _nameController.clear();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Guardar ruta',
+            style: AppTypography.titleLarge),
+        content: TextField(
+          controller: _nameController,
+          autofocus: true,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: const InputDecoration(
+            hintText: 'Nombre de la ruta',
+            hintStyle: TextStyle(color: AppColors.textMuted),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCELAR',
+                style: AppTypography.buttonSmall),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = _nameController.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(ctx);
+                context.read<TrackerBloc>().add(SaveRoute(name));
+              }
+            },
+            child: const Text('GUARDAR',
+                style: AppTypography.buttonSmall),
+          ),
+        ],
+      ),
+    );
   }
 }

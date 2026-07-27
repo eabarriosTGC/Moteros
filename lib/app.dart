@@ -35,6 +35,7 @@ import 'features/tracker/presentation/screens/route_tracker_screen.dart';
 import 'features/validation/data/datasources/validation_remote_datasource.dart';
 import 'features/validation/domain/usecases/validate_visit.dart';
 import 'features/validation/presentation/bloc/validation_bloc.dart';
+import 'features/routes/data/datasources/route_datasource.dart';
 import 'features/routes/presentation/bloc/route_bloc.dart';
 import 'features/mileage/presentation/bloc/mileage_bloc.dart';
 import 'features/progression/presentation/bloc/leaderboard_bloc.dart';
@@ -92,7 +93,7 @@ class MoterosApp extends StatelessWidget {
         BlocProvider(create: (_) => PatchesBloc()),
         BlocProvider(create: (_) => TrackerBloc()),
         // New F-29 to F-35 BLoCs
-        BlocProvider(create: (_) => RouteBloc()),
+        BlocProvider(create: (_) => RouteBloc(datasource: RouteDatasource())),
         BlocProvider(create: (_) => MileageBloc()),
         BlocProvider(create: (_) => LeaderboardBloc()),
         // ── Economy, Battle Pass & Showcase ──

@@ -1,12 +1,19 @@
 /// Route Datasource — Supabase operations for routes.
+/// Single point of access to routes, segments, history.
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RouteDatasource {
   final SupabaseClient _client;
 
-  RouteDatasource(this._client);
+  RouteDatasource({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
 
-  Future<List<Map<String, dynamic>>> getRoutes({String? difficulty, List<String>? tags, int? clubId}) async {
+  String get _userId => _client.auth.currentUser?.id ?? '';
+
+  Future<List<Map<String, dynamic>>> getRoutes({
+    String? difficulty,
+    int? clubId,
+  }) async {
     try {
       var query = _client.from('routes').select();
       if (difficulty != null) query = query.eq('difficulty', difficulty);
@@ -20,7 +27,18 @@ class RouteDatasource {
   }
 
   Future<Map<String, dynamic>> getRoute(int routeId) async {
-    final response = await _client.from('routes').select().eq('id', routeId).single();
+    final response =
+        await _client.from('routes').select().eq('id', routeId).single();
+    return response as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getRouteByUser(int routeId) async {
+    final response = await _client
+        .from('routes')
+        .select()
+        .eq('id', routeId)
+        .eq('created_by', _userId)
+        .single();
     return response as Map<String, dynamic>;
   }
 
@@ -34,32 +52,64 @@ class RouteDatasource {
   }
 
   Future<List<Map<String, dynamic>>> getHistory(int routeId) async {
-    final userId = _client.auth.currentUser?.id ?? '';
     final response = await _client
         .from('route_history')
         .select()
         .eq('route_id', routeId)
-        .eq('user_id', userId)
+        .eq('user_id', _userId)
         .order('completed_at', ascending: false);
     return (response as List).cast<Map<String, dynamic>>();
   }
 
   Future<Map<String, dynamic>> createRoute(Map<String, dynamic> data) async {
-    final response = await _client.from('routes').insert(data).select().single();
+    final payload = <String, dynamic>{
+      'created_by': _userId,
+      ...data,
+    };
+    final response =
+        await _client.from('routes').insert(payload).select().single();
     return response as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> createSegments(List<Map<String, dynamic>> segments) async {
-    final response = await _client.from('route_segments').insert(segments).select();
+  Future<List<Map<String, dynamic>>> createSegments(
+    List<Map<String, dynamic>> segments,
+  ) async {
+    final response =
+        await _client.from('route_segments').insert(segments).select();
     return (response as List).cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> completeRoute(Map<String, dynamic> history) async {
-    final response = await _client.from('route_history').insert(history).select().single();
+  Future<Map<String, dynamic>> completeRoute(
+    Map<String, dynamic> history,
+  ) async {
+    final payload = <String, dynamic>{
+      'user_id': _userId,
+      ...history,
+    };
+    final response =
+        await _client.from('route_history').insert(payload).select().single();
     return response as Map<String, dynamic>;
   }
 
   Future<void> deleteRoute(int routeId) async {
     await _client.from('routes').delete().eq('id', routeId);
+  }
+
+  /// Suggest motoposadas near waypoints via Edge Function.
+  Future<List<dynamic>> suggestMotoposadas(
+    List<dynamic> waypoints, {
+    double maxDistanceKm = 20,
+  }) async {
+    try {
+      final response = await _client.functions.invoke('suggest_motoposadas',
+        body: {
+          'waypoints': waypoints,
+          'max_distance_km': maxDistanceKm,
+        },
+      );
+      return (response.data as List?) ?? [];
+    } catch (_) {
+      return [];
+    }
   }
 }
