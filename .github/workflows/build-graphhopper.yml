@@ -2,8 +2,6 @@ name: Build GraphHopper
 
 on:
   push:
-    paths:
-      - 'graphhopper/**'
     branches: [main]
 
 env:
