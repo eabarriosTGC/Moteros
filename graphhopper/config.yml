@@ -6,7 +6,7 @@
 # ============================================================
 
 graphhopper:
-  datareader.file: /data/colombia-latest.osm.pbf
+  datareader.file: /data/colombia-coast.osm.pbf
   graph.location: /data/graph-cache
 
   profiles:

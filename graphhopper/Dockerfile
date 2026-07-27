@@ -1,16 +1,17 @@
 # GraphHopper Router — AsfaltoClub
 # ============================================================
 # Builds from official GraphHopper release JAR.
-# No external scripts — everything is self-contained.
-# OSM data downloaded at runtime.
+# Extracts only the Colombian Caribbean region (La Guajira + Costa)
+# using osmium to reduce memory usage during import.
 # ============================================================
 
 FROM eclipse-temurin:21-jre
 
 WORKDIR /graphhopper
 
-# Install wget
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+# Install wget + osmium-tool + osmctools (for osmconvert)
+RUN apt-get update && apt-get install -y wget osmium-tool && \
+    rm -rf /var/lib/apt/lists/*
 
 # Download GraphHopper web JAR
 ARG GH_VERSION=11.0
