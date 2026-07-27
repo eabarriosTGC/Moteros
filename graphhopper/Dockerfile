@@ -10,7 +10,7 @@ COPY config.yml /data/gh-config.yml
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-ENV JAVA_OPTS="-Xms1g -Xmx4g -XX:+UseParallelGC"
+ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+UseParallelGC -XX:MaxRAM=1g"
 
 EXPOSE 8989 8990
 

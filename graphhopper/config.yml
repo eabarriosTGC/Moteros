@@ -57,8 +57,8 @@ graphhopper:
           unclassified: 50
           residential: 30
 
-  prepare.ch.weightings: "motorcycle,car"
-  prepare.ch.threads: 4
+  prepare.ch.weightings: "car"
+  prepare.ch.threads: 2
 
   server:
     applicationConnectors:
