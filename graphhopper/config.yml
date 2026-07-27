@@ -77,7 +77,6 @@ graphhopper:
   # Contraction Hierarchies for fast routing (only car, saves RAM)
   profiles_ch:
     - profile: car
-      preparations: "fast"
 
   server:
     applicationConnectors:
