@@ -1,11 +1,14 @@
 # GraphHopper Configuration — AsfaltoClub v11
 # ============================================================
 # Compatible with GraphHopper 11.x
-# datareader.file and graph.location passed via -D flags in start.sh
-# Profiles defined using custom_model (vehicle field removed in v11)
+# datareader.file and graph.location are set here (not via -D flags
+# because Dropwizard does not always pick up nested -D properties)
 # ============================================================
 
 graphhopper:
+  datareader.file: /data/colombia-latest.osm.pbf
+  graph.location: /data/graph-cache
+
   profiles:
     # ── Motorcycle profile ──
     # Avoids motorways, prefers winding secondary/tertiary roads

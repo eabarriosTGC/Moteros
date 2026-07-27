@@ -28,6 +28,4 @@ echo "Config: /data/gh-config.yml"
 echo "JAVA_OPTS: $JAVA_OPTS"
 
 exec java $JAVA_OPTS \
-    -Ddw.graphhopper.datareader.file="$OSM_FILE" \
-    -Ddw.graphhopper.graph.location="$GRAPH_DIR" \
     -jar "$GH_JAR" server /data/gh-config.yml
