@@ -75,8 +75,9 @@ graphhopper:
             limit_to: "50"
 
   # Contraction Hierarchies for fast routing (only car, saves RAM)
-  prepare.ch.weightings: "car"
-  prepare.ch.threads: 2
+  profiles_ch:
+    car:
+      preparations: "fast"
 
   server:
     applicationConnectors:
