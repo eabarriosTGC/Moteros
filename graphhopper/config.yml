@@ -1,10 +1,10 @@
 # GraphHopper Configuration — AsfaltoClub
+# datareader.file and graph.location are passed via -D flags in start.sh
 # Profiles:
-#   - motorcycle: custom profile for motorbikes
-#   - car: standard driving profile (fallback)
+#   - motorcycle: custom for motorbikes (avoids highways, prefers curves)
+#   - car: standard driving profile
 
 graphhopper:
-  datareader.file: /data/colombia-latest.osm.pbf
   graph.location: /data/graph-cache
 
   profiles:
