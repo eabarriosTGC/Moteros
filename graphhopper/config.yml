@@ -5,8 +5,6 @@
 #   - car: standard driving profile
 
 graphhopper:
-  graph.location: /data/graph-cache
-
   profiles:
     - name: motorcycle
       vehicle: motor_vehicle
