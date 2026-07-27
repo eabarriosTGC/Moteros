@@ -143,10 +143,11 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                         subdomains: const ['a', 'b', 'c'],
                         userAgentPackageName: 'com.moteros.moteros_app',
                       ),
-                      // Planned route polyline (gray)
+                      // Planned route polyline (road-following if resolved, else straight)
+                      final routePoly = state.resolvedPolyline ?? waypoints;
                       PolylineLayer(polylines: [
                         Polyline(
-                          points: waypoints,
+                          points: routePoly,
                           color: AppColors.textMuted.withAlpha(120),
                           strokeWidth: 4,
                         ),

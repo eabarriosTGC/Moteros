@@ -1,7 +1,9 @@
-/// Route BLoC — now uses RouteDatasource instead of direct Supabase calls.
+/// Route BLoC — uses RouteDatasource + RoutingService for road polylines.
 library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../core/services/routing_service.dart';
 import '../../data/datasources/route_datasource.dart';
 import 'route_event.dart';
 import 'route_state.dart';
@@ -48,7 +50,35 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
         history = await _datasource.getHistory(event.routeId);
       } catch (_) {}
 
-      emit(RouteDetailLoaded(route: route, segments: segments, history: history));
+      // Resolve waypoints to road-following polyline via RoutingService
+      final waypointsRaw = route['waypoints'] as List? ?? [];
+      final wps = waypointsRaw
+          .map((wp) => (wp is Map<String, dynamic>)
+              ? LatLng((wp['lat'] as num).toDouble(), (wp['lng'] as num).toDouble())
+              : null)
+          .whereType<LatLng>()
+          .toList();
+
+      List<LatLng> resolvedPolyline = [];
+      if (wps.length >= 2) {
+        for (int i = 0; i < wps.length - 1; i++) {
+          final result = await RoutingService.getRoute(
+            originLat: wps[i].latitude,
+            originLng: wps[i].longitude,
+            destLat: wps[i + 1].latitude,
+            destLng: wps[i + 1].longitude,
+            instructions: false,
+          );
+          resolvedPolyline.addAll(result.polyline);
+        }
+      }
+
+      emit(RouteDetailLoaded(
+        route: route,
+        segments: segments,
+        history: history,
+        resolvedPolyline: resolvedPolyline.isNotEmpty ? resolvedPolyline : null,
+      ));
     } catch (e) {
       emit(RouteError(e.toString()));
     }

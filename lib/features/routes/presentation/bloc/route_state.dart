@@ -2,6 +2,7 @@
 library;
 
 import 'package:equatable/equatable.dart';
+import 'package:latlong2/latlong.dart';
 
 sealed class RouteState extends Equatable {
   const RouteState();
@@ -26,15 +27,17 @@ final class RouteDetailLoaded extends RouteState {
   final Map<String, dynamic> route;
   final List<Map<String, dynamic>>? segments;
   final List<Map<String, dynamic>>? history;
+  final List<LatLng>? resolvedPolyline;
 
   const RouteDetailLoaded({
     required this.route,
     this.segments,
     this.history,
+    this.resolvedPolyline,
   });
 
   @override
-  List<Object?> get props => [route, segments, history];
+  List<Object?> get props => [route, segments, history, resolvedPolyline];
 }
 
 final class RouteCreated extends RouteState {

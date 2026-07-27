@@ -139,6 +139,8 @@ serve(async (req) => {
         elevation: false,
         locale: 'es',
       }),
+      // 10s timeout: if GraphHopper is down, fail fast
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!ghResponse.ok) {
