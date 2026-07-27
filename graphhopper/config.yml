@@ -1,0 +1,73 @@
+# GraphHopper Configuration — AsfaltoClub
+# Profiles:
+#   - motorcycle: custom profile for motorbikes
+#   - car: standard driving profile (fallback)
+
+graphhopper:
+  datareader.file: /data/colombia-latest.osm.pbf
+  graph.location: /data/graph-cache
+
+  profiles:
+    - name: motorcycle
+      vehicle: motor_vehicle
+      weighting: fastest
+      custom_model:
+        speed:
+          motorway: 80
+          motorway_link: 60
+          trunk: 90
+          trunk_link: 60
+          primary: 80
+          primary_link: 60
+          secondary: 70
+          secondary_link: 50
+          tertiary: 60
+          tertiary_link: 40
+          unclassified: 40
+          residential: 30
+          living_street: 15
+          service: 15
+          track: 10
+          path: 5
+        priority:
+          secondary: 1.2
+          tertiary: 1.3
+          unclassified: 1.0
+          residential: 0.8
+          primary: 0.7
+          trunk: 0.4
+          motorway: 0.1
+          motorway_link: 0.2
+        conditional:
+          - if: "surface == 'unpaved' || surface == 'gravel' || surface == 'dirt' || surface == 'sand'"
+            multiply_by: 0.3
+          - if: "motorcycle == 'no' || vehicle == 'no'"
+            multiply_by: 0.0
+          - if: "scenic == 'yes' || tourism == 'viewpoint'"
+            multiply_by: 1.2
+
+    - name: car
+      vehicle: car
+      weighting: fastest
+      custom_model:
+        speed:
+          motorway: 110
+          trunk: 100
+          primary: 90
+          secondary: 80
+          tertiary: 70
+          unclassified: 50
+          residential: 30
+
+  prepare.ch.weightings: "motorcycle,car"
+  prepare.ch.threads: 4
+
+  server:
+    applicationConnectors:
+      - type: http
+        port: 8989
+        bindHost: 0.0.0.0
+    adminConnectors:
+      - type: http
+        port: 8990
+        bindHost: 0.0.0.0

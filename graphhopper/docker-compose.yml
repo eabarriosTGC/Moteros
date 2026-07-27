@@ -1,0 +1,21 @@
+# GraphHopper — Local development with Docker
+# Usage: docker compose up -d
+# Then: curl http://localhost:8989/route?point=4.71,-74.07&point=6.25,-75.57&profile=motorcycle
+#
+# For Railway deployment, just point Railway to this directory.
+# Railway will auto-detect the Dockerfile.
+
+services:
+  graphhopper:
+    build: .
+    ports:
+      - "8989:8989"  # API
+      - "8990:8990"  # Admin
+    volumes:
+      - gh-data:/data/graph-cache
+    environment:
+      - JAVA_OPTS=-Xms1g -Xmx4g -XX:+UseParallelGC
+    restart: unless-stopped
+
+volumes:
+  gh-data:
