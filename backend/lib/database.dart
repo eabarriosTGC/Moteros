@@ -1,3 +1,6 @@
+// Copyright 2026 eabarriosTGC
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:convert';
 import 'package:dotenv/dotenv.dart';
 import 'package:postgres/postgres.dart';

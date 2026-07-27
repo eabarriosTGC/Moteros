@@ -1,3 +1,6 @@
+// Copyright 2026 eabarriosTGC
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
