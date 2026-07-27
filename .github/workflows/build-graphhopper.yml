@@ -1,0 +1,39 @@
+# Build and push GraphHopper Docker image to GitHub Container Registry
+# Railway then deploys from GHCR instead of building from source.
+name: Build GraphHopper
+
+on:
+  push:
+    paths:
+      - 'graphhopper/**'
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: graphhopper-router
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: graphhopper
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
