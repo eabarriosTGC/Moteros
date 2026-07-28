@@ -561,114 +561,250 @@ class _RodarScreenState extends State<RodarScreen>
     );
   }
 
-  // ── Motoposada POI card with navigation buttons ──
+  // ── Motoposada POI card — single bottom sheet with nav buttons ──
 
   void _showMotoposadaCard(BuildContext context, MotoposadaModel mp) {
     _tap();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColors.textMuted.withAlpha(80),
-                    borderRadius: BorderRadius.circular(2),
+    // Pre-resolve available apps for the card
+    Future.delayed(Duration.zero, () async {
+      final wazeOk = await NavigationHandler.canLaunchWaze();
+      final mapsOk = await NavigationHandler.canLaunchGoogleMaps();
+      if (!context.mounted) return;
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Drag handle ──
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.textMuted.withAlpha(80),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              // Place name
-              Text(
-                mp.title,
-                style: AppTypography.titleLarge.copyWith(
-                  color: AppColors.textPrimary,
+                // ── Header row: icon + name + type ──
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withAlpha(20),
+                        borderRadius: AppRadius.mdCircular,
+                      ),
+                      child: Icon(
+                        _motoposadaIcon(mp.typeLabel),
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mp.title,
+                            style: AppTypography.titleLarge.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withAlpha(20),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              mp.typeLabel,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              // Type label
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 2,
+                // ── Description ──
+                if (mp.description.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    mp.description,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                // ── Divider ──
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Divider(color: AppColors.border, height: 1),
                 ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(20),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  mp.typeLabel,
+                // ── Label ──
+                Text(
+                  'NAVEGAR CON',
                   style: AppTypography.caption.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.textMuted,
+                    letterSpacing: 1.2,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              // Description
-              if (mp.description.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(
-                  mp.description,
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                // ── Nav buttons ──
+                _buildNavRow(ctx, mp, wazeOk, mapsOk),
               ],
-              const SizedBox(height: AppSpacing.md),
-              // Navigation buttons
-              _buildNavigationButtons(ctx, mp),
-            ],
+            ),
           ),
         ),
-      ),
+      );
+    });
+  }
+
+  /// Icon mapping based on motoposada type.
+  IconData _motoposadaIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'hospedaje':
+      case 'casa':
+      case 'hostal':
+        return Icons.bed_rounded;
+      case 'taller':
+      case 'mecánico':
+        return Icons.build_rounded;
+      case 'combustible':
+      case 'gasolina':
+      case 'estación':
+        return Icons.local_gas_station_rounded;
+      case 'restaurante':
+      case 'comida':
+        return Icons.restaurant_rounded;
+      default:
+        return Icons.place_rounded;
+    }
+  }
+
+  /// Build navigation buttons row — single button if only one app available,
+  /// two side-by-side if both are available.
+  Widget _buildNavRow(BuildContext ctx, MotoposadaModel mp, bool wazeOk, bool mapsOk) {
+    if (!wazeOk && !mapsOk) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.error.withAlpha(10),
+          borderRadius: AppRadius.mdCircular,
+          border: Border.all(color: AppColors.error.withAlpha(30)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline, color: AppColors.error, size: 18),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                'Instala Waze o Google Maps para navegar hasta aquí',
+                style: AppTypography.caption.copyWith(color: AppColors.error),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Both available → side-by-side
+    if (wazeOk && mapsOk) {
+      return Row(
+        children: [
+          Expanded(child: _navButton(
+            ctx, mp,
+            icon: Icons.navigation_rounded,
+            label: 'Waze',
+            color: const Color(0xFF33CCFF),
+            onTap: () => NavigationHandler.launchWaze(mp.lat, mp.lng),
+          )),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _navButton(
+            ctx, mp,
+            icon: Icons.map_outlined,
+            label: 'Google Maps',
+            color: const Color(0xFF34A853),
+            onTap: () => NavigationHandler.launchGoogleMaps(mp.lat, mp.lng),
+          )),
+        ],
+      );
+    }
+
+    // Only one available → full width
+    final isWaze = wazeOk;
+    return _navButton(
+      ctx, mp,
+      icon: isWaze ? Icons.navigation_rounded : Icons.map_outlined,
+      label: isWaze ? 'Abrir en Waze' : 'Abrir en Google Maps',
+      color: isWaze ? const Color(0xFF33CCFF) : const Color(0xFF34A853),
+      onTap: () => isWaze
+          ? NavigationHandler.launchWaze(mp.lat, mp.lng)
+          : NavigationHandler.launchGoogleMaps(mp.lat, mp.lng),
     );
   }
 
-  Widget _buildNavigationButtons(BuildContext ctx, MotoposadaModel mp) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              NavigationHandler.showNavigationPicker(
-                context,
-                lat: mp.lat,
-                lng: mp.lng,
-                placeName: mp.title,
-              );
-            },
-            icon: const Icon(Icons.navigation_rounded,
-                color: AppColors.secondary, size: 18),
-            label: const Text(
-              'CÓMO LLEGAR',
-              style: AppTypography.buttonSmall,
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textPrimary,
-              side: const BorderSide(color: AppColors.border),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
+  Widget _navButton(
+    BuildContext ctx,
+    MotoposadaModel mp, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return ElevatedButton(
+      onPressed: () {
+        Navigator.pop(ctx);
+        onTap();
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withAlpha(15),
+        foregroundColor: color,
+        side: BorderSide(color: color.withAlpha(50), width: 1.2),
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            label,
+            style: AppTypography.button.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
