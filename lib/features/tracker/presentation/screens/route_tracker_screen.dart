@@ -12,6 +12,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/services/location_tracking_service.dart';
+import '../../../../core/services/geofence_service.dart';
+import '../../../refugios/presentation/bloc/motoposadas_state.dart';
+import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'post_trip_summary_screen.dart';
 
 // ── BLoC ──
@@ -54,6 +57,7 @@ final class LoadSavedRoutes extends TrackerEvent {}
 
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   final _tracker = LocationTrackingService.instance;
+  GeofenceService? _geofenceService;
 
   TrackerBloc() : super(TrackerIdle()) {
     on<StartRecording>(_start);
@@ -62,11 +66,26 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
     on<LoadSavedRoutes>(_loadRoutes);
   }
 
+  /// Provide geofence service for visit detection.
+  void attachGeofence(GeofenceService service) {
+    _geofenceService = service;
+  }
+
+  /// Detach geofence service.
+  void detachGeofence() {
+    _geofenceService = null;
+  }
+
   Future<void> _start(StartRecording event, Emitter<TrackerState> emit) async {
     final ok = await _tracker.start();
     if (!ok) return;
 
     _tracker.onUpdate = (snap) {
+      // Feed geofence service for visit detection
+      if (_geofenceService != null) {
+        _geofenceService!.feedPoint(snap.position, speedKmh: snap.speedKmh);
+      }
+
       if (!isClosed) {
         emit(TrackerRecording(
           points: List.from(_tracker.tracePoints),
@@ -82,6 +101,7 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   void _stop(StopRecording event, Emitter<TrackerState> emit) {
     _tracker.stop();
     _tracker.onUpdate = null;
+    _geofenceService?.stop();
     emit(TrackerIdle());
   }
 
@@ -139,24 +159,106 @@ class RouteTrackerScreen extends StatefulWidget {
   State<RouteTrackerScreen> createState() => _RouteTrackerScreenState();
 }
 
-class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
+class _RouteTrackerScreenState extends State<RouteTrackerScreen>
+    with WidgetsBindingObserver {
   final _nameController = TextEditingController();
   final _pageController = PageController();
   int _currentPage = 0;
+  final GeofenceService _geofence = GeofenceService();
+  bool _wasRecordingInBg = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TrackerBloc>().add(LoadSavedRoutes());
     });
+
+    // Wire visit validated callback
+    _geofence.onVisitValidated = (visit) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('¡Has visitado ${visit.motoposada.title}!'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      // Save visit to DB
+      _saveVisitToDb(visit);
+    };
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _geofence.stop();
     _nameController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // App going to background — remember state to restore on resume.
+        // The GPS position stream from Geolocator keeps running in background
+        // as long as ACCESS_BACKGROUND_LOCATION is granted on Android or
+        // appropriate UIBackgroundModes is set on iOS.
+        final trackerState = context.read<TrackerBloc>().state;
+        if (trackerState is TrackerRecording) {
+          _wasRecordingInBg = true;
+          // Keep the GPS stream alive — don't pause the tracker
+        }
+      case AppLifecycleState.resumed:
+        if (_wasRecordingInBg && mounted) {
+          _wasRecordingInBg = false;
+          // Force re-emit current state from tracker to refresh UI
+          final tracker = LocationTrackingService.instance;
+          // The onUpdate callback will trigger if position is available
+          if (tracker.isRecording) {
+            // Re-emit via the tracker's internal ticker
+            tracker.resume();
+          }
+        }
+      case AppLifecycleState.detached:
+        // App is being destroyed — nothing to restore
+        break;
+    }
+  }
+
+  /// Save a validated visit to the motoposada_visits table.
+  Future<void> _saveVisitToDb(ValidatedVisit visit) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    try {
+      await Supabase.instance.client.from('motoposada_visits').insert({
+        'user_id': userId,
+        'motoposada_id': visit.motoposada.id,
+        'visited_at': visit.visitedAt.toUtc().toIso8601String(),
+        'dwell_seconds': visit.dwellSeconds,
+        'anti_cheat_flags': visit.antiCheatFlags,
+      });
+    } catch (_) {
+      // Silently fail — visit logging is non-critical
+    }
+  }
+
+  /// Load motoposadas and attach geofence service to the tracker.
+  void _startGeofence() {
+    // Get current motoposadas from BLoC
+    final mpState = context.read<MotoposadasBloc>().state;
+    if (mpState is MotoposadasLoaded) {
+      _geofence.start(motoposadas: mpState.motoposadas);
+    }
+    // Attach to tracker BLoC for point feeding
+    context.read<TrackerBloc>().attachGeofence(_geofence);
   }
 
   @override
@@ -382,7 +484,10 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
           SizedBox(
             width: 200,
             child: ElevatedButton(
-              onPressed: () => context.read<TrackerBloc>().add(StartRecording()),
+              onPressed: () {
+                _startGeofence();
+                context.read<TrackerBloc>().add(StartRecording());
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
                 foregroundColor: Colors.white,

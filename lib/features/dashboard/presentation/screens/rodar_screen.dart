@@ -18,6 +18,7 @@ import '../../../raids/presentation/screens/raid_list_screen.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import '../../../refugios/presentation/bloc/motoposadas_event.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
+import '../../../../core/services/navigation_handler.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -112,7 +113,11 @@ class _RodarScreenState extends State<RodarScreen>
                               point: LatLng(m.lat, m.lng),
                               width: 120,
                               height: 60,
-                              child: _buildMotoposadaMarker(m),
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _showMotoposadaCard(context, m),
+                                child: _buildMotoposadaMarker(m),
+                              ),
                             ))
                         .toList(),
                   );
@@ -553,6 +558,117 @@ class _RodarScreenState extends State<RodarScreen>
           ),
         ],
       ),
+    );
+  }
+
+  // ── Motoposada POI card with navigation buttons ──
+
+  void _showMotoposadaCard(BuildContext context, MotoposadaModel mp) {
+    _tap();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withAlpha(80),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Place name
+              Text(
+                mp.title,
+                style: AppTypography.titleLarge.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              // Type label
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  mp.typeLabel,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              // Description
+              if (mp.description.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  mp.description,
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              // Navigation buttons
+              _buildNavigationButtons(ctx, mp),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationButtons(BuildContext ctx, MotoposadaModel mp) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              NavigationHandler.showNavigationPicker(
+                context,
+                lat: mp.lat,
+                lng: mp.lng,
+                placeName: mp.title,
+              );
+            },
+            icon: const Icon(Icons.navigation_rounded,
+                color: AppColors.secondary, size: 18),
+            label: const Text(
+              'CÓMO LLEGAR',
+              style: AppTypography.buttonSmall,
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textPrimary,
+              side: const BorderSide(color: AppColors.border),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
