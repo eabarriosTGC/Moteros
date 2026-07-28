@@ -54,6 +54,7 @@ final class StartRecording extends TrackerEvent {}
 final class StopRecording extends TrackerEvent {}
 final class SaveRoute extends TrackerEvent { final String name; SaveRoute(this.name); }
 final class LoadSavedRoutes extends TrackerEvent {}
+final class ResumeFromCheckpoint extends TrackerEvent {}
 
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   final _tracker = LocationTrackingService.instance;
@@ -64,6 +65,7 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
     on<StopRecording>(_stop);
     on<SaveRoute>(_save);
     on<LoadSavedRoutes>(_loadRoutes);
+    on<ResumeFromCheckpoint>(_resumeFromCheckpoint);
   }
 
   /// Provide geofence service for visit detection.
@@ -86,6 +88,27 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         _geofenceService!.feedPoint(snap.position, speedKmh: snap.speedKmh);
       }
 
+      if (!isClosed) {
+        emit(TrackerRecording(
+          points: List.from(_tracker.tracePoints),
+          distanceKm: snap.distanceKm,
+          durationSec: snap.durationSec,
+          avgSpeed: snap.avgSpeedKmh,
+          maxSpeed: snap.maxSpeedKmh,
+        ));
+      }
+    };
+  }
+
+  Future<void> _resumeFromCheckpoint(
+      ResumeFromCheckpoint event, Emitter<TrackerState> emit) async {
+    final restored = await _tracker.restoreFromCheckpoint();
+    if (!restored) return;
+
+    _tracker.onUpdate = (snap) {
+      if (_geofenceService != null) {
+        _geofenceService!.feedPoint(snap.position, speedKmh: snap.speedKmh);
+      }
       if (!isClosed) {
         emit(TrackerRecording(
           points: List.from(_tracker.tracePoints),

@@ -199,7 +199,7 @@ class LocationTrackingService {
     _ticker = null;
     _startedAt = null;
     _lastPosition = null;
-    _clearCheckpoint();
+    clearCheckpoint();
     HapticFeedback.heavyImpact();
   }
 
@@ -246,7 +246,7 @@ class LocationTrackingService {
 
   /// Restore tracking state from a saved checkpoint.
   /// Returns true if state was restored, false if no checkpoint exists.
-  Future<bool> _restoreCheckpoint() async {
+  Future<bool> restoreFromCheckpoint() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_ckKey);
     if (raw == null) return false;
@@ -280,13 +280,13 @@ class LocationTrackingService {
       return true;
     } catch (_) {
       // Corrupted checkpoint — clear it
-      await _clearCheckpoint();
+      await clearCheckpoint();
       return false;
     }
   }
 
-  /// Clear saved checkpoint after successful trip save.
-  Future<void> _clearCheckpoint() async {
+  /// Clear saved checkpoint after successful trip save or discard.
+  Future<void> clearCheckpoint() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_ckKey);
   }

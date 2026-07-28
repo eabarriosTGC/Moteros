@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
+import '../../../../core/services/location_tracking_service.dart';
 import '../../../raids/presentation/bloc/raid_bloc.dart';
 import '../../../raids/presentation/bloc/raid_event.dart';
 import '../../../raids/presentation/bloc/raid_state.dart';
@@ -55,7 +56,66 @@ class _RodarScreenState extends State<RodarScreen>
       context.read<DashboardBloc>().add(LoadDashboard(userId: 1));
       context.read<RaidBloc>().add(const LoadRaids());
       context.read<MotoposadasBloc>().add(const LoadMotoposadas());
+      _checkPendingTrip();
     });
+  }
+
+  /// Check if there's a trip checkpoint from a prior session (process kill).
+  Future<void> _checkPendingTrip() async {
+    final hasPending = await LocationTrackingService.hasPendingTrip();
+    if (!hasPending || !mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.route_rounded, color: AppColors.primary, size: 22),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('Viaje pendiente',
+                style: TextStyle(color: AppColors.textPrimary)),
+          ],
+        ),
+        content: const Text(
+          'Tenías un viaje en curso que quedó sin guardar. '
+          '¿Quieres continuarlo o descartarlo?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'discard'),
+            child: const Text('DESCARTAR',
+                style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'continue'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnAmber,
+            ),
+            child: const Text('CONTINUAR',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (action == 'discard') {
+      await LocationTrackingService.instance.clearCheckpoint();
+    } else if (action == 'continue') {
+      context.read<TrackerBloc>().add(ResumeFromCheckpoint());
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => const RouteTrackerScreen()),
+      );
+    }
   }
 
   @override
