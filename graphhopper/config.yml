@@ -17,6 +17,8 @@ graphhopper:
     - name: motorcycle
       custom_model:
         speed:
+          - if: "true"
+            limit_to: "50"
           - if: "road_class == MOTORWAY || road_class == MOTORWAY_LINK"
             limit_to: "80"
           - if: "road_class == TRUNK || road_class == TRUNK_LINK"
@@ -37,8 +39,6 @@ graphhopper:
             limit_to: "10"
           - if: "surface == UNPAVED || surface == GRAVEL || surface == DIRT || surface == SAND"
             limit_to: "20"
-          - else: ""
-            limit_to: "50"
         priority:
           - if: "road_class == SECONDARY || road_class == TERTIARY"
             multiply_by: "1.3"
@@ -57,6 +57,8 @@ graphhopper:
     - name: car
       custom_model:
         speed:
+          - if: "true"
+            limit_to: "50"
           - if: "road_class == MOTORWAY || road_class == MOTORWAY_LINK"
             limit_to: "110"
           - if: "road_class == TRUNK || road_class == TRUNK_LINK"
@@ -71,8 +73,6 @@ graphhopper:
             limit_to: "50"
           - if: "road_class == RESIDENTIAL"
             limit_to: "30"
-          - else: ""
-            limit_to: "50"
 
   # Contraction Hierarchies for fast routing (only car, saves RAM)
   profiles_ch:
