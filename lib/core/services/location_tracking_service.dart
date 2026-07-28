@@ -12,11 +12,13 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ══════════════════════════════════════════════════════════════════════
 // Data classes
@@ -87,6 +89,10 @@ class LocationTrackingService {
   LatLng? _lastPosition;
   double _totalDistance = 0;
   int _elapsedSec = 0;
+  int _sinceLastCheckpoint = 0;
+
+  static const String _ckKey = 'tracker_checkpoint';
+  static const int _checkpointInterval = 10; // save every N points
 
   bool get isRecording => _positionSub != null;
   List<LatLng> get tracePoints => List.unmodifiable(_tracePoints);
@@ -193,6 +199,7 @@ class LocationTrackingService {
     _ticker = null;
     _startedAt = null;
     _lastPosition = null;
+    _clearCheckpoint();
     HapticFeedback.heavyImpact();
   }
 
@@ -203,6 +210,85 @@ class LocationTrackingService {
     _maxSpeed = 0;
     _elapsedSec = 0;
     _startedAt = null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Persistence — incremental checkpoint to survive process kill
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns true if a pending tracking checkpoint exists from a prior session.
+  static Future<bool> hasPendingTrip() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey(_ckKey);
+  }
+
+  /// Persist current tracking state to SharedPreferences.
+  Future<void> _saveCheckpoint() async {
+    final pointsJson = _tracePoints
+        .map((p) => [p.latitude, p.longitude])
+        .toList();
+
+    final data = {
+      'points': pointsJson,
+      'totalDistance': _totalDistance,
+      'maxSpeed': _maxSpeed,
+      'elapsedSec': _elapsedSec,
+      'startedAt': _startedAt?.toIso8601String(),
+      'lastLat': _lastPosition?.latitude,
+      'lastLng': _lastPosition?.longitude,
+      'currentSpeed': _currentSpeed,
+      'lastHeading': _lastHeading,
+    };
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_ckKey, jsonEncode(data));
+  }
+
+  /// Restore tracking state from a saved checkpoint.
+  /// Returns true if state was restored, false if no checkpoint exists.
+  Future<bool> _restoreCheckpoint() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_ckKey);
+    if (raw == null) return false;
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final points = (data['points'] as List)
+          .map((p) => LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+          .toList();
+
+      _tracePoints
+        ..clear()
+        ..addAll(points);
+      _totalDistance = (data['totalDistance'] as num).toDouble();
+      _maxSpeed = (data['maxSpeed'] as num).toDouble();
+      _elapsedSec = data['elapsedSec'] as int;
+      _currentSpeed = (data['currentSpeed'] as num?)?.toDouble() ?? 0;
+      _lastHeading = (data['lastHeading'] as num?)?.toDouble() ?? 0;
+
+      final lastLat = data['lastLat'] as num?;
+      final lastLng = data['lastLng'] as num?;
+      if (lastLat != null && lastLng != null) {
+        _lastPosition = LatLng(lastLat.toDouble(), lastLng.toDouble());
+      }
+
+      final startedStr = data['startedAt'] as String?;
+      if (startedStr != null) {
+        _startedAt = DateTime.tryParse(startedStr);
+      }
+
+      return true;
+    } catch (_) {
+      // Corrupted checkpoint — clear it
+      await _clearCheckpoint();
+      return false;
+    }
+  }
+
+  /// Clear saved checkpoint after successful trip save.
+  Future<void> _clearCheckpoint() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_ckKey);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -220,6 +306,15 @@ class LocationTrackingService {
 
     final speedKmh = p.speed.isFinite ? p.speed * 3.6 : 0.0;
     if (speedKmh > _maxSpeed) _maxSpeed = speedKmh;
+    _currentSpeed = speedKmh;
+    _lastHeading = p.heading.isFinite ? p.heading : _lastHeading;
+
+    // Incremental checkpoint every N points
+    _sinceLastCheckpoint++;
+    if (_sinceLastCheckpoint >= _checkpointInterval) {
+      _sinceLastCheckpoint = 0;
+      _saveCheckpoint();
+    }
 
     _emitUpdate();
   }
@@ -243,8 +338,8 @@ class LocationTrackingService {
     ));
   }
 
-  final double _currentSpeed = 0;
-  final double _lastHeading = 0;
+  double _currentSpeed = 0;
+  double _lastHeading = 0;
 
   // ═══════════════════════════════════════════════════════════════════
   // Static math utilities
