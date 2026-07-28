@@ -1,32 +1,25 @@
 /// Main navigation shell with custom bottom nav bar.
-/// Redesigned: 4 tabs (Inicio, Raids, Comunidad, Perfil) + center FAB.
+/// Redesigned: 3 tabs (Rodar, Progreso, Explorar) for the minimalista redesign.
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../theme/design_tokens.dart';
-import '../../features/economy/presentation/widgets/coins_badge.dart';
-import '../../features/economy/presentation/bloc/shop_bloc.dart';
-import '../../features/economy/presentation/bloc/shop_event.dart';
-import '../../features/economy/presentation/bloc/shop_state.dart';
 
 /// Tab index mapping
-enum AppTab { dashboard, raid, scannerPlaceholder, community, profile }
+enum AppTab { rodar, progreso, explorar }
 
 class MainShell extends StatefulWidget {
   const MainShell({
     super.key,
-    required this.dashboard,
-    required this.raidScreen,
-    required this.profileScreen,
-    required this.communityScreen,
-    this.initialTab = AppTab.dashboard,
+    required this.rodarScreen,
+    required this.progresoScreen,
+    required this.explorarScreen,
+    this.initialTab = AppTab.rodar,
   });
 
-  final Widget dashboard;
-  final Widget raidScreen;
-  final Widget profileScreen;
-  final Widget communityScreen;
+  final Widget rodarScreen;
+  final Widget progresoScreen;
+  final Widget explorarScreen;
   final AppTab initialTab;
 
   @override
@@ -40,9 +33,6 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _currentTab = widget.initialTab;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ShopBloc>().add(const LoadShop());
-    });
   }
 
   void _onTabSelected(AppTab tab) {
@@ -53,33 +43,12 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: Stack(
+      body: IndexedStack(
+        index: _currentTab.index,
         children: [
-          IndexedStack(
-            index: _currentTab.index,
-            children: [
-              widget.dashboard,                // 0: Inicio
-              widget.raidScreen,               // 1: Raids
-              const SizedBox.shrink(),         // 2: FAB placeholder (never shown)
-              widget.communityScreen,          // 3: Comunidad
-              widget.profileScreen,            // 4: Perfil
-            ],
-          ),
-          // ── Coins badge floating top-right ──
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 16,
-            child: BlocBuilder<ShopBloc, ShopState>(
-              builder: (context, state) {
-                final coins = state is ShopLoaded ? state.coins : 0;
-                return CoinsBadge(
-                  coins: coins,
-                  fontSize: 13,
-                  onTap: () => context.read<ShopBloc>().add(const RefreshCoins()),
-                );
-              },
-            ),
-          ),
+          widget.rodarScreen,    // 0: Rodar
+          widget.progresoScreen, // 1: Progreso
+          widget.explorarScreen, // 2: Explorar
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -106,35 +75,26 @@ class _MainShellState extends State<MainShell> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Tab 0: Inicio
+          // Tab 0: Rodar
           _NavItem(
-            icon: Icons.home_rounded,
-            label: 'Inicio',
-            isSelected: _currentTab == AppTab.dashboard,
-            onTap: () => _onTabSelected(AppTab.dashboard),
+            icon: Icons.explore_rounded,
+            label: 'Rodar',
+            isSelected: _currentTab == AppTab.rodar,
+            onTap: () => _onTabSelected(AppTab.rodar),
           ),
-          // Tab 1: Raids
+          // Tab 1: Progreso
           _NavItem(
-            icon: Icons.flag_rounded,
-            label: 'Raids',
-            isSelected: _currentTab == AppTab.raid,
-            onTap: () => _onTabSelected(AppTab.raid),
+            icon: Icons.bar_chart_rounded,
+            label: 'Progreso',
+            isSelected: _currentTab == AppTab.progreso,
+            onTap: () => _onTabSelected(AppTab.progreso),
           ),
-          // Tab 2: FAB placeholder (spacer)
-          const SizedBox(width: AppSpacing.fabSize),
-          // Tab 3: Comunidad
+          // Tab 2: Explorar
           _NavItem(
-            icon: Icons.groups_rounded,
-            label: 'Comunidad',
-            isSelected: _currentTab == AppTab.community,
-            onTap: () => _onTabSelected(AppTab.community),
-          ),
-          // Tab 4: Perfil
-          _NavItem(
-            icon: Icons.person_rounded,
-            label: 'Perfil',
-            isSelected: _currentTab == AppTab.profile,
-            onTap: () => _onTabSelected(AppTab.profile),
+            icon: Icons.compass_calibration_rounded,
+            label: 'Explorar',
+            isSelected: _currentTab == AppTab.explorar,
+            onTap: () => _onTabSelected(AppTab.explorar),
           ),
         ],
       ),
@@ -162,7 +122,7 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 56,
+        width: 72,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

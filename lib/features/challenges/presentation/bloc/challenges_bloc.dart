@@ -9,9 +9,8 @@ import 'challenges_state.dart';
 class ChallengesBloc extends Bloc<ChallengesEvent, ChallengesState> {
   final ApiClient _apiClient;
 
-  ChallengesBloc({required ApiClient apiClient})
-      : _apiClient = apiClient,
-        super(ChallengesInitial()) {
+  ChallengesBloc({required this._apiClient})
+      : super(ChallengesInitial()) {
     on<LoadChallenges>(_onLoad);
     on<CompleteChallenge>(_onComplete);
   }

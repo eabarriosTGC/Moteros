@@ -3,45 +3,33 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'core/network/api_client.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/design_tokens.dart';
 import 'core/widgets/main_shell.dart';
-import 'core/widgets/community_tab_screen.dart';
-import 'core/widgets/scanner_fab.dart';
-import 'features/admin/data/datasources/admin_remote_datasource.dart';
-import 'features/admin/domain/usecases/manage_allies.dart';
-import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/onboarding_screen.dart';
-import 'features/dashboard/presentation/screens/dashboard_screen.dart';
-import 'features/validation/presentation/screens/qr_scanner_screen.dart';
+import 'features/dashboard/presentation/screens/rodar_screen.dart';
 import 'features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import 'features/challenges/presentation/bloc/challenges_bloc.dart';
 import 'features/refugios/presentation/bloc/refugios_bloc.dart';
-import 'features/membership/data/datasources/membership_remote_datasource.dart';
-import 'features/membership/domain/usecases/activate_membership.dart';
-import 'features/membership/presentation/bloc/membership_bloc.dart';
 import 'features/places/data/datasources/place_remote_datasource.dart';
 import 'features/places/domain/usecases/get_nearby_places.dart';
 import 'features/places/presentation/bloc/places_bloc.dart';
-import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/raids/presentation/bloc/raid_bloc.dart';
-import 'features/raids/presentation/screens/raid_list_screen.dart';
 import 'features/refugios/presentation/bloc/motoposadas_bloc.dart';
-import 'features/clubs/presentation/bloc/club_bloc.dart';
 import 'features/patches/presentation/bloc/patches_bloc.dart';
 import 'features/tracker/presentation/screens/route_tracker_screen.dart';
-import 'features/validation/data/datasources/validation_remote_datasource.dart';
-import 'features/validation/domain/usecases/validate_visit.dart';
-import 'features/validation/presentation/bloc/validation_bloc.dart';
 import 'features/routes/data/datasources/route_datasource.dart';
 import 'features/routes/presentation/bloc/route_bloc.dart';
 import 'features/mileage/presentation/bloc/mileage_bloc.dart';
 import 'features/progression/presentation/bloc/leaderboard_bloc.dart';
-import 'features/economy/presentation/bloc/shop_bloc.dart';
-import 'features/battle_pass/presentation/bloc/battle_pass_bloc.dart';
 import 'features/showcase/presentation/bloc/showcase_bloc.dart';
+import 'features/progression/presentation/bloc/progreso_bloc.dart';
+import 'features/progression/presentation/screens/progreso_screen.dart';
+import 'features/explorar/presentation/bloc/explorar_bloc.dart';
+import 'features/explorar/presentation/screens/explorar_screen.dart';
 
 class MoterosApp extends StatelessWidget {
   final ApiClient apiClient;
@@ -62,44 +50,23 @@ class MoterosApp extends StatelessWidget {
         BlocProvider(create: (_) => ChallengesBloc(apiClient: apiClient)),
         BlocProvider(create: (_) => RefugiosBloc()),
         BlocProvider(create: (_) => MotoposadasBloc()),
-        BlocProvider(
-          create: (_) => PlacesBloc(
-            getNearbyPlaces: GetNearbyPlacesUseCase(
-              PlaceRemoteDataSource(apiClient),
-            ),
+        BlocProvider(create: (_) => PlacesBloc(
+          getNearbyPlaces: GetNearbyPlacesUseCase(
+            PlaceRemoteDataSource(apiClient),
           ),
-        ),
+        )),
         BlocProvider(
-          create: (_) => ValidationBloc(
-            validateVisit: ValidateVisitUseCase(
-              ValidationRemoteDataSource(apiClient),
-            ),
-          ),
+          create: (_) => RaidBloc(),
         ),
-        BlocProvider(
-          create: (_) => MembershipBloc(
-            activateMembership: ActivateMembershipUseCase(
-              MembershipRemoteDataSource(apiClient),
-            ),
-          ),
-        ),
-        BlocProvider(
-          create: (_) => AdminBloc(
-            manageAllies: ManageAlliesUseCase(AdminRemoteDataSource(apiClient)),
-          ),
-        ),
-        BlocProvider(create: (_) => RaidBloc()),
-        BlocProvider(create: (_) => ClubBloc()),
         BlocProvider(create: (_) => PatchesBloc()),
         BlocProvider(create: (_) => TrackerBloc()),
         // New F-29 to F-35 BLoCs
         BlocProvider(create: (_) => RouteBloc(datasource: RouteDatasource())),
         BlocProvider(create: (_) => MileageBloc()),
         BlocProvider(create: (_) => LeaderboardBloc()),
-        // ── Economy, Battle Pass & Showcase ──
-        BlocProvider(create: (_) => ShopBloc()),
-        BlocProvider(create: (_) => BattlePassBloc()),
         BlocProvider(create: (_) => ShowcaseBloc()),
+        BlocProvider(create: (_) => ProgresoBloc()),
+        BlocProvider(create: (_) => ExplorarBloc()),
       ],
       child: MaterialApp(
         title: 'AsfaltoClub',
@@ -156,10 +123,6 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
     }
   }
 
-  void _openScanner() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
-  }
-
   @override
   Widget build(BuildContext context) {
     // Onboarding gate — show onboarding if not yet completed
@@ -185,18 +148,32 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
     return Scaffold(
       key: _scaffoldKey,
       extendBody: true,
-      body: const MainShell(
-        dashboard: DashboardScreen(),
-        raidScreen: RaidListScreen(),
-        profileScreen: ProfileScreen(),
-        communityScreen: CommunityTabScreen(),
-        initialTab: AppTab.dashboard,
+      body: MainShell(
+        rodarScreen: const RodarScreen(),
+        progresoScreen: const ProgresoScreen(),
+        explorarScreen: const ExplorarScreen(),
+        initialTab: AppTab.rodar,
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: ScannerFab(onTap: _openScanner),
+    );
+  }
+}
+
+/// Temporary placeholder for screens not yet migrated to the 3-tab layout.
+class _PlaceholderScreen extends StatelessWidget {
+  const _PlaceholderScreen({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: Text(
+          label,
+          style: AppTypography.h1.copyWith(color: AppColors.textMuted),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 }

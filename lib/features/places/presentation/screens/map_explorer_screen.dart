@@ -14,12 +14,8 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/services/offline_map_service.dart';
-import '../../../admin/presentation/screens/admin_panel_screen.dart';
-import '../../../membership/presentation/screens/membership_screen.dart';
-import '../../../validation/presentation/screens/qr_scanner_screen.dart';
 import '../../../refugios/presentation/screens/create_motoposada_screen.dart';
 import '../../../refugios/presentation/screens/my_motoposada_screen.dart';
-import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../../domain/entities/place_entity.dart';
 import '../bloc/places_bloc.dart';
 import '../bloc/places_event.dart';
@@ -236,7 +232,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Escaneo QR no disponible en esta versión')));
                 },
                 icon: const Icon(AppIcons.qrScanner, size: AppSpacing.iconSm),
                 label: const Text('Validar visita'),
@@ -348,7 +344,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: category,
+              initialValue: category,
               dropdownColor: AppColors.card,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(labelText: 'Categoría', labelStyle: TextStyle(color: AppColors.textMuted)),
@@ -430,9 +426,9 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             title: const Text('Mapa de Conquistas'),
             actions: [
               IconButton(icon: const Icon(AppIcons.shield), tooltip: 'Admin',
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelScreen()))),
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Panel admin no disponible en esta versión')))),
               IconButton(icon: const Icon(AppIcons.fuel), tooltip: 'Membresía',
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MembershipScreen()))),
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Membresía no disponible en esta versión')))),
               IconButton(icon: const Icon(AppIcons.gps), onPressed: _getCurrentPosition),
               // OSM contribution
               PopupMenuButton<String>(
@@ -551,7 +547,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                 child: Row(children: [
                   // SOS button
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen())),
+                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Modo seguro no disponible en esta versión'))),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
                       decoration: BoxDecoration(

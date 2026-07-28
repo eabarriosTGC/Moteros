@@ -11,9 +11,8 @@ import 'dashboard_state.dart';
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final ApiClient _apiClient;
 
-  DashboardBloc({required ApiClient apiClient})
-      : _apiClient = apiClient,
-        super(DashboardInitial()) {
+  DashboardBloc({required this._apiClient})
+      : super(DashboardInitial()) {
     on<LoadDashboard>(_onLoadDashboard);
     on<ToggleBigButtons>(_onToggleBigButtons);
   }

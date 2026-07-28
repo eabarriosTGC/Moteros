@@ -13,7 +13,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       (data) {
         final session = data.session;
-        if (session != null && session.user != null) {
+        if (session != null) {
           final user = session.user;
           emit(Authenticated(
             user: UserEntity(
@@ -112,7 +112,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     final session = Supabase.instance.client.auth.currentSession;
-    if (session != null && session.user != null) {
+    if (session != null) {
       final user = session.user;
       emit(Authenticated(
         user: UserEntity(

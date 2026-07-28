@@ -2,7 +2,6 @@
 library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/theme/design_tokens.dart';
 import 'refugios_event.dart';
 import 'refugios_state.dart';
 

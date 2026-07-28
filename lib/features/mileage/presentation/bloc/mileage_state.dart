@@ -21,15 +21,6 @@ final class MileageLoaded extends MileageState {
   List<Object?> get props => [mileage, entries];
 }
 
-final class ManualEntrySubmitted extends MileageState {}
-
-final class PendingVerificationsLoaded extends MileageState {
-  final List<Map<String, dynamic>> entries;
-  const PendingVerificationsLoaded({required this.entries});
-  @override
-  List<Object?> get props => [entries];
-}
-
 final class MileageError extends MileageState {
   final String message;
   const MileageError(this.message);

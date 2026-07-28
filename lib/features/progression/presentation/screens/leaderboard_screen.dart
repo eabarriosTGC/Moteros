@@ -316,7 +316,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           // KM
           SizedBox(
             width: 48,
-            child: Text('${km.toStringAsFixed(0)}',
+            child: Text(km.toStringAsFixed(0),
               style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
               textAlign: TextAlign.right,
             ),
@@ -325,7 +325,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           // Puntos
           SizedBox(
             width: 40,
-            child: Text('${puntos.toStringAsFixed(0)}',
+            child: Text(puntos.toStringAsFixed(0),
               style: AppTypography.caption.copyWith(
                 color: isMe ? AppColors.primary : AppColors.textPrimary,
                 fontWeight: FontWeight.w700,

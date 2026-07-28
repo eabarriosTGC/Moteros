@@ -61,9 +61,9 @@ class AntiCheatService {
           'checkpoint_id': checkpointId,
           'latitude': latitude,
           'longitude': longitude,
-          if (qrCode != null) 'qr_code': qrCode,
-          if (photoUrl != null) 'photo_url': photoUrl,
-          if (accuracyMeters != null) 'accuracy_meters': accuracyMeters,
+          'qr_code': ?qrCode,
+          'photo_url': ?photoUrl,
+          'accuracy_meters': ?accuracyMeters,
         },
       );
       return response.data as Map<String, dynamic>? ?? {};

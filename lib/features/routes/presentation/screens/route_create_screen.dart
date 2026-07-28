@@ -284,7 +284,7 @@ class _RouteCreateScreenState extends State<RouteCreateScreen> {
                   Switch(
                     value: _isPublic,
                     onChanged: (v) => setState(() => _isPublic = v),
-                    activeColor: AppColors.primary,
+                    activeThumbColor: AppColors.primary,
                   ),
                 ],
               ),

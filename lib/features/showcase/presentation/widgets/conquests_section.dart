@@ -45,7 +45,7 @@ class ConquestsSection extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: conquests.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const SizedBox(width: AppSpacing.sm),
               itemBuilder: (_, i) => _conquestBadge(conquests[i]),
             ),

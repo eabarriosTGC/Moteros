@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../../sos/presentation/screens/emergency_contact_screen.dart';
 import 'offline_maps_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -209,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primary,
+        activeThumbColor: AppColors.primary,
         activeTrackColor: AppColors.primary.withAlpha(60),
         inactiveTrackColor: AppColors.trackInactive,
       ),
@@ -382,7 +381,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const EmergencyContactScreen(),
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Contacto de Emergencia')),
+                  body: const Center(child: Text('Contacto de emergencia no disponible en esta versión')),
+                ),
               ),
             ),
             child: _settingRow(

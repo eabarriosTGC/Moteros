@@ -6,9 +6,8 @@ import 'places_state.dart';
 class PlacesBloc extends Bloc<PlacesEvent, PlacesState> {
   final GetNearbyPlacesUseCase _getNearbyPlaces;
 
-  PlacesBloc({required GetNearbyPlacesUseCase getNearbyPlaces})
-      : _getNearbyPlaces = getNearbyPlaces,
-        super(PlacesInitial()) {
+  PlacesBloc({required this._getNearbyPlaces})
+      : super(PlacesInitial()) {
     on<LoadNearbyPlaces>(_onLoadNearbyPlaces);
     on<RefreshPlaces>(_onRefreshPlaces);
   }

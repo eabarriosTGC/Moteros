@@ -2,7 +2,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import '../../../../core/theme/design_tokens.dart';
 
 sealed class DashboardState {}
 

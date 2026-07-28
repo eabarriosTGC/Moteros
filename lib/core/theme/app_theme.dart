@@ -377,9 +377,6 @@ class AppTheme {
       textColor: AppColors.textPrimary,
       collapsedTextColor: AppColors.textSecondary,
     ),
-
-    // ── Dialog default (Material3) ──
-    dialogBackgroundColor: AppColors.elevated,
   );
 
   // ── Backward-compatible static colors ──

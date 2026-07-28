@@ -113,7 +113,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
       child: Column(
         children: [
           // Map
-          Container(
+          SizedBox(
             height: 280,
             child: waypoints.isEmpty
                 ? Container(

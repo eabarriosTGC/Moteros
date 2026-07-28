@@ -6,9 +6,8 @@ import 'membership_state.dart';
 class MembershipBloc extends Bloc<MembershipEvent, MembershipState> {
   final ActivateMembershipUseCase _activateMembership;
 
-  MembershipBloc({required ActivateMembershipUseCase activateMembership})
-      : _activateMembership = activateMembership,
-        super(MembershipInitial()) {
+  MembershipBloc({required this._activateMembership})
+      : super(MembershipInitial()) {
     on<LoadMembership>(_onLoad);
     on<ActivateMembership>(_onActivate);
   }

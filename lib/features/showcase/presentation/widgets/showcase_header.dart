@@ -86,7 +86,7 @@ class ShowcaseHeader extends StatelessWidget {
                   height: 140,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(height: 140),
+                  errorBuilder: (_, _, _) => const SizedBox(height: 140),
                   loadingBuilder: (_, child, progress) =>
                       progress == null ? child : const SizedBox(height: 140),
                 ),

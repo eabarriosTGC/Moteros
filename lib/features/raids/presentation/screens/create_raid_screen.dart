@@ -11,7 +11,6 @@ import '../../../../core/services/geocoding_service.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
-import 'raid_lobby_screen.dart';
 
 class CreateRaidScreen extends StatefulWidget {
   const CreateRaidScreen({super.key});
@@ -226,18 +225,10 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
   Widget build(BuildContext context) {
     return BlocListener<RaidBloc, RaidState>(
       listener: (context, state) {
-        if (state is RaidLobby) {
+        if (state is RaidCreated) {
           HapticFeedback.mediumImpact();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => RaidLobbyScreen(
-                raidId: '${state.raid['id']}',
-                initialRaid: state.raid,
-                initialParticipants: [],
-               ),
-            ),
-          );
+          // Navigate back after creation — will show in list
+          Navigator.of(context).pop(true);
         }
         if (state is RaidError) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -686,7 +677,7 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
           Switch(
             value: _isPublic,
             onChanged: (v) => setState(() => _isPublic = v),
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             inactiveTrackColor: AppColors.trackInactive,
           ),
         ],

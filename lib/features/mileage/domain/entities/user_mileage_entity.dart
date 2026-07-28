@@ -1,4 +1,5 @@
 /// Mileage entities.
+library;
 import 'package:equatable/equatable.dart';
 
 class UserMileageEntity extends Equatable {

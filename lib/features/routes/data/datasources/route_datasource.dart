@@ -1,5 +1,6 @@
 /// Route Datasource — Supabase operations for routes.
 /// Single point of access to routes, segments, history.
+library;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RouteDatasource {
@@ -29,7 +30,7 @@ class RouteDatasource {
   Future<Map<String, dynamic>> getRoute(int routeId) async {
     final response =
         await _client.from('routes').select().eq('id', routeId).single();
-    return response as Map<String, dynamic>;
+    return response;
   }
 
   Future<Map<String, dynamic>> getRouteByUser(int routeId) async {
@@ -39,7 +40,7 @@ class RouteDatasource {
         .eq('id', routeId)
         .eq('created_by', _userId)
         .single();
-    return response as Map<String, dynamic>;
+    return response;
   }
 
   Future<List<Map<String, dynamic>>> getSegments(int routeId) async {
@@ -68,7 +69,7 @@ class RouteDatasource {
     };
     final response =
         await _client.from('routes').insert(payload).select().single();
-    return response as Map<String, dynamic>;
+    return response;
   }
 
   Future<List<Map<String, dynamic>>> createSegments(
@@ -88,7 +89,7 @@ class RouteDatasource {
     };
     final response =
         await _client.from('route_history').insert(payload).select().single();
-    return response as Map<String, dynamic>;
+    return response;
   }
 
   Future<void> deleteRoute(int routeId) async {

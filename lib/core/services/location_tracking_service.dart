@@ -243,8 +243,8 @@ class LocationTrackingService {
     ));
   }
 
-  double _currentSpeed = 0;
-  double _lastHeading = 0;
+  final double _currentSpeed = 0;
+  final double _lastHeading = 0;
 
   // ═══════════════════════════════════════════════════════════════════
   // Static math utilities

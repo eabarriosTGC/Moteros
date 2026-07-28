@@ -60,6 +60,7 @@ dependencies:
   shared_preferences: ^2.3.0
   flutter_map_tile_caching: ^10.1.1
 
+  collection: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

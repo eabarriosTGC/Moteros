@@ -64,7 +64,7 @@ class PhotoAlbum extends StatelessWidget {
         child: Image.network(
           photo.photoUrl,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             color: AppColors.surface,
             child: const Icon(AppIcons.error,
                 color: AppColors.textMuted, size: 24),
@@ -113,7 +113,7 @@ class PhotoAlbum extends StatelessWidget {
               child: Image.network(
                 photo.photoUrl,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Center(
+                errorBuilder: (_, _, _) => const Center(
                   child: Text('Error al cargar imagen',
                       style: TextStyle(color: Colors.white)),
                 ),

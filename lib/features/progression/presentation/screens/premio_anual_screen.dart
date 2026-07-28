@@ -194,7 +194,7 @@ class _PremioAnualScreenState extends State<PremioAnualScreen> {
                         ),
                       ),
                     ),
-                    Text('${value.toStringAsFixed(0)}',
+                    Text(value.toStringAsFixed(0),
                       style: AppTypography.bodySmall.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,

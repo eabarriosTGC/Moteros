@@ -61,11 +61,11 @@ class SosService {
 
       final inserted = await _supabase.from('sos_events').insert({
         'user_id': userId,
-        if (raidId != null) 'raid_id': raidId,
+        'raid_id': ?raidId,
         'lat': position.latitude,
         'lng': position.longitude,
         'trigger_type': 'manual',
-        if (notes != null) 'notes': notes,
+        'notes': ?notes,
       }).select().single();
 
       return inserted as Map<String, dynamic>?;
@@ -85,7 +85,7 @@ class SosService {
           .select('emergency_contact_name, emergency_contact_phone')
           .eq('id', userId)
           .maybeSingle();
-      return resp as Map<String, dynamic>?;
+      return resp;
     } catch (_) {
       return null;
     }

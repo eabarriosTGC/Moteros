@@ -11,7 +11,6 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/services/offline_map_service.dart';
-import '../../../safemode/presentation/screens/safe_mode_screen.dart';
 import '../bloc/refugios_bloc.dart';
 import '../bloc/refugios_event.dart';
 import '../bloc/refugios_state.dart';
@@ -139,7 +138,7 @@ class _RefugiosScreenState extends State<RefugiosScreen>
       GestureDetector(
         onTap: () {
           HapticFeedback.heavyImpact();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const SafeModeScreen()));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Modo seguro no disponible en esta versión')));
         },
         child: Container(
           width: double.infinity, margin: const EdgeInsets.all(AppSpacing.sm),
@@ -162,7 +161,7 @@ class _RefugiosScreenState extends State<RefugiosScreen>
           controller: _listScroll,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           itemCount: state.refugios.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
           itemBuilder: (_, i) => _buildHostCard(context, state.refugios[i], _selectedHostId == state.refugios[i].id),
         ),
       ),
@@ -195,7 +194,7 @@ class _RefugiosScreenState extends State<RefugiosScreen>
         Text(refugio.description, style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
         const SizedBox(height: AppSpacing.xs),
         Text(refugio.benefit, style: AppTypography.caption.copyWith(color: AppColors.success)),
-        if (refugio.phone != null && refugio.phone!.isNotEmpty) ...[
+        if (refugio.phone.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.xs),
           Text('📞 ${refugio.phone}', style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
         ],

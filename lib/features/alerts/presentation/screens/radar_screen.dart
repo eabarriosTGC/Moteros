@@ -287,7 +287,7 @@ class _RadarScreenState extends State<RadarScreen> {
               options: MapOptions(
                 initialCenter: _initialCenter(),
                 initialZoom: 11.0,
-                onTap: (_, __) {
+                onTap: (_, _) {
                   if (_selectedAlert != null) {
                     setState(() => _selectedAlert = null);
                   }

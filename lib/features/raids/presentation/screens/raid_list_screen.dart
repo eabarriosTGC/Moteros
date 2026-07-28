@@ -11,8 +11,6 @@ import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
 import 'create_raid_screen.dart';
-import 'raid_lobby_screen.dart';
-import 'raid_live_screen.dart';
 import 'raid_stats_screen.dart';
 
 class RaidListScreen extends StatefulWidget {
@@ -416,29 +414,13 @@ class _RaidListScreenState extends State<RaidListScreen> {
     if (raidId.isEmpty) return;
     HapticFeedback.lightImpact();
 
-    Future<void>? navigation;
-    switch (category) {
-      case 'lobby':
-        navigation = Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => RaidLobbyScreen(raidId: raidId)),
-        );
-        break;
-      case 'active':
-        navigation = Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => RaidLiveScreen(raidId: raidId)),
-        );
-        break;
-      case 'completed':
-        navigation = Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => RaidStatsScreen(raidId: raidId)),
-        );
-        break;
+    // Only completed raids have stats; others show list view
+    if (category == 'completed') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => RaidStatsScreen(raidId: raidId)),
+      ).then((_) => context.read<RaidBloc>().add(const LoadRaids()));
     }
-    // Reload list when returning from detail screen
-    navigation?.then((_) => context.read<RaidBloc>().add(const LoadRaids()));
   }
 
   String _formatDate(dynamic dateStr) {

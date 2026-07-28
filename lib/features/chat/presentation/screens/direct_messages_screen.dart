@@ -63,7 +63,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
             .limit(1);
 
         if ((lastMsgResp as List).isNotEmpty) {
-          final lastMsg = lastMsgResp.first as Map<String, dynamic>;
+          final lastMsg = lastMsgResp.first;
           final participants = await Supabase.instance.client
               .from('conversation_participants')
               .select()
@@ -194,7 +194,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                       child: ListView.separated(
                         padding: AppSpacing.screenPadding,
                         itemCount: _conversations.length + 1, // +1 for FAB area
-                        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
                         itemBuilder: (context, index) {
                           if (index == _conversations.length) {
                             return Padding(

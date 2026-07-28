@@ -3,7 +3,6 @@ library;
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/services/offline_map_service.dart';
@@ -48,11 +47,13 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
   Future<void> _refreshStats() async {
     setState(() => _loadingStats = true);
     final s = await OfflineMapService.stats();
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _tiles = s.tiles;
       _sizeMb = s.sizeMb;
       _loadingStats = false;
     });
+    }
   }
 
   Future<void> _startDownload() async {
@@ -150,7 +151,7 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _statCircle('$_tiles', 'TESELAS'),
-                    _statCircle('${_sizeMb.toStringAsFixed(1)}', 'MB'),
+                    _statCircle(_sizeMb.toStringAsFixed(1), 'MB'),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),

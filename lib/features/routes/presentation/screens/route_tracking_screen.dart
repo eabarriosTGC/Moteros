@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
@@ -133,7 +132,7 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
           .select('waypoints')
           .eq('id', widget.routeId!)
           .single();
-      final data = resp as Map<String, dynamic>;
+      final data = resp;
       final wps = data['waypoints'] as List? ?? [];
       _plannedRoute = wps.map((wp) {
         if (wp is Map<String, dynamic>) {
@@ -259,8 +258,11 @@ class _RouteTrackingScreenState extends State<RouteTrackingScreen>
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () {
-            if (recording) _showConfirmStopDialog();
-            else Navigator.pop(context);
+            if (recording) {
+              _showConfirmStopDialog();
+            } else {
+              Navigator.pop(context);
+            }
           },
         ),
         title: Text(

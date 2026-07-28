@@ -8,11 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/services/location_tracking_service.dart';
+import 'post_trip_summary_screen.dart';
 
 // ── BLoC ──
 
@@ -185,7 +185,25 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
                       color: AppColors.error, size: 28),
                   onPressed: () {
                     HapticFeedback.heavyImpact();
-                    context.read<TrackerBloc>().add(StopRecording());
+                    final currentState = context.read<TrackerBloc>().state;
+                    if (currentState is TrackerRecording) {
+                      final recording = currentState;
+                      context.read<TrackerBloc>().add(StopRecording());
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PostTripSummaryScreen(
+                            result: PostTripResult(
+                              distanceKm: recording.distanceKm,
+                              durationSec: recording.durationSec,
+                              points: List.from(recording.points),
+                              avgSpeed: recording.avgSpeed,
+                              maxSpeed: recording.maxSpeed,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
                   },
                   tooltip: 'DETENER',
                 ),
@@ -207,8 +225,8 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
           ),
           body: SafeArea(
             child: isRecording
-                ? _buildRecordingView(state as TrackerRecording)
-                : _buildIdleView(isSaved ? state as TrackerSavedRoutes : null),
+                ? _buildRecordingView(state)
+                : _buildIdleView(isSaved ? state : null),
           ),
         );
       },
@@ -409,7 +427,7 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen> {
     return ListView.separated(
       padding: AppSpacing.screenPadding,
       itemCount: routes.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
         final r = routes[i];
         return Container(

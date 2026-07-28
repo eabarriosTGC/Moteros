@@ -9,7 +9,6 @@ import '../../../../core/theme/app_icons.dart';
 import '../../../progression/presentation/widgets/xp_progress_card.dart';
 import '../../../progression/presentation/screens/achievements_screen.dart';
 import '../../../progression/presentation/screens/leaderboard_screen.dart';
-import '../../../economy/presentation/screens/shop_screen.dart';
 import '../bloc/showcase_bloc.dart';
 import '../bloc/showcase_event.dart';
 import '../bloc/showcase_state.dart';
@@ -174,11 +173,7 @@ class _ShowcaseProfileScreenState extends State<ShowcaseProfileScreen> {
                   MaterialPageRoute(
                       builder: (_) => const LeaderboardScreen()),
                 ),
-                onShopTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ShopScreen()),
                 ),
-              ),
             ),
           ),
           const SliverToBoxAdapter(
@@ -545,7 +540,7 @@ class _ShowcaseProfileScreenState extends State<ShowcaseProfileScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: items.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const Divider(color: AppColors.border),
                   itemBuilder: (_, i) {
                     final item = items[i];
