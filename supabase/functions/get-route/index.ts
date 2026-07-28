@@ -129,16 +129,21 @@ serve(async (req) => {
     }
     points.push([body.destination.lng, body.destination.lat]);
 
+    const ghBody: Record<string, any> = {
+      points,
+      profile,
+      instructions: includeInstructions,
+      elevation: false,
+      locale: 'es',
+    };
+    if (profile !== 'car') {
+      ghBody['ch.disable'] = true;
+    }
+
     const ghResponse = await fetch(`${graphhopperUrl}/route`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        points,
-        profile,
-        instructions: includeInstructions,
-        elevation: false,
-        locale: 'es',
-      }),
+      body: JSON.stringify(ghBody),
       // 10s timeout: if GraphHopper is down, fail fast
       signal: AbortSignal.timeout(10000),
     });
