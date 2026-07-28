@@ -9,6 +9,7 @@ graphhopper:
   datareader.file: /data/colombia-coast.osm.pbf
   graph.location: /data/graph-cache
   import.osm.ignored_highways: ""
+  encoded_values: road_class, surface, road_environment, max_speed, scenic, tourism
 
   profiles:
     # ── Motorcycle profile ──
