@@ -96,3 +96,21 @@ final class DeleteMotoposada extends MotoposadasEvent {
   final int id;
   const DeleteMotoposada({required this.id});
 }
+
+final class CreateTouristPoi extends MotoposadasEvent {
+  final String type;
+  final String title;
+  final String description;
+  final String rules;
+  final double lat;
+  final double lng;
+  final String address;
+  final String city;
+  const CreateTouristPoi({
+    required this.type, required this.title, required this.description,
+    required this.rules, required this.lat, required this.lng,
+    required this.address, required this.city,
+  });
+  String get poiType => 'tourist';
+  @override List<Object?> get props => [type, title, description, rules, lat, lng, address, city];
+}

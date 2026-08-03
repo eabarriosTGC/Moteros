@@ -21,6 +21,9 @@ final class MotoposadaModel {
   final DateTime createdAt;
   final String? hostName;
   final int? hostLevel;
+  final String poiType;
+  final bool isTourist;
+  final String? city;
 
   const MotoposadaModel({
     required this.id, required this.userId, required this.type,
@@ -29,6 +32,7 @@ final class MotoposadaModel {
     this.photos = const [], this.maxGuests = 1, this.isActive = true,
     this.visibility = 'public', this.targetClanId,
     required this.createdAt, this.hostName, this.hostLevel,
+    this.poiType = 'standard', this.isTourist = false, this.city,
   });
 
   factory MotoposadaModel.fromMap(Map<String, dynamic> m) {
@@ -51,6 +55,9 @@ final class MotoposadaModel {
       createdAt: DateTime.parse(m['created_at'] as String),
       hostName: host?['username'] as String?,
       hostLevel: host?['user_xp'] is Map ? (host!['user_xp']['level'] as int?) : null,
+      poiType: m['poi_type'] as String? ?? 'standard',
+      isTourist: m['is_tourist'] as bool? ?? false,
+      city: m['city'] as String?,
     );
   }
 
@@ -166,4 +173,14 @@ final class MotoposadasError extends MotoposadasState {
   final String message;
   const MotoposadasError(this.message);
   @override List<Object?> get props => [message];
+}
+
+final class TouristPoiCreated extends MotoposadasState {
+  final int id;
+  const TouristPoiCreated(this.id);
+  @override List<Object?> get props => [id];
+}
+
+final class TouristPoiForbidden extends MotoposadasState {
+  const TouristPoiForbidden();
 }

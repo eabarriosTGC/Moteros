@@ -292,6 +292,29 @@ class LocationTrackingService {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // Passive streams — for map display (no tracking, no trace recording)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Passive position stream for map display (no tracking, no trace recording).
+  /// Uses 5m distance filter and high accuracy.
+  Stream<Position> get passivePositionStream =>
+      Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5,
+          timeLimit: null,
+        ),
+      );
+
+  /// Heading stream from geolocator (fused compass+gyro).
+  /// Only emits when heading changes by >= 5°.
+  Stream<double> get headingStream =>
+      passivePositionStream
+          .map((p) => p.heading)
+          .where((h) => h.isFinite && h >= 0)
+          .distinct((prev, next) => (next - prev).abs() < 5);
+
+  // ═══════════════════════════════════════════════════════════════════
   // Internal
   // ═══════════════════════════════════════════════════════════════════
 

@@ -9,8 +9,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/theme/theme_cubit.dart';
 import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../../core/services/location_tracking_service.dart';
+import '../widgets/blue_dot_marker.dart';
+import '../widgets/recenter_button.dart';
+import '../widgets/place_search_bar.dart';
+import '../widgets/search_results_list.dart';
+import '../bloc/search_bloc.dart';
+import '../bloc/search_state.dart';
 import '../../../raids/presentation/bloc/raid_bloc.dart';
 import '../../../raids/presentation/bloc/raid_event.dart';
 import '../../../raids/presentation/bloc/raid_state.dart';
@@ -19,6 +26,7 @@ import '../../../raids/presentation/screens/raid_list_screen.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import '../../../refugios/presentation/bloc/motoposadas_event.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
+import '../../../refugios/presentation/widgets/tourist_poi_marker.dart';
 import '../../../../core/services/navigation_handler.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
@@ -37,6 +45,13 @@ class _RodarScreenState extends State<RodarScreen>
   late Animation<double> _kmAnimation;
   bool _kmAnimated = false;
   final MapController _mapController = MapController();
+
+  // ── Position tracking for blue dot + recenter ──
+  LatLng? _currentPosition;
+  double _currentHeading = 0;
+
+  // ── Search state ──
+  LatLng? _searchResultMarker;
 
   static const LatLng _defaultCenter = LatLng(4.5709, -74.2973); // Bogotá
 
@@ -57,6 +72,17 @@ class _RodarScreenState extends State<RodarScreen>
       context.read<RaidBloc>().add(const LoadRaids());
       context.read<MotoposadasBloc>().add(const LoadMotoposadas());
       _checkPendingTrip();
+    });
+
+    // Start passive position stream for blue dot (map only, no tracking).
+    LocationTrackingService.instance.passivePositionStream.listen((pos) {
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = LatLng(pos.latitude, pos.longitude);
+        if (pos.heading.isFinite && pos.heading >= 0) {
+          _currentHeading = pos.heading;
+        }
+      });
     });
   }
 
@@ -137,8 +163,18 @@ class _RodarScreenState extends State<RodarScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.monitor,
+    final isDark = context.watch<ThemeCubit>().state == ThemeMode.dark;
+    return BlocListener<SearchBloc, SearchState>(
+      listener: (context, state) {
+        if (state is PlaceSelected) {
+          final loc = LatLng(state.result.lat, state.result.lng);
+          setState(() => _searchResultMarker = loc);
+          _mapController.move(loc, 15);
+          HapticFeedback.lightImpact();
+        }
+      },
+      child: Scaffold(
+      backgroundColor: isDark ? AppColors.monitor : AppColors.lightMonitor,
       body: Stack(
         children: [
           // ── Base map layer ──
@@ -155,8 +191,9 @@ class _RodarScreenState extends State<RodarScreen>
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                urlTemplate: isDark
+                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c'],
                 userAgentPackageName: 'com.moteros.moteros_app',
               ),
@@ -176,13 +213,42 @@ class _RodarScreenState extends State<RodarScreen>
                               child: GestureDetector(
                                 onTap: () =>
                                     _showMotoposadaCard(context, m),
-                                child: _buildMotoposadaMarker(m),
+                                child: m.isTourist
+                                    ? TouristPoiMarker(title: m.title)
+                                    : _buildMotoposadaMarker(m),
                               ),
                             ))
                         .toList(),
                   );
                 },
               ),
+              // Blue dot — user's current location with heading
+              if (_currentPosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _currentPosition!,
+                      width: 32,
+                      height: 32,
+                      child: BlueDotMarker(
+                        position: _currentPosition!,
+                        heading: _currentHeading,
+                      ),
+                    ),
+                  ],
+                ),
+              // Search result marker (cyan, temporary)
+              if (_searchResultMarker != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _searchResultMarker!,
+                      width: 28,
+                      height: 28,
+                      child: _buildSearchResultMarker(),
+                    ),
+                  ],
+                ),
             ],
           ),
 
@@ -201,6 +267,33 @@ class _RodarScreenState extends State<RodarScreen>
               }
               return const SizedBox.shrink();
             },
+          ),
+
+          // ── Recenter button (above Rodar FAB) ──
+          if (_currentPosition != null)
+            Positioned(
+              bottom: 100,
+              right: 16,
+              child: RecenterButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _mapController.move(_currentPosition!, _mapController.camera.zoom);
+                },
+              ),
+            ),
+
+          // ── Search bar + results ──
+          const Positioned(
+            top: 72,
+            left: 12,
+            right: 12,
+            child: PlaceSearchBar(),
+          ),
+          const Positioned(
+            top: 116,
+            left: 12,
+            right: 12,
+            child: SearchResultsList(),
           ),
 
           // ── Rodar FAB ──
@@ -292,6 +385,21 @@ class _RodarScreenState extends State<RodarScreen>
           ),
         ],
       ),
+    ));
+  }
+
+  // ── Search result marker (cyan dot + pin) ──
+
+  Widget _buildSearchResultMarker() {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.secondary.withAlpha(40),
+        border: Border.all(color: AppColors.secondary, width: 2.5),
+      ),
+      child: const Icon(Icons.push_pin, color: AppColors.secondary, size: 14),
     );
   }
 

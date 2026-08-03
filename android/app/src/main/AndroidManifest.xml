@@ -45,5 +45,8 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Navigation app detection (Android 11+ package visibility) -->
+        <package android:name="com.waze" />
+        <package android:name="com.google.android.apps.maps" />
     </queries>
 </manifest>

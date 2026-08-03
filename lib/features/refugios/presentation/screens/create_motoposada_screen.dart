@@ -23,12 +23,14 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
   final _descController = TextEditingController();
   final _rulesController = TextEditingController();
   final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
   String _type = 'casa';
   String _visibility = 'public';
   int _maxGuests = 1;
   double _lat = 4.60971;
   double _lng = -74.08175;
   String _locationLabel = 'Seleccionar en el mapa';
+  bool _isTourist = false;
 
   final _types = ['casa', 'parqueadero', 'garage'];
   final _visibilities = ['public', 'clan_only', 'clan_specific'];
@@ -39,6 +41,7 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
     _descController.dispose();
     _rulesController.dispose();
     _addressController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
@@ -46,17 +49,30 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
     if (!_formKey.currentState!.validate()) return;
     HapticFeedback.mediumImpact();
 
-    context.read<MotoposadasBloc>().add(CreateMotoposada(
-      type: _type,
-      title: _titleController.text.trim(),
-      description: _descController.text.trim(),
-      rules: _rulesController.text.trim(),
-      lat: _lat,
-      lng: _lng,
-      address: _addressController.text.trim(),
-      maxGuests: _maxGuests,
-      visibility: _visibility,
-    ));
+    if (_isTourist) {
+      context.read<MotoposadasBloc>().add(CreateTouristPoi(
+        type: _type,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        rules: _rulesController.text.trim(),
+        lat: _lat,
+        lng: _lng,
+        address: _addressController.text.trim(),
+        city: _cityController.text.trim(),
+      ));
+    } else {
+      context.read<MotoposadasBloc>().add(CreateMotoposada(
+        type: _type,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        rules: _rulesController.text.trim(),
+        lat: _lat,
+        lng: _lng,
+        address: _addressController.text.trim(),
+        maxGuests: _maxGuests,
+        visibility: _visibility,
+      ));
+    }
   }
 
   @override
@@ -68,6 +84,17 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
             const SnackBar(content: Text('✅ Motoposada creada'), backgroundColor: AppColors.success),
           );
           Navigator.pop(context, true);
+        }
+        if (state is TouristPoiCreated) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Lugar turístico creado'), backgroundColor: AppColors.success),
+          );
+          Navigator.pop(context, true);
+        }
+        if (state is TouristPoiForbidden) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⛔ No tienes permisos de curador para esta ciudad'), backgroundColor: AppColors.error),
+          );
         }
         if (state is MotoposadasError) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -154,15 +181,42 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
                   _input(_addressController, 'Dirección amigable', Icons.location_on_outlined),
                   const SizedBox(height: AppSpacing.lg),
 
-                  _label('MÁXIMO HUÉSPEDES'),
+                  // ── Tourist POI toggle ──
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, color: AppColors.warning, size: 20),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text('¿Es un lugar de visita obligada?',
+                          style: AppTypography.body.copyWith(color: AppColors.textPrimary)),
+                      ),
+                      Switch(
+                        value: _isTourist,
+                        activeColor: AppColors.warning,
+                        onChanged: (v) => setState(() => _isTourist = v),
+                      ),
+                    ],
+                  ),
+                  if (_isTourist) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _label('CIUDAD'),
+                    const SizedBox(height: AppSpacing.sm),
+                    _input(_cityController, 'Ej: Bogotá, Medellín...', Icons.location_city_outlined),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
                   const SizedBox(height: AppSpacing.sm),
-                  _buildStepper(),
-                  const SizedBox(height: AppSpacing.lg),
 
-                  _label('VISIBILIDAD'),
-                  const SizedBox(height: AppSpacing.sm),
-                  _buildToggle(_visibilities, _visibility, (v) => setState(() => _visibility = v)),
-                  const SizedBox(height: AppSpacing.lg),
+                  if (!_isTourist) ...[
+                    _label('MÁXIMO HUÉSPEDES'),
+                    const SizedBox(height: AppSpacing.sm),
+                    _buildStepper(),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    _label('VISIBILIDAD'),
+                    const SizedBox(height: AppSpacing.sm),
+                    _buildToggle(_visibilities, _visibility, (v) => setState(() => _visibility = v)),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
 
                   SizedBox(
                     width: double.infinity,

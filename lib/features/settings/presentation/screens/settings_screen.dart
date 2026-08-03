@@ -3,9 +3,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/app_icons.dart';
 import 'offline_maps_screen.dart';
 
@@ -106,6 +108,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildDrivingSection(),
                     const SizedBox(height: AppSpacing.lg),
                     _buildPrivacySection(),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildAppearanceSection(),
                     const SizedBox(height: AppSpacing.lg),
                     _buildAboutSection(),
                     const SizedBox(height: AppSpacing.xxl),
@@ -423,6 +427,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() => _showLocationRaids = v);
               _saveToggle('show_location_raids', v);
             }),
+          ),
+        ]),
+      ],
+    );
+  }
+
+  // ── Appearance Section ──
+
+  Widget _buildAppearanceSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('APARIENCIA'),
+        _sectionCard([
+          _settingRow(
+            icon: Icons.brightness_6_outlined,
+            title: 'Tema claro',
+            subtitle: 'Modo claro de alto contraste para luz solar',
+            trailing: BlocBuilder<ThemeCubit, ThemeMode>(
+              builder: (context, state) => _amberToggle(
+                state == ThemeMode.light,
+                (v) => context.read<ThemeCubit>().toggle(),
+              ),
+            ),
           ),
         ]),
       ],

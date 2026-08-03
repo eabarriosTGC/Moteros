@@ -386,4 +386,373 @@ class AppTheme {
   static const Color backgroundColor = AppColors.background;
   static const Color surfaceColor = AppColors.surface;
   static const Color cardColor = AppColors.surface;
+
+  // ── Light Theme (F-M5) ──
+
+  static const ColorScheme _lightColorScheme = ColorScheme.light(
+    // Primary — Amber (darker for light bg contrast)
+    primary: AppColors.lightPrimary,
+    onPrimary: Colors.white,
+    primaryContainer: AppColors.primaryDark,
+    onPrimaryContainer: Colors.white,
+
+    // Secondary — Electric Cyan (works on light)
+    secondary: AppColors.secondary,
+    onSecondary: Colors.black,
+    secondaryContainer: AppColors.secondaryDark,
+    onSecondaryContainer: Colors.black,
+
+    // Surface hierarchy — light
+    surface: AppColors.lightSurface,
+    onSurface: AppColors.lightTextPrimary,
+    surfaceContainerHighest: AppColors.lightElevated,
+    onSurfaceVariant: AppColors.lightTextSecondary,
+    surfaceTint: AppColors.lightPrimary,
+
+    // Semantic — adjusted for light
+    error: AppColors.lightError,
+    onError: Colors.white,
+
+    // Borders — light
+    outline: AppColors.lightBorder,
+    outlineVariant: AppColors.lightBorderLight,
+  );
+
+  static ThemeData get light => ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.light,
+    scaffoldBackgroundColor: AppColors.lightBackground,
+    colorScheme: _lightColorScheme,
+
+    // ── Typography (same fonts, both themes) ──
+    textTheme: const TextTheme(
+      displayLarge: AppTypography.displayLarge,
+      displayMedium: AppTypography.displayMedium,
+      displaySmall: AppTypography.displaySmall,
+      headlineLarge: AppTypography.h1,
+      headlineMedium: AppTypography.h2,
+      headlineSmall: AppTypography.h3,
+      titleLarge: AppTypography.titleLarge,
+      titleMedium: AppTypography.titleMedium,
+      bodyLarge: AppTypography.bodyLarge,
+      bodyMedium: AppTypography.body,
+      bodySmall: AppTypography.bodySmall,
+      labelLarge: AppTypography.button,
+      labelMedium: AppTypography.label,
+      labelSmall: AppTypography.caption,
+    ),
+
+    // ── AppBar ──
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: AppColors.lightTextPrimary,
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: AppTypography.h3,
+    ),
+
+    // ── Bottom Navigation Bar ──
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.lightElevated,
+      elevation: 0,
+      selectedItemColor: AppColors.lightPrimary,
+      unselectedItemColor: AppColors.lightTextMuted,
+      type: BottomNavigationBarType.fixed,
+      selectedLabelStyle: AppTypography.caption,
+      unselectedLabelStyle: AppTypography.caption,
+    ),
+
+    // ── Cards ──
+    cardTheme: CardThemeData(
+      color: AppColors.lightSurface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.mdCircular,
+        side: const BorderSide(color: AppColors.lightBorder, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+    ),
+
+    // ── Input Fields ──
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.lightInput,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: AppRadius.smCircular,
+        borderSide: const BorderSide(color: AppColors.lightBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: AppRadius.smCircular,
+        borderSide: const BorderSide(color: AppColors.lightBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: AppRadius.smCircular,
+        borderSide: const BorderSide(color: AppColors.lightPrimary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: AppRadius.smCircular,
+        borderSide: const BorderSide(color: AppColors.lightError),
+      ),
+      labelStyle: const TextStyle(color: AppColors.lightTextSecondary, fontFamily: 'DMSans'),
+      hintStyle: const TextStyle(color: AppColors.lightTextMuted, fontFamily: 'DMSans'),
+    ),
+
+    // ── Elevated Button ──
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.lightPrimary,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: AppColors.lightBorder,
+        disabledForegroundColor: AppColors.lightTextDisabled,
+        minimumSize: const Size(double.infinity, AppSpacing.buttonHeight),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.mdCircular,
+        ),
+        textStyle: AppTypography.button,
+        elevation: 0,
+      ),
+    ),
+
+    // ── Outlined Button ──
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.lightPrimary,
+        side: const BorderSide(color: AppColors.lightPrimary, width: 1.5),
+        minimumSize: const Size(double.infinity, AppSpacing.buttonHeight),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.mdCircular,
+        ),
+        textStyle: AppTypography.button,
+      ),
+    ),
+
+    // ── Text Button ──
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.lightPrimary,
+        textStyle: AppTypography.button,
+      ),
+    ),
+
+    // ── Chip ──
+    chipTheme: ChipThemeData(
+      backgroundColor: AppColors.lightInput,
+      selectedColor: AppColors.lightPrimary.withAlpha(30),
+      labelStyle: const TextStyle(color: AppColors.lightTextSecondary, fontSize: 12, fontFamily: 'DMSans'),
+      side: const BorderSide(color: AppColors.lightBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+    ),
+
+    // ── Divider ──
+    dividerTheme: const DividerThemeData(
+      color: AppColors.lightBorder,
+      thickness: 1,
+      space: 1,
+    ),
+
+    // ── Snackbar ──
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: AppColors.lightSurface,
+      contentTextStyle: const TextStyle(color: AppColors.lightTextPrimary, fontFamily: 'DMSans'),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.mdCircular,
+        side: const BorderSide(color: AppColors.lightBorder),
+      ),
+    ),
+
+    // ── Dialog ──
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.lightElevated,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.xlCircular,
+      ),
+    ),
+
+    // ── Bottom Sheet ──
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: AppColors.lightElevated,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
+      ),
+    ),
+
+    // ── Progress Indicator ──
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: AppColors.lightPrimary,
+      linearTrackColor: AppColors.lightTrackInactive,
+      circularTrackColor: AppColors.lightTrackInactive,
+    ),
+
+    // ── Slider ──
+    sliderTheme: SliderThemeData(
+      activeTrackColor: AppColors.lightPrimary,
+      inactiveTrackColor: AppColors.lightTrackInactive,
+      thumbColor: AppColors.lightPrimary,
+      overlayColor: AppColors.lightPrimary.withAlpha(20),
+      valueIndicatorColor: AppColors.lightPrimary,
+      valueIndicatorTextStyle: const TextStyle(
+        color: Colors.white,
+        fontFamily: 'SpaceGrotesk',
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+
+    // ── Switch ──
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppColors.lightPrimary;
+        return AppColors.lightTextMuted;
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppColors.lightPrimary.withAlpha(80);
+        return AppColors.lightTrackInactive;
+      }),
+    ),
+
+    // ── Floating Action Button ──
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.lightPrimary,
+      foregroundColor: Colors.white,
+      elevation: 4,
+      shape: CircleBorder(),
+    ),
+
+    // ── Navigation Drawer ──
+    drawerTheme: const DrawerThemeData(
+      backgroundColor: AppColors.lightElevated,
+    ),
+
+    // ── Popup Menu ──
+    popupMenuTheme: PopupMenuThemeData(
+      color: AppColors.lightElevated,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.mdCircular,
+        side: const BorderSide(color: AppColors.lightBorder),
+      ),
+      textStyle: const TextStyle(
+        color: AppColors.lightTextPrimary,
+        fontFamily: 'DMSans',
+      ),
+    ),
+
+    // ── Tooltip ──
+    tooltipTheme: TooltipThemeData(
+      decoration: BoxDecoration(
+        color: AppColors.lightElevated,
+        borderRadius: AppRadius.smCircular,
+        border: Border.all(color: AppColors.lightBorder),
+      ),
+      textStyle: const TextStyle(
+        color: AppColors.lightTextPrimary,
+        fontSize: 12,
+        fontFamily: 'DMSans',
+      ),
+    ),
+
+    // ── Time Picker ──
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: AppColors.lightElevated,
+      hourMinuteColor: AppColors.lightSurface,
+      dialBackgroundColor: AppColors.lightSurface,
+      dialHandColor: AppColors.lightPrimary,
+      entryModeIconColor: AppColors.lightPrimary,
+      hourMinuteTextColor: AppColors.lightTextPrimary,
+      dayPeriodTextColor: AppColors.lightTextPrimary,
+      dayPeriodColor: AppColors.lightInput,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.xlCircular,
+      ),
+    ),
+
+    // ── Date Picker ──
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: AppColors.lightElevated,
+      headerBackgroundColor: AppColors.lightPrimary,
+      headerForegroundColor: Colors.white,
+      todayForegroundColor: const WidgetStatePropertyAll(AppColors.lightPrimary),
+      todayBackgroundColor: WidgetStatePropertyAll(AppColors.lightPrimary.withAlpha(30)),
+      surfaceTintColor: AppColors.lightPrimary,
+    ),
+
+    // ── Badge ──
+    badgeTheme: const BadgeThemeData(
+      backgroundColor: AppColors.lightError,
+      textColor: Colors.white,
+      smallSize: 8,
+      largeSize: 20,
+    ),
+
+    // ── Navigation Bar ──
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: AppColors.lightElevated,
+      indicatorColor: AppColors.lightPrimary.withAlpha(30),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const TextStyle(
+            color: AppColors.lightPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'DMSans',
+          );
+        }
+        return const TextStyle(
+          color: AppColors.lightTextMuted,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          fontFamily: 'DMSans',
+        );
+      }),
+    ),
+
+    // ── Segmented Button ──
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        backgroundColor: AppColors.lightInput,
+        selectedBackgroundColor: AppColors.lightPrimary.withAlpha(30),
+        foregroundColor: AppColors.lightTextSecondary,
+        selectedForegroundColor: AppColors.lightPrimary,
+        side: const BorderSide(color: AppColors.lightBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.mdCircular,
+        ),
+      ),
+    ),
+
+    // ── Menu Bar ──
+    menuBarTheme: MenuBarThemeData(
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(AppColors.lightElevated),
+        side: const WidgetStatePropertyAll(BorderSide(color: AppColors.lightBorder)),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+        ),
+      ),
+    ),
+
+    // ── Menu Button ──
+    menuButtonTheme: MenuButtonThemeData(
+      style: ButtonStyle(
+        foregroundColor: WidgetStatePropertyAll(AppColors.lightTextPrimary),
+        backgroundColor: WidgetStatePropertyAll(AppColors.lightElevated),
+      ),
+    ),
+
+    // ── Expansion Tile ──
+    expansionTileTheme: const ExpansionTileThemeData(
+      iconColor: AppColors.lightTextSecondary,
+      collapsedIconColor: AppColors.lightTextMuted,
+      textColor: AppColors.lightTextPrimary,
+      collapsedTextColor: AppColors.lightTextSecondary,
+    ),
+  );
 }

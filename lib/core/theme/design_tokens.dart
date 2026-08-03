@@ -97,6 +97,32 @@ class AppColors {
   /// Texto sobre fondo ámbar — negro para máximo contraste.
   static const Color textOnAmber = Color(0xFF0A0A0F);
 
+  // ── Light Palette (F-M5) ──
+
+  /// Light backgrounds — warm off-white comfortable in sunlight.
+  static const Color lightBackground = Color(0xFFF5F5F0);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightElevated = Color(0xFFF0F0EB);
+  static const Color lightMonitor = Color(0xFFE8E8E0);
+  static const Color lightOverlay = Color(0xDDFFFFFF);
+  static const Color lightInput = Color(0xFFFFFFFF);
+
+  /// Light text — near-black with descending contrast.
+  static const Color lightTextPrimary = Color(0xFF1A1A1A);
+  static const Color lightTextSecondary = Color(0xFF666666);
+  static const Color lightTextMuted = Color(0xFF999999);
+  static const Color lightTextDisabled = Color(0xFFCCCCCC);
+
+  /// Light borders.
+  static const Color lightBorder = Color(0xFFDDDDDD);
+  static const Color lightBorderLight = Color(0xFFEEEEE8);
+  static const Color lightTrackInactive = Color(0xFFE0E0E0);
+
+  /// Light semantic — adjusted for light backgrounds.
+  static const Color lightSuccess = Color(0xFF2ECC40);
+  static const Color lightError = Color(0xFFCC2440);
+  static const Color lightPrimary = Color(0xFFE67A00);
+
   // ── Borders ──
 
   /// Borde sutil que no compite con el contenido.

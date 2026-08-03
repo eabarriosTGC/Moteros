@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moteros_app/core/services/location_tracking_service.dart';
 
@@ -85,6 +86,31 @@ void main() {
 
       expect(b.speedKmh, equals(100));
       expect(b.position, equals(a.position)); // no cambió
+    });
+  });
+
+  group('LocationTrackingService — passive streams', () {
+    test('passivePositionStream returns a Stream<Position>', () {
+      final stream = LocationTrackingService.instance.passivePositionStream;
+      expect(stream, isA<Stream<Position>>());
+    });
+
+    test('headingStream returns a Stream<double>', () {
+      final stream = LocationTrackingService.instance.headingStream;
+      expect(stream, isA<Stream<double>>());
+    });
+
+    test('passivePositionStream is available as a stream', () {
+      final stream = LocationTrackingService.instance.passivePositionStream;
+      // The getter should return a valid stream (not null).
+      expect(stream, isNotNull);
+    });
+
+    test('headingStream is derived from passivePositionStream', () {
+      final stream = LocationTrackingService.instance.headingStream;
+      expect(stream, isA<Stream<double>>());
+      // Heading stream only emits finite, non-negative headings
+      // (runtime behavior; structural test confirms stream type)
     });
   });
 }

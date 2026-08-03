@@ -18,6 +18,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<RespondToRequest>(_onRespond);
     on<SubmitReview>(_onSubmitReview);
     on<DeleteMotoposada>(_onDelete);
+    on<CreateTouristPoi>(_onCreateTouristPoi);
   }
 
   SupabaseClient get _db => Supabase.instance.client;
@@ -203,6 +204,49 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       await _db.from('motoposadas').delete().eq('id', event.id);
       emit(const MotoposadaDeleted());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  Future<void> _onCreateTouristPoi(CreateTouristPoi event, Emitter<MotoposadasState> emit) async {
+    emit(MotoposadasLoading());
+    try {
+      // 1. Check curator status from profiles table
+      final profileResp = await _db
+          .from('profiles')
+          .select('is_city_curator, curator_city')
+          .eq('user_id', _uid!)
+          .maybeSingle();
+
+      final isCurator = profileResp?['is_city_curator'] as bool? ?? false;
+      final curatorCity = profileResp?['curator_city'] as String?;
+
+      // 2. Guard: reject if not curator or city mismatch
+      if (!isCurator || curatorCity != event.city) {
+        emit(const TouristPoiForbidden());
+        return;
+      }
+
+      // 3. Insert tourist POI — auto-approved
+      final resp = await _db.from('motoposadas').insert({
+        'user_id': _uid,
+        'type': event.type,
+        'title': event.title,
+        'description': event.description,
+        'rules': event.rules,
+        'lat': event.lat,
+        'lng': event.lng,
+        'address': event.address,
+        'poi_type': 'tourist',
+        'is_tourist': true,
+        'city': event.city,
+        'is_approved': true,
+        'visibility': 'public',
+        'max_guests': 0,
+      }).select().single();
+
+      emit(TouristPoiCreated(resp['id'] as int));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }

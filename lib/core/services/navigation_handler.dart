@@ -35,10 +35,13 @@ class NavigationHandler {
   /// Check if Waze can be launched (installed or web-fallback).
   static Future<bool> canLaunchWaze() async {
     try {
-      return await canLaunchUrl(
+      final result = await canLaunchUrl(
         Uri.parse('https://waze.com/ul?ll=4.0,-74.0&navigate=yes'),
       );
-    } catch (_) {
+      debugPrint('[NavHandler] canLaunchWaze: $result (post-fix)');
+      return result;
+    } catch (e) {
+      debugPrint('[NavHandler] canLaunchWaze error: $e');
       return false;
     }
   }
@@ -46,10 +49,13 @@ class NavigationHandler {
   /// Check if Google Maps can be launched (installed or web-fallback).
   static Future<bool> canLaunchGoogleMaps() async {
     try {
-      return await canLaunchUrl(
+      final result = await canLaunchUrl(
         Uri.parse('https://www.google.com/maps/dir/?api=1&destination=4.0,-74.0'),
       );
-    } catch (_) {
+      debugPrint('[NavHandler] canLaunchGoogleMaps: $result (post-fix)');
+      return result;
+    } catch (e) {
+      debugPrint('[NavHandler] canLaunchGoogleMaps error: $e');
       return false;
     }
   }

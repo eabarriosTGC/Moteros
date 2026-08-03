@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'core/network/api_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/design_tokens.dart';
+import 'core/theme/theme_cubit.dart';
 import 'core/widgets/main_shell.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
@@ -68,23 +69,30 @@ class MoterosApp extends StatelessWidget {
         BlocProvider(create: (_) => ProgresoBloc()),
         BlocProvider(create: (_) => ExplorarBloc()),
       ],
-      child: MaterialApp(
-        title: 'AsfaltoClub',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        home: BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, state) {
-            if (state is AuthInitial) {
-              return const SplashScreen();
-            }
-            if (state is AuthLoading) {
-              return const SplashScreen();
-            }
-            if (state is Authenticated) {
-              return const _AuthenticatedShell();
-            }
-            return const LoginScreen();
-          },
+      child: BlocProvider<ThemeCubit>(
+        create: (_) => ThemeCubit(),
+        child: BlocBuilder<ThemeCubit, ThemeMode>(
+          builder: (context, themeMode) => MaterialApp(
+            title: 'AsfaltoClub',
+            debugShowCheckedModeBanner: false,
+            themeMode: themeMode,
+            darkTheme: AppTheme.dark,
+            theme: AppTheme.light,
+            home: BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, state) {
+                if (state is AuthInitial) {
+                  return const SplashScreen();
+                }
+                if (state is AuthLoading) {
+                  return const SplashScreen();
+                }
+                if (state is Authenticated) {
+                  return const _AuthenticatedShell();
+                }
+                return const LoginScreen();
+              },
+            ),
+          ),
         ),
       ),
     );
