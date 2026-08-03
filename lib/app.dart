@@ -13,6 +13,7 @@ import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/onboarding_screen.dart';
 import 'features/dashboard/presentation/screens/rodar_screen.dart';
 import 'features/dashboard/presentation/bloc/dashboard_bloc.dart';
+import 'features/dashboard/presentation/bloc/search_bloc.dart';
 import 'features/challenges/presentation/bloc/challenges_bloc.dart';
 import 'features/refugios/presentation/bloc/refugios_bloc.dart';
 import 'features/places/data/datasources/place_remote_datasource.dart';
@@ -47,6 +48,7 @@ class MoterosApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: authBloc),
+        BlocProvider(create: (_) => SearchBloc()),
         BlocProvider(create: (_) => DashboardBloc(apiClient: apiClient)),
         BlocProvider(create: (_) => ChallengesBloc(apiClient: apiClient)),
         BlocProvider(create: (_) => RefugiosBloc()),
