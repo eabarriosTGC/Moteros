@@ -10,6 +10,7 @@ import '../../../../core/theme/app_icons.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
+import '../widgets/raid_join_sheet.dart';
 import 'create_raid_screen.dart';
 import 'raid_stats_screen.dart';
 
@@ -414,12 +415,21 @@ class _RaidListScreenState extends State<RaidListScreen> {
     if (raidId.isEmpty) return;
     HapticFeedback.lightImpact();
 
-    // Only completed raids have stats; others show list view
+    // Completed raids have stats; lobby/active open the join sheet (F-M8)
     if (category == 'completed') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => RaidStatsScreen(raidId: raidId)),
       ).then((_) => context.read<RaidBloc>().add(const LoadRaids()));
+      return;
+    }
+    final state = context.read<RaidBloc>().state;
+    if (state is! RaidsLoaded) return;
+    for (final r in state.raids) {
+      if (r['id'].toString() == raidId) {
+        showRaidJoinSheet(context, r);
+        return;
+      }
     }
   }
 

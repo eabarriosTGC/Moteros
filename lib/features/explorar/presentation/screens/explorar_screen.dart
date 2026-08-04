@@ -10,6 +10,7 @@ import '../bloc/explorar_event.dart';
 import '../bloc/explorar_state.dart';
 import '../widgets/featured_motoposada_card.dart';
 import '../widgets/raid_card.dart';
+import '../../../raids/presentation/widgets/raid_join_sheet.dart';
 
 class ExplorarScreen extends StatefulWidget {
   const ExplorarScreen({super.key});
@@ -97,9 +98,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                     else
                       ...state.upcomingRaids.map((raid) => RaidCard(
                         raid: raid,
-                        onTap: () {
-                          // Navigate to raid — placeholder for now
-                        },
+                        onTap: () => showRaidJoinSheet(context, raid),
                       )),
 
                     const SizedBox(height: AppSpacing.xxl),

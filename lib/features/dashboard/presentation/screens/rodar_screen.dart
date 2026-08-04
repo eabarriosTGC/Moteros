@@ -23,6 +23,8 @@ import '../../../raids/presentation/bloc/raid_event.dart';
 import '../../../raids/presentation/bloc/raid_state.dart';
 import '../../../raids/presentation/screens/create_raid_screen.dart';
 import '../../../raids/presentation/screens/raid_list_screen.dart';
+import '../../../raids/presentation/widgets/raid_join_sheet.dart';
+import '../../../raids/presentation/widgets/raid_marker.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import '../../../refugios/presentation/bloc/motoposadas_event.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
@@ -220,6 +222,38 @@ class _RodarScreenState extends State<RodarScreen>
                             ))
                         .toList(),
                   );
+                },
+              ),
+              // Raid markers — public upcoming/active rides (F-M8)
+              BlocBuilder<RaidBloc, RaidState>(
+                builder: (context, state) {
+                  if (state is! RaidsLoaded) {
+                    return const SizedBox.shrink();
+                  }
+                  final markers = state.raids
+                      .where((r) =>
+                          (r['status'] == 'lobby' ||
+                              r['status'] == 'planned' ||
+                              r['status'] == 'active') &&
+                          r['origin_lat'] != null &&
+                          r['origin_lng'] != null)
+                      .map((r) {
+                    final isActive = r['status'] == 'active';
+                    return Marker(
+                      point: LatLng(
+                        (r['origin_lat'] as num).toDouble(),
+                        (r['origin_lng'] as num).toDouble(),
+                      ),
+                      width: 40,
+                      height: 40,
+                      child: GestureDetector(
+                        onTap: () => showRaidJoinSheet(context, r),
+                        child: RaidMarker(isActive: isActive),
+                      ),
+                    );
+                  }).toList();
+                  if (markers.isEmpty) return const SizedBox.shrink();
+                  return MarkerLayer(markers: markers);
                 },
               ),
               // Blue dot — user's current location with heading
@@ -529,9 +563,7 @@ class _RodarScreenState extends State<RodarScreen>
       onTap: () {
         if (raidId.isEmpty) return;
         _tap();
-        Navigator.push(context, MaterialPageRoute(
-          builder: (_) => const RaidListScreen(),
-        ));
+        showRaidJoinSheet(context, raid);
       },
       child: Container(
         width: double.infinity,
