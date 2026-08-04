@@ -56,6 +56,7 @@ class GeocodingService {
 
   /// Search places by name via Nominatim (OSM).
   /// Free, no API key needed. 1 req/sec limit.
+  /// F-M6: restricted to Colombia via countrycodes + viewbox + bounded.
   static Future<List<GeocodingResult>> searchPlaces(String query) async {
     if (query.trim().isEmpty) return [];
     try {
@@ -65,7 +66,9 @@ class GeocodingService {
         '&format=json'
         '&addressdetails=1'
         '&limit=5'
-        '&countrycodes=co', // Prioritize Colombia
+        '&countrycodes=co' // Prioritize Colombia
+        '&viewbox=-79.6,12.7,-66.5,-4.5'
+        '&bounded=1',
       );
       final resp = await http.get(uri, headers: {
         'User-Agent': 'AsfaltoClub/1.0 (moteros.app)',

@@ -2,10 +2,18 @@
 ///
 /// Uses a dedicated Dio instance with Nominatim base URL and custom User-Agent
 /// as required by the Nominatim Usage Policy.
+///
+/// Geocoding is restricted to Colombia (F-M6): `countrycodes=co` plus a
+/// viewbox over the national territory with `bounded=1` so results from
+/// other countries are never returned for generic queries.
 library;
 
 import 'package:dio/dio.dart';
 import '../../domain/entities/search_result_entity.dart';
+
+/// Colombia viewbox in Nominatim format: left(lon), top(lat), right(lon), bottom(lat).
+/// Covers the full national territory with a small margin.
+const String colombiaViewbox = '-79.6,12.7,-66.5,-4.5';
 
 class NominatimDatasource {
   final Dio dio;
@@ -38,6 +46,10 @@ class NominatimDatasource {
           'format': 'json',
           'limit': 5,
           'addressdetails': 0,
+          // F-M6: restrict geocoding to Colombia
+          'countrycodes': 'co',
+          'viewbox': colombiaViewbox,
+          'bounded': 1,
         },
       );
 

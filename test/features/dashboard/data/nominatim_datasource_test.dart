@@ -52,6 +52,10 @@ void main() {
               'format': 'json',
               'limit': 5,
               'addressdetails': 0,
+              // F-M6: Colombia-restricted geocoding
+              'countrycodes': 'co',
+              'viewbox': colombiaViewbox,
+              'bounded': 1,
             },
           )).thenAnswer((_) async => mockResponse);
 
@@ -66,6 +70,9 @@ void main() {
               'format': 'json',
               'limit': 5,
               'addressdetails': 0,
+              'countrycodes': 'co',
+              'viewbox': colombiaViewbox,
+              'bounded': 1,
             },
           )).called(1);
     });
