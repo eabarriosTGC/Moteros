@@ -50,19 +50,21 @@ class MoterosApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: authBloc),
-        BlocProvider(create: (_) => SearchBloc(datasource: NominatimDatasource())),
+        BlocProvider(
+          create: (_) => SearchBloc(datasource: NominatimDatasource()),
+        ),
         BlocProvider(create: (_) => DashboardBloc(apiClient: apiClient)),
         BlocProvider(create: (_) => ChallengesBloc(apiClient: apiClient)),
         BlocProvider(create: (_) => RefugiosBloc()),
         BlocProvider(create: (_) => MotoposadasBloc()),
-        BlocProvider(create: (_) => PlacesBloc(
-          getNearbyPlaces: GetNearbyPlacesUseCase(
-            PlaceRemoteDataSource(apiClient),
-          ),
-        )),
         BlocProvider(
-          create: (_) => RaidBloc(),
+          create: (_) => PlacesBloc(
+            getNearbyPlaces: GetNearbyPlacesUseCase(
+              PlaceRemoteDataSource(apiClient),
+            ),
+          ),
         ),
+        BlocProvider(create: (_) => RaidBloc()),
         BlocProvider(create: (_) => PatchesBloc()),
         BlocProvider(create: (_) => TrackerBloc()),
         // New F-29 to F-35 BLoCs
@@ -148,8 +150,11 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
         city: row?['city'] as String?,
       );
       if (mounted) {
-        setState(() =>
-            _gateState = complete ? _GateState.complete : _GateState.incomplete);
+        setState(
+          () => _gateState = complete
+              ? _GateState.complete
+              : _GateState.incomplete,
+        );
       }
     } catch (_) {
       if (mounted) setState(() => _gateState = _GateState.error);
@@ -157,9 +162,9 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
   }
 
   Future<void> _showOnboarding() async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
     // Re-query the users row on return — the query result IS the state.
     // NEVER setState(true) here (phantom-flag bug class, ADR-001).
     if (mounted) {
@@ -199,18 +204,25 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                const Icon(
+                  Icons.error_outline,
+                  color: AppColors.error,
+                  size: 48,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   'No pudimos verificar tu perfil',
-                  style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+                  style: AppTypography.h3.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Revisá tu conexión e intentá de nuevo',
-                  style:
-                      AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textMuted,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.lg),

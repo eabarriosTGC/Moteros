@@ -45,7 +45,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// returns a builder whose `then` resolves to [result] or throws [error].
 class FakeTransformBuilder<T> implements PostgrestTransformBuilder<T> {
   FakeTransformBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
@@ -66,7 +66,7 @@ class FakeTransformBuilder<T> implements PostgrestTransformBuilder<T> {
 /// Answers the generic await seam (`then`) on filter chains.
 class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
   FakeFilterBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
@@ -85,8 +85,9 @@ class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
     if (invocation.memberName == #then) {
       if (error != null) throw error!;
       final onValue = invocation.positionalArguments.first as dynamic;
-      return Future.value(result)
-          .then((_) => onValue(result ?? const <Map<String, dynamic>>[]));
+      return Future.value(
+        result,
+      ).then((_) => onValue(result ?? const <Map<String, dynamic>>[]));
     }
     return this;
   }
@@ -94,14 +95,17 @@ class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
 
 class FakeQueryBuilder implements SupabaseQueryBuilder {
   FakeQueryBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
   final List<Invocation> recorder;
 
-  late final FakeFilterBuilder filter =
-      FakeFilterBuilder(result: result, error: error, recorder: recorder);
+  late final FakeFilterBuilder filter = FakeFilterBuilder(
+    result: result,
+    error: error,
+    recorder: recorder,
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
@@ -133,10 +137,7 @@ class FakeSupabaseClient implements SupabaseClient {
     calls.add(invocation);
     if (invocation.memberName == #from) {
       final table = invocation.positionalArguments.first as String;
-      return tables.putIfAbsent(
-        table,
-        () => FakeQueryBuilder(recorder: calls),
-      );
+      return tables.putIfAbsent(table, () => FakeQueryBuilder(recorder: calls));
     }
     if (invocation.memberName == #auth) return FakeAuth(user: currentUser);
     return null;
@@ -152,38 +153,36 @@ final _completeRow = <String, dynamic>{
 };
 
 User _userWithMetadata(Map<String, dynamic> metadata) => User(
-      id: 'user-1',
-      appMetadata: const {},
-      userMetadata: metadata,
-      aud: 'authenticated',
-      createdAt: '2023-01-01T00:00:00.000Z',
-    );
+  id: 'user-1',
+  appMetadata: const {},
+  userMetadata: metadata,
+  aud: 'authenticated',
+  createdAt: '2023-01-01T00:00:00.000Z',
+);
 
 /// Same provider set MoterosApp uses — MainShell tabs need them all.
 /// `SingleChildWidget` (not raw `BlocProvider`) so each element keeps its
 /// concrete generic type (e.g. `BlocProvider<SearchBloc>`) for lookup.
 List<SingleChildWidget> _shellProviders(ApiClient apiClient) => [
-      BlocProvider(create: (_) => SearchBloc(datasource: NominatimDatasource())),
-      BlocProvider(create: (_) => DashboardBloc(apiClient: apiClient)),
-      BlocProvider(create: (_) => RefugiosBloc()),
-      BlocProvider(create: (_) => MotoposadasBloc()),
-      BlocProvider(
-        create: (_) => PlacesBloc(
-          getNearbyPlaces: GetNearbyPlacesUseCase(
-            PlaceRemoteDataSource(apiClient),
-          ),
-        ),
-      ),
-      BlocProvider(create: (_) => RaidBloc()),
-      BlocProvider(create: (_) => PatchesBloc()),
-      BlocProvider(create: (_) => TrackerBloc()),
-      BlocProvider(create: (_) => RouteBloc(datasource: RouteDatasource())),
-      BlocProvider(create: (_) => MileageBloc()),
-      BlocProvider(create: (_) => LeaderboardBloc()),
-      BlocProvider(create: (_) => ShowcaseBloc()),
-      BlocProvider(create: (_) => ProgresoBloc()),
-      BlocProvider(create: (_) => ExplorarBloc()),
-    ];
+  BlocProvider(create: (_) => SearchBloc(datasource: NominatimDatasource())),
+  BlocProvider(create: (_) => DashboardBloc(apiClient: apiClient)),
+  BlocProvider(create: (_) => RefugiosBloc()),
+  BlocProvider(create: (_) => MotoposadasBloc()),
+  BlocProvider(
+    create: (_) => PlacesBloc(
+      getNearbyPlaces: GetNearbyPlacesUseCase(PlaceRemoteDataSource(apiClient)),
+    ),
+  ),
+  BlocProvider(create: (_) => RaidBloc()),
+  BlocProvider(create: (_) => PatchesBloc()),
+  BlocProvider(create: (_) => TrackerBloc()),
+  BlocProvider(create: (_) => RouteBloc(datasource: RouteDatasource())),
+  BlocProvider(create: (_) => MileageBloc()),
+  BlocProvider(create: (_) => LeaderboardBloc()),
+  BlocProvider(create: (_) => ShowcaseBloc()),
+  BlocProvider(create: (_) => ProgresoBloc()),
+  BlocProvider(create: (_) => ExplorarBloc()),
+];
 
 Widget _wrap(FakeSupabaseClient client) {
   return MultiBlocProvider(
@@ -191,9 +190,7 @@ Widget _wrap(FakeSupabaseClient client) {
       ..._shellProviders(ApiClient()),
       BlocProvider<ThemeCubit>(create: (_) => ThemeCubit()),
     ],
-    child: MaterialApp(
-      home: AuthenticatedShell(client: client),
-    ),
+    child: MaterialApp(home: AuthenticatedShell(client: client)),
   );
 }
 
@@ -206,49 +203,57 @@ void main() {
   /// (mirrors widget_test.dart). localhost refuses instantly on the mocked
   /// HttpClient, so background screen loads fail fast into bloc error states.
   Future<void> initSupabase(WidgetTester tester) async {
-    await tester.runAsync(() => Supabase.initialize(
-          url: 'http://localhost:54321',
-          publishableKey: 'fake-anon-key',
-        ));
+    await tester.runAsync(
+      () => Supabase.initialize(
+        url: 'http://localhost:54321',
+        publishableKey: 'fake-anon-key',
+      ),
+    );
     addTearDown(() async {
       await tester.runAsync(() => Supabase.instance.dispose());
     });
   }
 
   testWidgets(
-      'phantom flag: users row empty + onboarding_complete=true metadata '
-      '→ OnboardingScreen shown (OP-R1)', (tester) async {
+    'phantom flag: users row empty + onboarding_complete=true metadata '
+    '→ OnboardingScreen shown (OP-R1)',
+    (tester) async {
+      await initSupabase(tester);
+      final client = FakeSupabaseClient(
+        currentUser: _userWithMetadata({'onboarding_complete': true}),
+      );
+      client.tables['users'] = FakeQueryBuilder(
+        result: <String, dynamic>{},
+        recorder: client.calls,
+      );
+
+      await tester.pumpWidget(_wrap(client));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(OnboardingScreen),
+        findsOneWidget,
+        reason: 'empty row must NOT pass the gate even with the flag set',
+      );
+      expect(find.byType(MainShell), findsNothing);
+      // The gate must have queried real fields, not the metadata flag.
+      final selectCalls = client.calls
+          .where((c) => c.memberName == #select)
+          .toList();
+      expect(selectCalls, isNotEmpty);
+      expect(
+        selectCalls.first.positionalArguments.first,
+        contains('full_name'),
+        reason: 'gate must select the real users row fields',
+      );
+    },
+  );
+
+  testWidgets('complete row → MainShell, no onboarding (OP-R1)', (
+    tester,
+  ) async {
     await initSupabase(tester);
-    final client = FakeSupabaseClient(
-      currentUser: _userWithMetadata({'onboarding_complete': true}),
-    );
-    client.tables['users'] = FakeQueryBuilder(
-      result: <String, dynamic>{},
-      recorder: client.calls,
-    );
-
-    await tester.pumpWidget(_wrap(client));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(OnboardingScreen), findsOneWidget,
-        reason: 'empty row must NOT pass the gate even with the flag set');
-    expect(find.byType(MainShell), findsNothing);
-    // The gate must have queried real fields, not the metadata flag.
-    final selectCalls =
-        client.calls.where((c) => c.memberName == #select).toList();
-    expect(selectCalls, isNotEmpty);
-    expect(
-      selectCalls.first.positionalArguments.first,
-      contains('full_name'),
-      reason: 'gate must select the real users row fields',
-    );
-  });
-
-  testWidgets('complete row → MainShell, no onboarding (OP-R1)', (tester) async {
-    await initSupabase(tester);
-    final client = FakeSupabaseClient(
-      currentUser: _userWithMetadata(const {}),
-    );
+    final client = FakeSupabaseClient(currentUser: _userWithMetadata(const {}));
     client.tables['users'] = FakeQueryBuilder(
       result: _completeRow,
       recorder: client.calls,
@@ -261,12 +266,11 @@ void main() {
     expect(find.byType(OnboardingScreen), findsNothing);
   });
 
-  testWidgets('query throws → retry screen with button, no infinite spinner',
-      (tester) async {
+  testWidgets('query throws → retry screen with button, no infinite spinner', (
+    tester,
+  ) async {
     await initSupabase(tester);
-    final client = FakeSupabaseClient(
-      currentUser: _userWithMetadata(const {}),
-    );
+    final client = FakeSupabaseClient(currentUser: _userWithMetadata(const {}));
     client.tables['users'] = FakeQueryBuilder(
       error: Exception('network down'),
       recorder: client.calls,
@@ -275,10 +279,16 @@ void main() {
     await tester.pumpWidget(_wrap(client));
     await tester.pumpAndSettle();
 
-    expect(find.text('REINTENTAR'), findsOneWidget,
-        reason: 'error state must offer a retry action');
-    expect(find.byType(CircularProgressIndicator), findsNothing,
-        reason: 'error state must not spin forever');
+    expect(
+      find.text('REINTENTAR'),
+      findsOneWidget,
+      reason: 'error state must offer a retry action',
+    );
+    expect(
+      find.byType(CircularProgressIndicator),
+      findsNothing,
+      reason: 'error state must not spin forever',
+    );
     expect(find.byType(OnboardingScreen), findsNothing);
 
     // Retry re-runs the query and can recover.
@@ -288,7 +298,10 @@ void main() {
     );
     await tester.tap(find.text('REINTENTAR'));
     await tester.pumpAndSettle();
-    expect(find.byType(MainShell), findsOneWidget,
-        reason: 'retry must recover to MainShell once the query succeeds');
+    expect(
+      find.byType(MainShell),
+      findsOneWidget,
+      reason: 'retry must recover to MainShell once the query succeeds',
+    );
   });
 }

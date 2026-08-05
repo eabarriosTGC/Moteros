@@ -8,7 +8,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moteros_app/core/network/api_client.dart';
 import 'package:moteros_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:moteros_app/features/profile/presentation/screens/profile_edit_screen.dart';
 import 'package:moteros_app/features/profile/presentation/screens/profile_screen.dart';
@@ -24,25 +23,27 @@ void main() {
   /// ShowcaseProfileScreen reads Supabase.instance.client.auth.currentUser in
   /// initState — initialize Supabase like onboarding_gate_test.dart does.
   Future<void> initSupabase(WidgetTester tester) async {
-    await tester.runAsync(() => Supabase.initialize(
-          url: 'http://localhost:54321',
-          publishableKey: 'fake-anon-key',
-        ));
+    await tester.runAsync(
+      () => Supabase.initialize(
+        url: 'http://localhost:54321',
+        publishableKey: 'fake-anon-key',
+      ),
+    );
     addTearDown(() async {
       await tester.runAsync(() => Supabase.instance.dispose());
     });
   }
 
   Future<void> pumpProfile(WidgetTester tester) async {
-    await tester.pumpWidget(MultiBlocProvider(
-      providers: [
-        BlocProvider(create: (_) => AuthBloc()),
-        BlocProvider(create: (_) => ShowcaseBloc()),
-      ],
-      child: const MaterialApp(
-        home: ProfileScreen(),
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => AuthBloc()),
+          BlocProvider(create: (_) => ShowcaseBloc()),
+        ],
+        child: const MaterialApp(home: ProfileScreen()),
       ),
-    ));
+    );
     await tester.pump();
   }
 
@@ -50,8 +51,11 @@ void main() {
     await initSupabase(tester);
     await pumpProfile(tester);
 
-    expect(find.text('EDITAR PERFIL'), findsOneWidget,
-        reason: 'ProfileScreen AppBar must expose the edit entry');
+    expect(
+      find.text('EDITAR PERFIL'),
+      findsOneWidget,
+      reason: 'ProfileScreen AppBar must expose the edit entry',
+    );
   });
 
   testWidgets('EDITAR PERFIL pushes ProfileEditScreen (OP-R3)', (tester) async {
@@ -65,7 +69,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(ProfileEditScreen), findsOneWidget,
-        reason: 'tapping EDITAR PERFIL must navigate to the edit screen');
+    expect(
+      find.byType(ProfileEditScreen),
+      findsOneWidget,
+      reason: 'tapping EDITAR PERFIL must navigate to the edit screen',
+    );
   });
 }

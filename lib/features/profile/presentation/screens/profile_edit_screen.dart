@@ -149,8 +149,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
                           labelText: 'Nombre completo',
-                          prefixIcon: Icon(Icons.person, color: AppColors.textMuted),
-                          filled: true, fillColor: AppColors.input,
+                          prefixIcon: Icon(
+                            Icons.person,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.input,
                         ),
                         validator: _required,
                       ),
@@ -164,8 +168,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           labelText: 'Tu moto (marca y modelo)',
                           hintText: 'Ej: Yamaha MT-07',
                           hintStyle: TextStyle(color: AppColors.textDisabled),
-                          prefixIcon: Icon(Icons.motorcycle, color: AppColors.textMuted),
-                          filled: true, fillColor: AppColors.input,
+                          prefixIcon: Icon(
+                            Icons.motorcycle,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.input,
                         ),
                         validator: _required,
                       ),
@@ -179,8 +187,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           labelText: 'Ciudad',
                           hintText: 'Ej: Medellín',
                           hintStyle: TextStyle(color: AppColors.textDisabled),
-                          prefixIcon: Icon(Icons.location_city, color: AppColors.textMuted),
-                          filled: true, fillColor: AppColors.input,
+                          prefixIcon: Icon(
+                            Icons.location_city,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.input,
                         ),
                         validator: _required,
                       ),
@@ -193,8 +205,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
                           labelText: 'Teléfono (opcional)',
-                          prefixIcon: Icon(Icons.phone, color: AppColors.textMuted),
-                          filled: true, fillColor: AppColors.input,
+                          prefixIcon: Icon(
+                            Icons.phone,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.input,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -204,9 +220,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         controller: _emergencyNameCtrl,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
-                          labelText: 'Contacto de emergencia (nombre, opcional)',
-                          prefixIcon: Icon(Icons.emergency, color: AppColors.textMuted),
-                          filled: true, fillColor: AppColors.input,
+                          labelText:
+                              'Contacto de emergencia (nombre, opcional)',
+                          prefixIcon: Icon(
+                            Icons.emergency,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.input,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -217,32 +238,47 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         keyboardType: TextInputType.phone,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
-                          labelText: 'Contacto de emergencia (teléfono, opcional)',
-                          prefixIcon: Icon(Icons.phone_in_talk, color: AppColors.textMuted),
-                          filled: true, fillColor: AppColors.input,
+                          labelText:
+                              'Contacto de emergencia (teléfono, opcional)',
+                          prefixIcon: Icon(
+                            Icons.phone_in_talk,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.input,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
 
                       SizedBox(
-                        width: double.infinity, height: AppSpacing.buttonHeight,
+                        width: double.infinity,
+                        height: AppSpacing.buttonHeight,
                         child: ElevatedButton(
                           onPressed: _saving ? null : _save,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: AppColors.textOnAmber,
                             shape: RoundedRectangleBorder(
-                                borderRadius: AppRadius.mdCircular),
+                              borderRadius: AppRadius.mdCircular,
+                            ),
                           ),
                           child: _saving
                               ? const SizedBox(
-                                  width: 22, height: 22,
+                                  width: 22,
+                                  height: 22,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))
-                              : const Text('GUARDAR',
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'GUARDAR',
                                   style: TextStyle(
-                                      fontSize: 16, fontWeight: FontWeight.w800,
-                                      letterSpacing: 2)),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

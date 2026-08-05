@@ -12,7 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class ProfileRepository {
   final SupabaseClient _client;
   ProfileRepository({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   /// Upsert: creates the users row on first onboarding, updates it on edits.
   /// Optional fields (phone / emergency contact) are omitted when null or
@@ -39,18 +39,18 @@ class ProfileRepository {
     });
     // Mirror full_name to metadata for display fallback (ShowcaseProfileScreen).
     // The gate NEVER reads this metadata (ADR-001).
-    await _client.auth.updateUser(UserAttributes(
-      data: {'full_name': fullName.trim()},
-    ));
+    await _client.auth.updateUser(
+      UserAttributes(data: {'full_name': fullName.trim()}),
+    );
   }
 
   /// Reads the editable profile fields for the given user.
   /// Null row => user has no users row yet (edge: pre-trigger accounts).
-  Future<Map<String, dynamic>?> fetchProfile(String userId) =>
-      _client
-          .from('users')
-          .select(
-              'full_name, bike_model, city, phone, emergency_contact_name, emergency_contact_phone')
-          .eq('id', userId)
-          .maybeSingle();
+  Future<Map<String, dynamic>?> fetchProfile(String userId) => _client
+      .from('users')
+      .select(
+        'full_name, bike_model, city, phone, emergency_contact_name, emergency_contact_phone',
+      )
+      .eq('id', userId)
+      .maybeSingle();
 }

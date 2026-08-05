@@ -24,7 +24,10 @@ class MockProfileRepository implements ProfileRepository {
       // profile_repository_test.dart).
       final Map<String, dynamic> payload = {};
       for (final e in invocation.namedArguments.entries) {
-        final key = e.key.toString().replaceFirst('Symbol("', '').replaceFirst('")', '');
+        final key = e.key
+            .toString()
+            .replaceFirst('Symbol("', '')
+            .replaceFirst('")', '');
         final value = e.value;
         if (value is String && value.trim().isEmpty) continue;
         if (value == null) continue;
@@ -65,12 +68,12 @@ class FakeSupabaseClient implements SupabaseClient {
 }
 
 User _user({Map<String, dynamic>? metadata}) => User(
-      id: 'user-1',
-      appMetadata: const {},
-      userMetadata: metadata ?? const {},
-      aud: 'authenticated',
-      createdAt: '2023-01-01T00:00:00.000Z',
-    );
+  id: 'user-1',
+  appMetadata: const {},
+  userMetadata: metadata ?? const {},
+  aud: 'authenticated',
+  createdAt: '2023-01-01T00:00:00.000Z',
+);
 
 Widget _wrap({
   required MockProfileRepository repository,
@@ -81,106 +84,155 @@ Widget _wrap({
   );
 }
 
-Future<void> _fillRequired(WidgetTester tester,
-    {String fullName = 'Ana María',
-    String bike = 'Yamaha MT-07',
-    String city = 'Medellín'}) async {
+Future<void> _fillRequired(
+  WidgetTester tester, {
+  String fullName = 'Ana María',
+  String bike = 'Yamaha MT-07',
+  String city = 'Medellín',
+}) async {
   await tester.enterText(
-      find.widgetWithText(TextFormField, 'Nombre completo'), fullName);
+    find.widgetWithText(TextFormField, 'Nombre completo'),
+    fullName,
+  );
   await tester.enterText(
-      find.widgetWithText(TextFormField, 'Tu moto (marca y modelo)'), bike);
+    find.widgetWithText(TextFormField, 'Tu moto (marca y modelo)'),
+    bike,
+  );
   await tester.enterText(find.widgetWithText(TextFormField, 'Ciudad'), city);
 }
 
 Future<void> _acceptTermsAndSubmit(WidgetTester tester) async {
   final terms = find.text('Acepto los términos y condiciones de AsfaltoClub');
-  await tester.scrollUntilVisible(terms, 200,
-      scrollable: find.byType(Scrollable).first);
+  await tester.scrollUntilVisible(
+    terms,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
   await tester.tap(terms);
   await tester.pump();
   final submit = find.text('COMENZAR');
-  await tester.scrollUntilVisible(submit, 200,
-      scrollable: find.byType(Scrollable).first);
+  await tester.scrollUntilVisible(
+    submit,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
   await tester.tap(submit);
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets(
-      'submit without bike_model → blocked + validator error (OP-R4)',
-      (tester) async {
+  testWidgets('submit without bike_model → blocked + validator error (OP-R4)', (
+    tester,
+  ) async {
     final repo = MockProfileRepository();
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        repository: repo,
+        client: FakeSupabaseClient(currentUser: _user()),
+      ),
+    );
 
     // Fill full_name and city, leave bike_model empty.
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Nombre completo'), 'Ana María');
-    await tester.enterText(find.widgetWithText(TextFormField, 'Ciudad'), 'Medellín');
+      find.widgetWithText(TextFormField, 'Nombre completo'),
+      'Ana María',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Ciudad'),
+      'Medellín',
+    );
     await _acceptTermsAndSubmit(tester);
 
-    expect(find.text('Requerido'), findsWidgets,
-        reason: 'bike_model must stay required (OP-R4 scenario)');
-    expect(repo.saveCalls, isEmpty,
-        reason: 'invalid form must not reach the repository');
+    expect(
+      find.text('Requerido'),
+      findsWidgets,
+      reason: 'bike_model must stay required (OP-R4 scenario)',
+    );
+    expect(
+      repo.saveCalls,
+      isEmpty,
+      reason: 'invalid form must not reach the repository',
+    );
   });
 
   testWidgets('full_name and city are also required (OP-R4)', (tester) async {
     final repo = MockProfileRepository();
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        repository: repo,
+        client: FakeSupabaseClient(currentUser: _user()),
+      ),
+    );
 
     // Only bike_model filled.
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Tu moto (marca y modelo)'),
-        'Yamaha MT-07');
+      find.widgetWithText(TextFormField, 'Tu moto (marca y modelo)'),
+      'Yamaha MT-07',
+    );
     await _acceptTermsAndSubmit(tester);
 
-    expect(find.text('Requerido'), findsNWidgets(2),
-        reason: 'full_name and city missing → 2 validator errors');
+    expect(
+      find.text('Requerido'),
+      findsNWidgets(2),
+      reason: 'full_name and city missing → 2 validator errors',
+    );
     expect(repo.saveCalls, isEmpty);
   });
 
   testWidgets(
-      'submit with 3 fields + empty phone/emergency → succeeds, optional '
-      'skipped (OP-R4)', (tester) async {
-    final repo = MockProfileRepository();
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
+    'submit with 3 fields + empty phone/emergency → succeeds, optional '
+    'skipped (OP-R4)',
+    (tester) async {
+      final repo = MockProfileRepository();
+      await tester.pumpWidget(
+        _wrap(
+          repository: repo,
+          client: FakeSupabaseClient(currentUser: _user()),
+        ),
+      );
 
-    await _fillRequired(tester);
-    // Leave phone / emergency fields empty on purpose.
-    await _acceptTermsAndSubmit(tester);
+      await _fillRequired(tester);
+      // Leave phone / emergency fields empty on purpose.
+      await _acceptTermsAndSubmit(tester);
 
-    expect(repo.saveCalls, hasLength(1),
-        reason: 'valid form must call saveProfile exactly once');
-    final payload = repo.saveCalls.first;
-    expect(payload['userId'], 'user-1');
-    expect(payload['fullName'], 'Ana María');
-    expect(payload['bikeModel'], 'Yamaha MT-07');
-    expect(payload['city'], 'Medellín');
-    expect(payload.containsKey('phone'), isFalse,
-        reason: 'empty phone must be skipped (OP-R4)');
-    expect(payload.containsKey('emergencyName'), isFalse,
-        reason: 'empty emergency name must be skipped');
-    expect(payload.containsKey('emergencyPhone'), isFalse,
-        reason: 'empty emergency phone must be skipped');
-  });
+      expect(
+        repo.saveCalls,
+        hasLength(1),
+        reason: 'valid form must call saveProfile exactly once',
+      );
+      final payload = repo.saveCalls.first;
+      expect(payload['userId'], 'user-1');
+      expect(payload['fullName'], 'Ana María');
+      expect(payload['bikeModel'], 'Yamaha MT-07');
+      expect(payload['city'], 'Medellín');
+      expect(
+        payload.containsKey('phone'),
+        isFalse,
+        reason: 'empty phone must be skipped (OP-R4)',
+      );
+      expect(
+        payload.containsKey('emergencyName'),
+        isFalse,
+        reason: 'empty emergency name must be skipped',
+      );
+      expect(
+        payload.containsKey('emergencyPhone'),
+        isFalse,
+        reason: 'empty emergency phone must be skipped',
+      );
+    },
+  );
 
   testWidgets('full_name prefills from userMetadata (OP-R4)', (tester) async {
     final repo = MockProfileRepository();
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(
-        currentUser: _user(metadata: {'full_name': 'Juan Carlos'}),
+    await tester.pumpWidget(
+      _wrap(
+        repository: repo,
+        client: FakeSupabaseClient(
+          currentUser: _user(metadata: {'full_name': 'Juan Carlos'}),
+        ),
       ),
-    ));
+    );
 
     expect(
       find.widgetWithText(TextFormField, 'Juan Carlos'),

@@ -15,7 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Mock ProfileRepository — serves a mutable profile row for fetchProfile
 /// and records saveProfile payloads (same contract as onboarding tests).
 class MockProfileRepository implements ProfileRepository {
-  MockProfileRepository({Map<String, dynamic>? row}) : row = row;
+  MockProfileRepository({this.row});
 
   Map<String, dynamic>? row;
   final List<Map<String, dynamic>> saveCalls = [];
@@ -25,7 +25,10 @@ class MockProfileRepository implements ProfileRepository {
     if (invocation.memberName == #saveProfile) {
       final Map<String, dynamic> payload = {};
       for (final e in invocation.namedArguments.entries) {
-        final key = e.key.toString().replaceFirst('Symbol("', '').replaceFirst('")', '');
+        final key = e.key
+            .toString()
+            .replaceFirst('Symbol("', '')
+            .replaceFirst('")', '');
         final value = e.value;
         if (value is String && value.trim().isEmpty) continue;
         if (value == null) continue;
@@ -75,12 +78,12 @@ class FakeSupabaseClient implements SupabaseClient {
 }
 
 User _user() => User(
-      id: 'user-1',
-      appMetadata: const {},
-      userMetadata: const {},
-      aud: 'authenticated',
-      createdAt: '2023-01-01T00:00:00.000Z',
-    );
+  id: 'user-1',
+  appMetadata: const {},
+  userMetadata: const {},
+  aud: 'authenticated',
+  createdAt: '2023-01-01T00:00:00.000Z',
+);
 
 final _profileRow = <String, dynamic>{
   'full_name': 'Ana María',
@@ -101,13 +104,16 @@ Widget _wrap({
 }
 
 void main() {
-  testWidgets('renders 3 required fields prefilled from fetchProfile (OP-R3)',
-      (tester) async {
+  testWidgets('renders 3 required fields prefilled from fetchProfile (OP-R3)', (
+    tester,
+  ) async {
     final repo = MockProfileRepository(row: Map.of(_profileRow));
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        repository: repo,
+        client: FakeSupabaseClient(currentUser: _user()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(
@@ -132,72 +138,106 @@ void main() {
     );
   });
 
-  testWidgets('edit bike_model + save → saveProfile with updated value (OP-R3)',
-      (tester) async {
+  testWidgets(
+    'edit bike_model + save → saveProfile with updated value (OP-R3)',
+    (tester) async {
+      final repo = MockProfileRepository(row: Map.of(_profileRow));
+      await tester.pumpWidget(
+        _wrap(
+          repository: repo,
+          client: FakeSupabaseClient(currentUser: _user()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Yamaha MT-07'),
+        'Ducati Monster',
+      );
+      await tester.tap(find.text('GUARDAR'));
+      await tester.pumpAndSettle();
+
+      expect(
+        repo.saveCalls,
+        hasLength(1),
+        reason: 'save must call saveProfile exactly once',
+      );
+      final payload = repo.saveCalls.first;
+      expect(payload['bikeModel'], 'Ducati Monster');
+      expect(payload['fullName'], 'Ana María');
+      expect(payload['city'], 'Medellín');
+
+      // Next fetchProfile returns the updated value (spec OP-R3).
+      final updated = await repo.fetchProfile('user-1');
+      expect(
+        updated?['bike_model'],
+        'Ducati Monster',
+        reason: 'next fetchProfile must reflect the persisted edit',
+      );
+    },
+  );
+
+  testWidgets(
+    'change city+phone, emergency empty → no validation error (OP-R3)',
+    (tester) async {
+      final repo = MockProfileRepository(row: Map.of(_profileRow));
+      await tester.pumpWidget(
+        _wrap(
+          repository: repo,
+          client: FakeSupabaseClient(currentUser: _user()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Medellín'),
+        'Bogotá',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '3001234567'),
+        '3109876543',
+      );
+      // Emergency fields: clear them (leave empty).
+      await tester.enterText(find.widgetWithText(TextFormField, 'Juan'), '');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '3017654321'),
+        '',
+      );
+      await tester.tap(find.text('GUARDAR'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Requerido'),
+        findsNothing,
+        reason: 'emergency fields are optional — empty must not block save',
+      );
+      expect(repo.saveCalls, hasLength(1));
+      final payload = repo.saveCalls.first;
+      expect(payload['city'], 'Bogotá', reason: 'city edit must persist');
+      expect(payload['phone'], '3109876543');
+      expect(
+        payload.containsKey('emergencyName'),
+        isFalse,
+        reason: 'empty emergency name must be skipped (optional)',
+      );
+      expect(
+        payload.containsKey('emergencyPhone'),
+        isFalse,
+        reason: 'empty emergency phone must be skipped (optional)',
+      );
+    },
+  );
+
+  testWidgets('form contains no cédula/documento field (OP-R2)', (
+    tester,
+  ) async {
     final repo = MockProfileRepository(row: Map.of(_profileRow));
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-        find.widgetWithText(TextFormField, 'Yamaha MT-07'), 'Ducati Monster');
-    await tester.tap(find.text('GUARDAR'));
-    await tester.pumpAndSettle();
-
-    expect(repo.saveCalls, hasLength(1),
-        reason: 'save must call saveProfile exactly once');
-    final payload = repo.saveCalls.first;
-    expect(payload['bikeModel'], 'Ducati Monster');
-    expect(payload['fullName'], 'Ana María');
-    expect(payload['city'], 'Medellín');
-
-    // Next fetchProfile returns the updated value (spec OP-R3).
-    final updated = await repo.fetchProfile('user-1');
-    expect(updated?['bike_model'], 'Ducati Monster',
-        reason: 'next fetchProfile must reflect the persisted edit');
-  });
-
-  testWidgets('change city+phone, emergency empty → no validation error (OP-R3)',
-      (tester) async {
-    final repo = MockProfileRepository(row: Map.of(_profileRow));
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-        find.widgetWithText(TextFormField, 'Medellín'), 'Bogotá');
-    await tester.enterText(
-        find.widgetWithText(TextFormField, '3001234567'), '3109876543');
-    // Emergency fields: clear them (leave empty).
-    await tester.enterText(
-        find.widgetWithText(TextFormField, 'Juan'), '');
-    await tester.enterText(
-        find.widgetWithText(TextFormField, '3017654321'), '');
-    await tester.tap(find.text('GUARDAR'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Requerido'), findsNothing,
-        reason: 'emergency fields are optional — empty must not block save');
-    expect(repo.saveCalls, hasLength(1));
-    final payload = repo.saveCalls.first;
-    expect(payload['city'], 'Bogotá', reason: 'city edit must persist');
-    expect(payload['phone'], '3109876543');
-    expect(payload.containsKey('emergencyName'), isFalse,
-        reason: 'empty emergency name must be skipped (optional)');
-    expect(payload.containsKey('emergencyPhone'), isFalse,
-        reason: 'empty emergency phone must be skipped (optional)');
-  });
-
-  testWidgets('form contains no cédula/documento field (OP-R2)', (tester) async {
-    final repo = MockProfileRepository(row: Map.of(_profileRow));
-    await tester.pumpWidget(_wrap(
-      repository: repo,
-      client: FakeSupabaseClient(currentUser: _user()),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        repository: repo,
+        client: FakeSupabaseClient(currentUser: _user()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final identityPatterns = [
@@ -207,8 +247,11 @@ void main() {
     ];
     for (final text in tester.widgetList<Text>(find.byType(Text))) {
       for (final p in identityPatterns) {
-        expect(p.hasMatch(text.data ?? ''), isFalse,
-            reason: 'edit form must not reference an identity document');
+        expect(
+          p.hasMatch(text.data ?? ''),
+          isFalse,
+          reason: 'edit form must not reference an identity document',
+        );
       }
     }
   });

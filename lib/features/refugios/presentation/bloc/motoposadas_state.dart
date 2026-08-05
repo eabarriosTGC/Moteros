@@ -34,14 +34,29 @@ final class MotoposadaModel {
   final int hostBadges;
 
   const MotoposadaModel({
-    required this.id, required this.userId, required this.type,
-    required this.title, this.description = '', this.rules = '',
-    required this.lat, required this.lng, this.address = '',
-    this.photos = const [], this.maxGuests = 1, this.isActive = true,
-    this.visibility = 'public', this.targetClanId,
-    required this.createdAt, this.hostName, this.hostLevel,
-    this.poiType = 'standard', this.isTourist = false, this.city,
-    this.hostMemberSince, this.hostKm = 0, this.hostTrips = 0,
+    required this.id,
+    required this.userId,
+    required this.type,
+    required this.title,
+    this.description = '',
+    this.rules = '',
+    required this.lat,
+    required this.lng,
+    this.address = '',
+    this.photos = const [],
+    this.maxGuests = 1,
+    this.isActive = true,
+    this.visibility = 'public',
+    this.targetClanId,
+    required this.createdAt,
+    this.hostName,
+    this.hostLevel,
+    this.poiType = 'standard',
+    this.isTourist = false,
+    this.city,
+    this.hostMemberSince,
+    this.hostKm = 0,
+    this.hostTrips = 0,
     this.hostBadges = 0,
   });
 
@@ -85,13 +100,21 @@ final class MotoposadaModel {
     );
   }
 
-  String get typeLabel => type == 'casa' ? 'Casa' : type == 'parqueadero' ? 'Parqueadero' : 'Garage';
+  String get typeLabel => type == 'casa'
+      ? 'Casa'
+      : type == 'parqueadero'
+      ? 'Parqueadero'
+      : 'Garage';
   String get visibilityLabel {
     switch (visibility) {
-      case 'public': return 'Público';
-      case 'clan_only': return 'Solo mi clan';
-      case 'clan_specific': return 'Clan específico';
-      default: return visibility;
+      case 'public':
+        return 'Público';
+      case 'clan_only':
+        return 'Solo mi clan';
+      case 'clan_specific':
+        return 'Clan específico';
+      default:
+        return visibility;
     }
   }
 }
@@ -112,11 +135,19 @@ final class MotoposadaRequestModel {
   final String? motoposadaTitle;
 
   const MotoposadaRequestModel({
-    required this.id, required this.motoposadaId, required this.guestId,
-    required this.checkIn, required this.checkOut,
-    this.guestCount = 1, this.message = '', this.status = 'pending',
-    required this.createdAt, this.guestName, this.guestLevel,
-    this.guestTrustScore, this.motoposadaTitle,
+    required this.id,
+    required this.motoposadaId,
+    required this.guestId,
+    required this.checkIn,
+    required this.checkOut,
+    this.guestCount = 1,
+    this.message = '',
+    this.status = 'pending',
+    required this.createdAt,
+    this.guestName,
+    this.guestLevel,
+    this.guestTrustScore,
+    this.motoposadaTitle,
   });
 
   factory MotoposadaRequestModel.fromMap(Map<String, dynamic> m) {
@@ -143,29 +174,34 @@ final class MotoposadaRequestModel {
 
 sealed class MotoposadasState extends Equatable {
   const MotoposadasState();
-  @override List<Object?> get props => [];
+  @override
+  List<Object?> get props => [];
 }
 
 final class MotoposadasInitial extends MotoposadasState {}
+
 final class MotoposadasLoading extends MotoposadasState {}
 
 final class MotoposadasLoaded extends MotoposadasState {
   final List<MotoposadaModel> motoposadas;
   const MotoposadasLoaded({required this.motoposadas});
-  @override List<Object?> get props => [motoposadas];
+  @override
+  List<Object?> get props => [motoposadas];
 }
 
 final class MyMotoposadasLoaded extends MotoposadasState {
   final List<MotoposadaModel> motoposadas;
   const MyMotoposadasLoaded({required this.motoposadas});
-  @override List<Object?> get props => [motoposadas];
+  @override
+  List<Object?> get props => [motoposadas];
 }
 
 final class RequestsLoaded extends MotoposadasState {
   final List<MotoposadaRequestModel> requests;
   final bool isHost;
   const RequestsLoaded({required this.requests, this.isHost = false});
-  @override List<Object?> get props => [requests, isHost];
+  @override
+  List<Object?> get props => [requests, isHost];
 }
 
 final class MotoposadaCreated extends MotoposadasState {
@@ -196,13 +232,15 @@ final class ReviewSubmitted extends MotoposadasState {
 final class MotoposadasError extends MotoposadasState {
   final String message;
   const MotoposadasError(this.message);
-  @override List<Object?> get props => [message];
+  @override
+  List<Object?> get props => [message];
 }
 
 final class TouristPoiCreated extends MotoposadasState {
   final int id;
   const TouristPoiCreated(this.id);
-  @override List<Object?> get props => [id];
+  @override
+  List<Object?> get props => [id];
 }
 
 final class TouristPoiForbidden extends MotoposadasState {

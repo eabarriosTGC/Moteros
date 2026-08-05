@@ -11,8 +11,7 @@ import 'package:moteros_app/features/trust/domain/models/trust_signals.dart';
 
 void main() {
   group('TrustSignals.fromJoinedUserRow (TS-R1)', () {
-    test(
-        'maps created_at/trips/km/badges — each equals its source row, '
+    test('maps created_at/trips/km/badges — each equals its source row, '
         'memberSinceLabel in Spanish', () {
       final signals = TrustSignals.fromJoinedUserRow(
         {
@@ -27,12 +26,18 @@ void main() {
 
       expect(signals.memberSince?.year, 2023);
       expect(signals.memberSince?.month, 8);
-      expect(signals.memberSinceLabel, 'Miembro desde ago 2023',
-          reason: 'Spanish lowercase month abbreviation, per spec TS-R1');
+      expect(
+        signals.memberSinceLabel,
+        'Miembro desde ago 2023',
+        reason: 'Spanish lowercase month abbreviation, per spec TS-R1',
+      );
       expect(signals.trips, 4);
       expect(signals.km, 1250, reason: 'km must equal user_xp.km_traveled');
-      expect(signals.badges, 2,
-          reason: 'badges must equal the user_achievements count embed');
+      expect(
+        signals.badges,
+        2,
+        reason: 'badges must equal the user_achievements count embed',
+      );
     });
 
     test('zero-data edge: null row → 0 trips/km/badges, empty label', () {
@@ -58,20 +63,20 @@ void main() {
       expect(signals.badges, 0, reason: 'empty achievements must be 0');
     });
 
-    test('km rounds to integer; count embed via user_achievements[0].count', () {
-      final signals = TrustSignals.fromJoinedUserRow(
-        {
+    test(
+      'km rounds to integer; count embed via user_achievements[0].count',
+      () {
+        final signals = TrustSignals.fromJoinedUserRow({
           'user_xp': {'km_traveled': 1250.7},
           'user_achievements': [
             {'count': 3},
           ],
-        },
-        trips: 7,
-      );
+        }, trips: 7);
 
-      expect(signals.km, 1251, reason: 'km must round (PostgREST num → int)');
-      expect(signals.badges, 3);
-      expect(signals.trips, 7);
-    });
+        expect(signals.km, 1251, reason: 'km must round (PostgREST num → int)');
+        expect(signals.badges, 3);
+        expect(signals.trips, 7);
+      },
+    );
   });
 }

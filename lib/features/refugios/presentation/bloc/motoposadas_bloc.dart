@@ -17,8 +17,8 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
   final SupabaseClient? _injectedClient;
 
   MotoposadasBloc({SupabaseClient? client})
-      : _injectedClient = client,
-        super(MotoposadasInitial()) {
+    : _injectedClient = client,
+      super(MotoposadasInitial()) {
     on<LoadMotoposadas>(_onLoad);
     on<LoadMyMotoposadas>(_onLoadMy);
     on<LoadMotoposadaRequests>(_onLoadRequests);
@@ -38,36 +38,46 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
   /// Batched trip counts (F-M13): one `get_trip_counts` RPC for all host
   /// ids. Count-only SECURITY DEFINER — never returns GPS rows.
   Future<Map<String, int>> _fetchTripsByHost(List<dynamic> rows) async {
-    final hostIds =
-        rows.map((r) => (r as Map)['user_id'] as String).toSet().toList();
+    final hostIds = rows
+        .map((r) => (r as Map)['user_id'] as String)
+        .toSet()
+        .toList();
     if (hostIds.isEmpty) return const {};
-    final resp = await _db.rpc('get_trip_counts', params: {
-      'user_ids': hostIds,
-    });
+    final resp = await _db.rpc(
+      'get_trip_counts',
+      params: {'user_ids': hostIds},
+    );
     return {
       for (final row in (resp as List))
-        (row as Map)['user_id'] as String: ((row['trips'] as num?) ?? 0).toInt(),
+        (row as Map)['user_id'] as String: ((row['trips'] as num?) ?? 0)
+            .toInt(),
     };
   }
 
-  Future<void> _onLoad(LoadMotoposadas event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onLoad(
+    LoadMotoposadas event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       // Fetch public + visible motoposadas with host info + public signals.
       final resp = await _db
           .from('motoposadas')
           .select(
-              '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))')
+            '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
+          )
           .eq('is_active', true)
           .order('created_at', ascending: false);
 
       final rows = resp as List;
       final tripsByHost = await _fetchTripsByHost(rows);
       final list = rows
-          .map((m) => MotoposadaModel.fromMap(
-                m as Map<String, dynamic>,
-                tripsByHost: tripsByHost,
-              ))
+          .map(
+            (m) => MotoposadaModel.fromMap(
+              m as Map<String, dynamic>,
+              tripsByHost: tripsByHost,
+            ),
+          )
           .toList();
       emit(MotoposadasLoaded(motoposadas: list));
     } catch (e) {
@@ -75,23 +85,29 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onLoadMy(LoadMyMotoposadas event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onLoadMy(
+    LoadMyMotoposadas event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       final resp = await _db
           .from('motoposadas')
           .select(
-              '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))')
+            '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
+          )
           .eq('user_id', _uid!)
           .order('created_at', ascending: false);
 
       final rows = resp as List;
       final tripsByHost = await _fetchTripsByHost(rows);
       final list = rows
-          .map((m) => MotoposadaModel.fromMap(
-                m as Map<String, dynamic>,
-                tripsByHost: tripsByHost,
-              ))
+          .map(
+            (m) => MotoposadaModel.fromMap(
+              m as Map<String, dynamic>,
+              tripsByHost: tripsByHost,
+            ),
+          )
           .toList();
       emit(MyMotoposadasLoaded(motoposadas: list));
     } catch (e) {
@@ -99,54 +115,76 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onLoadRequests(LoadMotoposadaRequests event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onLoadRequests(
+    LoadMotoposadaRequests event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select('*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title)')
+          .select(
+            '*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title)',
+          )
           .eq('motoposada_id', event.motoposadaId)
           .order('created_at', ascending: false);
 
-      final list = (resp as List).map((m) => MotoposadaRequestModel.fromMap(m as Map<String, dynamic>)).toList();
+      final list = (resp as List)
+          .map((m) => MotoposadaRequestModel.fromMap(m as Map<String, dynamic>))
+          .toList();
       emit(RequestsLoaded(requests: list, isHost: true));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
   }
 
-  Future<void> _onLoadMyRequests(LoadMyRequests event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onLoadMyRequests(
+    LoadMyRequests event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select('*, motoposadas!inner(title), guests!inner(username, user_xp!inner(level, trust_score))')
+          .select(
+            '*, motoposadas!inner(title), guests!inner(username, user_xp!inner(level, trust_score))',
+          )
           .eq('guest_id', _uid!)
           .order('created_at', ascending: false);
 
-      final list = (resp as List).map((m) => MotoposadaRequestModel.fromMap(m as Map<String, dynamic>)).toList();
+      final list = (resp as List)
+          .map((m) => MotoposadaRequestModel.fromMap(m as Map<String, dynamic>))
+          .toList();
       emit(RequestsLoaded(requests: list, isHost: false));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
   }
 
-  Future<void> _onCreate(CreateMotoposada event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onCreate(
+    CreateMotoposada event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
-      final resp = await _db.from('motoposadas').insert({
-        'user_id': _uid,
-        'type': event.type,
-        'title': event.title,
-        'description': event.description,
-        'rules': event.rules,
-        'lat': event.lat,
-        'lng': event.lng,
-        'address': event.address,
-        'max_guests': event.maxGuests,
-        'visibility': event.visibility,
-        if (event.targetClanId != null) 'target_clan_id': event.targetClanId,
-      }).select().single();
+      final resp = await _db
+          .from('motoposadas')
+          .insert({
+            'user_id': _uid,
+            'type': event.type,
+            'title': event.title,
+            'description': event.description,
+            'rules': event.rules,
+            'lat': event.lat,
+            'lng': event.lng,
+            'address': event.address,
+            'max_guests': event.maxGuests,
+            'visibility': event.visibility,
+            if (event.targetClanId != null)
+              'target_clan_id': event.targetClanId,
+          })
+          .select()
+          .single();
 
       emit(MotoposadaCreated(resp['id'] as int));
     } catch (e) {
@@ -154,25 +192,35 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onUpdate(UpdateMotoposada event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onUpdate(
+    UpdateMotoposada event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
-      await _db.from('motoposadas').update({
-        'title': event.title,
-        'description': event.description,
-        'rules': event.rules,
-        'max_guests': event.maxGuests,
-        'visibility': event.visibility,
-        if (event.targetClanId != null) 'target_clan_id': event.targetClanId,
-        'is_active': event.isActive,
-      }).eq('id', event.id);
+      await _db
+          .from('motoposadas')
+          .update({
+            'title': event.title,
+            'description': event.description,
+            'rules': event.rules,
+            'max_guests': event.maxGuests,
+            'visibility': event.visibility,
+            if (event.targetClanId != null)
+              'target_clan_id': event.targetClanId,
+            'is_active': event.isActive,
+          })
+          .eq('id', event.id);
       emit(const MotoposadaUpdated());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
   }
 
-  Future<void> _onSendRequest(SendMotoposadaRequest event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onSendRequest(
+    SendMotoposadaRequest event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       await _db.from('motoposada_requests').insert({
@@ -189,13 +237,19 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onRespond(RespondToRequest event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onRespond(
+    RespondToRequest event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
-      await _db.from('motoposada_requests').update({
-        'status': event.status,
-        'host_response_at': DateTime.now().toIso8601String(),
-      }).eq('id', event.requestId);
+      await _db
+          .from('motoposada_requests')
+          .update({
+            'status': event.status,
+            'host_response_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', event.requestId);
 
       // If rejected, penalize guest trust_score if malicious pattern detected
       emit(const RequestResponded());
@@ -204,7 +258,10 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onSubmitReview(SubmitReview event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onSubmitReview(
+    SubmitReview event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       await _db.from('motoposada_reviews').insert({
@@ -222,15 +279,18 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
       final trustDelta = event.rating >= 4 ? 2 : (event.rating <= 2 ? -2 : 0);
       if (trustDelta != 0) {
         try {
-          final current = await _db.from('user_xp')
+          final current = await _db
+              .from('user_xp')
               .select('trust_score')
               .eq('user_id', event.toUserId)
               .maybeSingle();
           if (current != null) {
-            final newScore = ((current['trust_score'] as int?) ?? 50) + trustDelta;
-            await _db.from('user_xp').update({
-              'trust_score': newScore.clamp(0, 100),
-            }).eq('user_id', event.toUserId);
+            final newScore =
+                ((current['trust_score'] as int?) ?? 50) + trustDelta;
+            await _db
+                .from('user_xp')
+                .update({'trust_score': newScore.clamp(0, 100)})
+                .eq('user_id', event.toUserId);
           }
         } catch (_) {}
       }
@@ -241,7 +301,10 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onDelete(DeleteMotoposada event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onDelete(
+    DeleteMotoposada event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       await _db.from('motoposadas').delete().eq('id', event.id);
@@ -251,7 +314,10 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  Future<void> _onCreateTouristPoi(CreateTouristPoi event, Emitter<MotoposadasState> emit) async {
+  Future<void> _onCreateTouristPoi(
+    CreateTouristPoi event,
+    Emitter<MotoposadasState> emit,
+  ) async {
     emit(MotoposadasLoading());
     try {
       // 1. Check curator status from profiles table
@@ -271,22 +337,26 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
       }
 
       // 3. Insert tourist POI — auto-approved
-      final resp = await _db.from('motoposadas').insert({
-        'user_id': _uid,
-        'type': event.type,
-        'title': event.title,
-        'description': event.description,
-        'rules': event.rules,
-        'lat': event.lat,
-        'lng': event.lng,
-        'address': event.address,
-        'poi_type': 'tourist',
-        'is_tourist': true,
-        'city': event.city,
-        'is_approved': true,
-        'visibility': 'public',
-        'max_guests': 0,
-      }).select().single();
+      final resp = await _db
+          .from('motoposadas')
+          .insert({
+            'user_id': _uid,
+            'type': event.type,
+            'title': event.title,
+            'description': event.description,
+            'rules': event.rules,
+            'lat': event.lat,
+            'lng': event.lng,
+            'address': event.address,
+            'poi_type': 'tourist',
+            'is_tourist': true,
+            'city': event.city,
+            'is_approved': true,
+            'visibility': 'public',
+            'max_guests': 0,
+          })
+          .select()
+          .single();
 
       emit(TouristPoiCreated(resp['id'] as int));
     } catch (e) {

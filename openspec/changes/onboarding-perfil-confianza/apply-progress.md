@@ -12,6 +12,28 @@
   - 2.3-2.4: onboarding_screen.dart rework (full_name prefill metadata + city, 3 validadores, phone/emergency opcionales, saveProfile, sin onboarding_complete write, terms intacto, client/repository inyectables) + 4 widget tests GREEN
 - Fases 3-6: PENDIENTES (2.5 no-cédula guard + tasks 3.1-6.3)
 
+## Fase 2.5 + 3-6 (continuación #3 + retoma orquestador)
+
+- 2.5: no_cedula_guard_test.dart GREEN (2/2: formulario onboarding sin cédula + payload saveProfile sin clave identidad) — commit b81fa94 junto a Fase 3
+- Fase 3 COMPLETA — commit b81fa94: ProfileEditScreen + entry EDITAR PERFIL en ProfileScreen + guard parte 2
+- Fase 4 COMPLETA — commit 6e22fe1: TrustSignals model + TrustSignalsRow (capa pura, sin trust_score por construcción)
+- Fase 5 COMPLETA — commit 109a5b6 (retomada inline por orquestador tras 2º max_iterations):
+  - ExplorarDatasource + MotoposadasBloc joins extendidos + batch get_trip_counts RPC
+  - MotoposadaModel host signals; host card + RaidCard con TrustSignalsRow
+  - Tests: 14 nuevos (RLS regression, model parse, TS-R4, TS-R5, TS-R3 sweep)
+- Fase 6 COMPLETA: flutter test 166/166 OK (baseline 115), analyze limpio en archivos del cambio (solo 3 warnings pre-existentes de main), dart format aplicado
+
+## Fixes del orquestador al retomar (Fase 5)
+
+- signals_test: fake #rpc devolvía Future.value → TypeError (call site tipa PostgrestFilterBuilder); corregido resolviendo vía FakeFilterBuilder #then (patrón raid_bloc_test)
+- DateTime zone: created_at .000Z parsea UTC → tests comparan con DateTime.utc
+- detail_signals_test: FakeAsync hang (Future.delayed sin pump) → patrón _SeededBloc con emit
+- raid_card.dart: variable signals huérfana tras refactor inline (analyze)
+
+## Pendiente
+
+- sdd-verify (gatekeeper fresh-context del diff completo) + sdd-archive
+
 ## Fixes del orquestador al retomar
 
 - SingleChildWidget no está en provider.dart (provider no lo re-exporta): vive en package:nested/nested.dart → pubspec dev_dependencies + nested: ^1.0.0; import corregido en onboarding_gate_test.dart

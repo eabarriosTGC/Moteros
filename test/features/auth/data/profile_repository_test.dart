@@ -16,7 +16,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// `upsert` payloads / `select` strings / `eq` filters for verification.
 class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
   FakeFilterBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
@@ -35,8 +35,9 @@ class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
     if (invocation.memberName == #then) {
       if (error != null) throw error!;
       final onValue = invocation.positionalArguments.first as dynamic;
-      return Future.value(result)
-          .then((_) => onValue(result ?? const <Map<String, dynamic>>[]));
+      return Future.value(
+        result,
+      ).then((_) => onValue(result ?? const <Map<String, dynamic>>[]));
     }
     return this;
   }
@@ -45,7 +46,7 @@ class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
 /// Answers `maybeSingle()` — awaitable through its `then`.
 class FakeTransformBuilder<T> implements PostgrestTransformBuilder<T> {
   FakeTransformBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
@@ -65,14 +66,17 @@ class FakeTransformBuilder<T> implements PostgrestTransformBuilder<T> {
 
 class FakeQueryBuilder implements SupabaseQueryBuilder {
   FakeQueryBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
   final List<Invocation> recorder;
 
-  late final FakeFilterBuilder filter =
-      FakeFilterBuilder(result: result, error: error, recorder: recorder);
+  late final FakeFilterBuilder filter = FakeFilterBuilder(
+    result: result,
+    error: error,
+    recorder: recorder,
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
@@ -114,10 +118,7 @@ class FakeSupabaseClient implements SupabaseClient {
     calls.add(invocation);
     if (invocation.memberName == #from) {
       final table = invocation.positionalArguments.first as String;
-      return tables.putIfAbsent(
-        table,
-        () => FakeQueryBuilder(recorder: calls),
-      );
+      return tables.putIfAbsent(table, () => FakeQueryBuilder(recorder: calls));
     }
     if (invocation.memberName == #auth) {
       return FakeAuth(user: currentUser, recorder: calls);
@@ -129,41 +130,52 @@ class FakeSupabaseClient implements SupabaseClient {
 // ── Fixtures ──
 
 User _user({String id = 'user-1'}) => User(
-      id: id,
-      appMetadata: const {},
-      userMetadata: const {},
-      aud: 'authenticated',
-      createdAt: '2023-01-01T00:00:00.000Z',
-    );
+  id: id,
+  appMetadata: const {},
+  userMetadata: const {},
+  aud: 'authenticated',
+  createdAt: '2023-01-01T00:00:00.000Z',
+);
 
 void main() {
   group('ProfileRepository.saveProfile (OP-R3/OP-R4)', () {
     test(
-        'upsert payload always has id/full_name/bike_model/city, trimmed',
-        () async {
-      final client = FakeSupabaseClient(currentUser: _user());
-      final repo = ProfileRepository(client: client);
+      'upsert payload always has id/full_name/bike_model/city, trimmed',
+      () async {
+        final client = FakeSupabaseClient(currentUser: _user());
+        final repo = ProfileRepository(client: client);
 
-      await repo.saveProfile(
-        userId: 'user-1',
-        fullName: '  Ana María  ',
-        bikeModel: '  Yamaha MT-07  ',
-        city: '  Medellín  ',
-      );
+        await repo.saveProfile(
+          userId: 'user-1',
+          fullName: '  Ana María  ',
+          bikeModel: '  Yamaha MT-07  ',
+          city: '  Medellín  ',
+        );
 
-      final upserts =
-          client.calls.where((c) => c.memberName == #upsert).toList();
-      expect(upserts, hasLength(1),
-          reason: 'saveProfile must upsert to users exactly once');
-      final payload =
-          upserts.first.positionalArguments.first as Map<String, dynamic>;
-      expect(payload['id'], 'user-1');
-      expect(payload['full_name'], 'Ana María',
-          reason: 'full_name must be trimmed');
-      expect(payload['bike_model'], 'Yamaha MT-07',
-          reason: 'bike_model must be trimmed');
-      expect(payload['city'], 'Medellín', reason: 'city must be trimmed');
-    });
+        final upserts = client.calls
+            .where((c) => c.memberName == #upsert)
+            .toList();
+        expect(
+          upserts,
+          hasLength(1),
+          reason: 'saveProfile must upsert to users exactly once',
+        );
+        final payload =
+            upserts.first.positionalArguments.first as Map<String, dynamic>;
+        expect(payload['id'], 'user-1');
+        expect(
+          payload['full_name'],
+          'Ana María',
+          reason: 'full_name must be trimmed',
+        );
+        expect(
+          payload['bike_model'],
+          'Yamaha MT-07',
+          reason: 'bike_model must be trimmed',
+        );
+        expect(payload['city'], 'Medellín', reason: 'city must be trimmed');
+      },
+    );
 
     test('optional keys omitted when null/empty (OP-R4)', () async {
       final client = FakeSupabaseClient(currentUser: _user());
@@ -179,16 +191,26 @@ void main() {
         emergencyPhone: '',
       );
 
-      final upserts =
-          client.calls.where((c) => c.memberName == #upsert).toList();
+      final upserts = client.calls
+          .where((c) => c.memberName == #upsert)
+          .toList();
       final payload =
           upserts.first.positionalArguments.first as Map<String, dynamic>;
-      expect(payload.containsKey('phone'), isFalse,
-          reason: 'whitespace-only phone must be skipped (OP-R4)');
-      expect(payload.containsKey('emergency_contact_name'), isFalse,
-          reason: 'null emergency name must be skipped');
-      expect(payload.containsKey('emergency_contact_phone'), isFalse,
-          reason: 'empty emergency phone must be skipped');
+      expect(
+        payload.containsKey('phone'),
+        isFalse,
+        reason: 'whitespace-only phone must be skipped (OP-R4)',
+      );
+      expect(
+        payload.containsKey('emergency_contact_name'),
+        isFalse,
+        reason: 'null emergency name must be skipped',
+      );
+      expect(
+        payload.containsKey('emergency_contact_phone'),
+        isFalse,
+        reason: 'empty emergency phone must be skipped',
+      );
       // The 3 required fields are still present.
       expect(payload['full_name'], 'Ana');
       expect(payload['bike_model'], 'MT-07');
@@ -209,8 +231,9 @@ void main() {
         emergencyPhone: ' 3017654321 ',
       );
 
-      final upserts =
-          client.calls.where((c) => c.memberName == #upsert).toList();
+      final upserts = client.calls
+          .where((c) => c.memberName == #upsert)
+          .toList();
       final payload =
           upserts.first.positionalArguments.first as Map<String, dynamic>;
       expect(payload['phone'], '3001234567');
@@ -218,31 +241,44 @@ void main() {
       expect(payload['emergency_contact_phone'], '3017654321');
     });
 
-    test('auth.updateUser mirrors full_name only (no onboarding_complete)',
-        () async {
-      final client = FakeSupabaseClient(currentUser: _user());
-      final repo = ProfileRepository(client: client);
+    test(
+      'auth.updateUser mirrors full_name only (no onboarding_complete)',
+      () async {
+        final client = FakeSupabaseClient(currentUser: _user());
+        final repo = ProfileRepository(client: client);
 
-      await repo.saveProfile(
-        userId: 'user-1',
-        fullName: 'Ana María',
-        bikeModel: 'MT-07',
-        city: 'Medellín',
-      );
+        await repo.saveProfile(
+          userId: 'user-1',
+          fullName: 'Ana María',
+          bikeModel: 'MT-07',
+          city: 'Medellín',
+        );
 
-      final updateUserCalls =
-          client.calls.where((c) => c.memberName == #updateUser).toList();
-      expect(updateUserCalls, hasLength(1),
-          reason: 'metadata mirror must run exactly once');
-      final attrs = updateUserCalls.first.positionalArguments.first
-          as UserAttributes;
-      final data = (attrs.data as Map<String, dynamic>?) ?? const {};
-      expect(data, {'full_name': 'Ana María'},
-          reason: 'metadata must mirror full_name ONLY — the gate never '
-              'reads onboarding_complete (ADR-001)');
-      expect(data.containsKey('onboarding_complete'), isFalse,
-          reason: 'onboarding_complete metadata write must be dropped');
-    });
+        final updateUserCalls = client.calls
+            .where((c) => c.memberName == #updateUser)
+            .toList();
+        expect(
+          updateUserCalls,
+          hasLength(1),
+          reason: 'metadata mirror must run exactly once',
+        );
+        final attrs =
+            updateUserCalls.first.positionalArguments.first as UserAttributes;
+        final data = (attrs.data as Map<String, dynamic>?) ?? const {};
+        expect(
+          data,
+          {'full_name': 'Ana María'},
+          reason:
+              'metadata must mirror full_name ONLY — the gate never '
+              'reads onboarding_complete (ADR-001)',
+        );
+        expect(
+          data.containsKey('onboarding_complete'),
+          isFalse,
+          reason: 'onboarding_complete metadata write must be dropped',
+        );
+      },
+    );
   });
 
   group('ProfileRepository.fetchProfile (OP-R3)', () {
@@ -271,8 +307,9 @@ void main() {
       expect(row['emergency_contact_name'], 'Juan');
       expect(row['emergency_contact_phone'], '3017654321');
 
-      final selectCalls =
-          client.calls.where((c) => c.memberName == #select).toList();
+      final selectCalls = client.calls
+          .where((c) => c.memberName == #select)
+          .toList();
       expect(selectCalls, hasLength(1));
       final fields = selectCalls.first.positionalArguments.first as String;
       expect(fields, contains('full_name'));
@@ -282,10 +319,14 @@ void main() {
       expect(fields, contains('emergency_contact_name'));
       expect(fields, contains('emergency_contact_phone'));
 
-      final maybeSingleCalls =
-          client.calls.where((c) => c.memberName == #maybeSingle).toList();
-      expect(maybeSingleCalls, hasLength(1),
-          reason: 'fetchProfile must use maybeSingle (null row allowed)');
+      final maybeSingleCalls = client.calls
+          .where((c) => c.memberName == #maybeSingle)
+          .toList();
+      expect(
+        maybeSingleCalls,
+        hasLength(1),
+        reason: 'fetchProfile must use maybeSingle (null row allowed)',
+      );
     });
 
     test('returns null when the users row does not exist', () async {
@@ -298,8 +339,11 @@ void main() {
 
       final row = await repo.fetchProfile('missing-user');
 
-      expect(row, isNull,
-          reason: 'missing row must yield null — edit screen can handle it');
+      expect(
+        row,
+        isNull,
+        reason: 'missing row must yield null — edit screen can handle it',
+      );
     });
   });
 }

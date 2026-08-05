@@ -16,23 +16,25 @@ void main() {
       expect(isProfileComplete(fullName: '', bikeModel: '', city: ''), isFalse);
     });
 
-    test('metadata flag onboarding_complete=true with empty row (phantom) → false',
-        () {
-      // ADR-001: the boolean flag SHALL NOT satisfy the gate. The function
-      // has no parameter for the flag — presence of the flag in metadata must
-      // not change the outcome.
-      const phantomMetadata = <String, dynamic>{'onboarding_complete': true};
-      expect(phantomMetadata['onboarding_complete'], isTrue, reason: 'fixture sanity');
-      expect(
-        isProfileComplete(
-          fullName: null,
-          bikeModel: null,
-          city: null,
-        ),
-        isFalse,
-        reason: 'flag set but users row empty → incomplete',
-      );
-    });
+    test(
+      'metadata flag onboarding_complete=true with empty row (phantom) → false',
+      () {
+        // ADR-001: the boolean flag SHALL NOT satisfy the gate. The function
+        // has no parameter for the flag — presence of the flag in metadata must
+        // not change the outcome.
+        const phantomMetadata = <String, dynamic>{'onboarding_complete': true};
+        expect(
+          phantomMetadata['onboarding_complete'],
+          isTrue,
+          reason: 'fixture sanity',
+        );
+        expect(
+          isProfileComplete(fullName: null, bikeModel: null, city: null),
+          isFalse,
+          reason: 'flag set but users row empty → incomplete',
+        );
+      },
+    );
 
     test('null row (missing users row) → false', () {
       // maybeSingle() returns null when the row does not exist.
@@ -74,24 +76,23 @@ void main() {
 
     test('whitespace-only fields → false (values are trimmed)', () {
       expect(
-        isProfileComplete(
-          fullName: '   ',
-          bikeModel: ' ',
-          city: '\t',
-        ),
+        isProfileComplete(fullName: '   ', bikeModel: ' ', city: '\t'),
         isFalse,
       );
     });
 
-    test('values with surrounding whitespace → true (trimmed before check)', () {
-      expect(
-        isProfileComplete(
-          fullName: '  Ana María  ',
-          bikeModel: ' MT-07 ',
-          city: ' Medellín ',
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'values with surrounding whitespace → true (trimmed before check)',
+      () {
+        expect(
+          isProfileComplete(
+            fullName: '  Ana María  ',
+            bikeModel: ' MT-07 ',
+            city: ' Medellín ',
+          ),
+          isTrue,
+        );
+      },
+    );
   });
 }
