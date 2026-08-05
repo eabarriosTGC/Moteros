@@ -8,8 +8,16 @@ import 'package:moteros_app/features/routes/presentation/bloc/route_bloc.dart';
 import 'package:moteros_app/features/routes/presentation/bloc/route_event.dart';
 import 'package:moteros_app/features/routes/presentation/bloc/route_state.dart';
 import 'package:moteros_app/core/services/routing_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Fake RouteDatasource que devuelve datos controlados.
+/// Inyecta un SupabaseClient fake al super constructor para no depender
+/// de Supabase.instance (mismo patrón que raid_bloc_test).
+class FakeSupabaseClient implements SupabaseClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
 class FakeRouteDatasource extends RouteDatasource {
   final List<Map<String, dynamic>> _fakeRoutes;
   final Map<int, Map<String, dynamic>> _fakeDetails;
@@ -19,7 +27,8 @@ class FakeRouteDatasource extends RouteDatasource {
     List<Map<String, dynamic>>? routes,
     Map<int, Map<String, dynamic>>? details,
   })  : _fakeRoutes = routes ?? [],
-        _fakeDetails = details ?? {};
+        _fakeDetails = details ?? {},
+        super(client: FakeSupabaseClient());
 
   @override
   Future<List<Map<String, dynamic>>> getRoutes({
@@ -38,7 +47,9 @@ class FakeRouteDatasource extends RouteDatasource {
   @override
   Future<Map<String, dynamic>> getRoute(int routeId) async {
     if (shouldThrow) throw Exception('DB error');
-    return _fakeDetails[routeId] ?? throw Exception('Not found');
+    final detail = _fakeDetails[routeId];
+    if (detail == null) throw Exception('Not found');
+    return detail;
   }
 
   @override

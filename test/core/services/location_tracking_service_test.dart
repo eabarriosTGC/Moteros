@@ -14,10 +14,10 @@ void main() {
       final medellin = const LatLng(6.2476, -75.5658);
 
       final dist = LocationTrackingService.distanceM(bogota, medellin);
-      // La distancia real Bogotá-Medellín es ~240km
-      // Haversine da ~244km
-      expect(dist, greaterThan(240000));
-      expect(dist, lessThan(250000));
+      // Distancia real en línea recta Bogotá-Medellín ~237-240km
+      // Haversine con estas coordenadas da ~237.2km
+      expect(dist, greaterThan(235000));
+      expect(dist, lessThan(245000));
     });
 
     test('distanceKm es distanceM / 1000', () {
