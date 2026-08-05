@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'core/network/api_client.dart';
+import 'core/onboarding/profile_gate.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/design_tokens.dart';
 import 'core/theme/theme_cubit.dart';
@@ -90,7 +91,7 @@ class MoterosApp extends StatelessWidget {
                   return const SplashScreen();
                 }
                 if (state is Authenticated) {
-                  return const _AuthenticatedShell();
+                  return const AuthenticatedShell();
                 }
                 return const LoginScreen();
               },
@@ -102,16 +103,26 @@ class MoterosApp extends StatelessWidget {
   }
 }
 
-class _AuthenticatedShell extends StatefulWidget {
-  const _AuthenticatedShell();
+/// Gate state for the first-access profile check (F-M12, ADR-001).
+/// Decided by the ACTUAL users row (full_name/bike_model/city), never by the
+/// `onboarding_complete` metadata boolean.
+enum _GateState { loading, complete, incomplete, error }
+
+class AuthenticatedShell extends StatefulWidget {
+  /// Injectable for tests; defaults to the app-wide Supabase client.
+  final SupabaseClient? client;
+
+  const AuthenticatedShell({super.key, this.client});
 
   @override
-  State<_AuthenticatedShell> createState() => _AuthenticatedShellState();
+  State<AuthenticatedShell> createState() => _AuthenticatedShellState();
 }
 
-class _AuthenticatedShellState extends State<_AuthenticatedShell> {
+class _AuthenticatedShellState extends State<AuthenticatedShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool? _onboardingComplete;
+  _GateState _gateState = _GateState.loading;
+
+  SupabaseClient get _db => widget.client ?? Supabase.instance.client;
 
   @override
   void initState() {
@@ -119,25 +130,47 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
     _checkOnboarding();
   }
 
+  /// Queries the users row and derives gate state from real field presence.
+  /// Row missing (null) → incomplete (onboarding upsert recreates it).
   Future<void> _checkOnboarding() async {
-    final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
-    final done = meta?['onboarding_complete'] == true;
-    if (mounted) setState(() => _onboardingComplete = done);
+    if (_gateState != _GateState.loading) {
+      setState(() => _gateState = _GateState.loading);
+    }
+    try {
+      final row = await _db
+          .from('users')
+          .select('full_name, bike_model, city')
+          .eq('id', _db.auth.currentUser!.id)
+          .maybeSingle();
+      final complete = isProfileComplete(
+        fullName: row?['full_name'] as String?,
+        bikeModel: row?['bike_model'] as String?,
+        city: row?['city'] as String?,
+      );
+      if (mounted) {
+        setState(() =>
+            _gateState = complete ? _GateState.complete : _GateState.incomplete);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _gateState = _GateState.error);
+    }
   }
 
   Future<void> _showOnboarding() async {
-    final result = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const OnboardingScreen()),
     );
-    if (result == true && mounted) {
-      setState(() => _onboardingComplete = true);
+    // Re-query the users row on return — the query result IS the state.
+    // NEVER setState(true) here (phantom-flag bug class, ADR-001).
+    if (mounted) {
+      await _checkOnboarding();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Onboarding gate — show onboarding if not yet completed
-    if (_onboardingComplete == false) {
+    // Onboarding gate — show onboarding if profile fields are incomplete
+    if (_gateState == _GateState.incomplete) {
       // Show onboarding in a non-blocking way
       Future.microtask(() {
         if (mounted) _showOnboarding();
@@ -149,10 +182,53 @@ class _AuthenticatedShellState extends State<_AuthenticatedShell> {
     }
 
     // Still loading onboarding status
-    if (_onboardingComplete == null) {
+    if (_gateState == _GateState.loading) {
       return const Scaffold(
         backgroundColor: Color(0xFF0A0A0F),
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Gate query failed (network/RLS) — retry, never loop silently
+    if (_gateState == _GateState.error) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0A0A0F),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'No pudimos verificar tu perfil',
+                  style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Revisá tu conexión e intentá de nuevo',
+                  style:
+                      AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ElevatedButton(
+                  onPressed: _checkOnboarding,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textOnAmber,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.mdCircular,
+                    ),
+                  ),
+                  child: const Text('REINTENTAR'),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

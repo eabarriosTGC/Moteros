@@ -66,6 +66,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # SingleChildWidget (lista tipada de providers en tests de widgets);
+  # transitiva de provider/flutter_bloc, declarada para uso directo en tests.
+  nested: ^1.0.0
 
   bloc_test: ^10.0.0
   mocktail: ^1.0.0
