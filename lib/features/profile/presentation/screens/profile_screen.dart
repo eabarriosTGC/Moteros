@@ -1,5 +1,9 @@
 /// ProfileScreen — lightweight wrapper that embeds ShowcaseProfileScreen
 /// and keeps the logout button in the AppBar.
+///
+/// OP-R3: the AppBar exposes "EDITAR PERFIL", which pushes ProfileEditScreen
+/// (editable profile fields). The onboarding gate is NOT re-run on save —
+/// the next app start re-queries the users row (spec OP-R3).
 library;
 
 import 'package:flutter/material.dart';
@@ -9,6 +13,7 @@ import '../../../../core/theme/app_icons.dart';
 import '../../../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../../../features/auth/presentation/bloc/auth_event.dart';
 import '../../../showcase/presentation/screens/showcase_profile_screen.dart';
+import 'profile_edit_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -32,6 +37,23 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          // OP-R3: editable profile fields entry.
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
+              );
+            },
+            child: const Text(
+              'EDITAR PERFIL',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(AppIcons.settings, color: AppColors.textMuted),
             onPressed: () {
