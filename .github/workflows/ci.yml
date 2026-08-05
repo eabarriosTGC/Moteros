@@ -1,0 +1,22 @@
+name: CI — Migration content guard
+
+# The SQL blur floor (≥300 m, M-MAPA-1) is the security boundary for the
+# casa_motero feature and has no pgTAP infra in this repo. This guard greps
+# the migration file directly so CI fails if the floor or its haversine check
+# is ever removed from 026_casa_motero.sql.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  migration-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Migration 026 must enforce the ≥300 m blur floor (haversine)
+        run: grep -q 'haversine_distance' supabase/migrations/026_casa_motero.sql
+
+      - name: Migration 026 must keep the server-side < 300 rejection
+        run: grep -q '< 300' supabase/migrations/026_casa_motero.sql
