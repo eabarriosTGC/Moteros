@@ -1,15 +1,35 @@
 /// OnboardingScreen — mandatory profile completion for new users.
 /// Shown once after registration. Must complete to access the app.
+///
+/// OP-R4: only full_name, bike_model and city are required; phone and
+/// emergency contact are optional (no 'Requerido' validators). Submit goes
+/// through ProfileRepository (shared persistence path with profile edit);
+/// the `onboarding_complete` metadata boolean is no longer written
+/// (ADR-001 — the gate reads real field presence).
 library;
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../auth/data/repositories/profile_repository.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final String? inviteCode;
   final String? clubName;
-  const OnboardingScreen({super.key, this.inviteCode, this.clubName});
+
+  /// Injectable for tests; defaults to the app-wide Supabase client.
+  final SupabaseClient? client;
+
+  /// Injectable for tests; defaults to a repo over [client].
+  final ProfileRepository? repository;
+
+  const OnboardingScreen({
+    super.key,
+    this.inviteCode,
+    this.clubName,
+    this.client,
+    this.repository,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -17,19 +37,37 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emergencyNameCtrl = TextEditingController();
   final _emergencyPhoneCtrl = TextEditingController();
   final _bikeCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
   bool _acceptedTerms = false;
   bool _saving = false;
 
+  SupabaseClient get _client => widget.client ?? Supabase.instance.client;
+  ProfileRepository get _repository =>
+      widget.repository ?? ProfileRepository(client: _client);
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill full_name from auth metadata (Google/email OAuth display name).
+    final metaName = _client.auth.currentUser?.userMetadata?['full_name']
+            as String? ??
+        '';
+    _nameCtrl.text = metaName;
+  }
+
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _emergencyNameCtrl.dispose();
     _emergencyPhoneCtrl.dispose();
     _bikeCtrl.dispose();
+    _cityCtrl.dispose();
     super.dispose();
   }
 
@@ -38,33 +76,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     setState(() => _saving = true);
 
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _client.auth.currentUser;
       if (user == null) return;
 
-      // Update users table with profile data
-      await Supabase.instance.client.from('users').upsert({
-        'id': user.id,
-        'phone': _phoneCtrl.text.trim(),
-        'emergency_contact_name': _emergencyNameCtrl.text.trim(),
-        'emergency_contact_phone': _emergencyPhoneCtrl.text.trim(),
-        'bike_model': _bikeCtrl.text.trim(),
-      });
-
-      // Mark onboarding complete in user_metadata
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(
-          data: {
-            'onboarding_complete': true,
-            'phone': _phoneCtrl.text.trim(),
-            'bike_model': _bikeCtrl.text.trim(),
-          },
-        ),
+      // Shared persistence path (onboarding + edit). The repo upserts the
+      // users row and mirrors full_name to metadata — onboarding_complete is
+      // NOT written (ADR-001).
+      await _repository.saveProfile(
+        userId: user.id,
+        fullName: _nameCtrl.text,
+        bikeModel: _bikeCtrl.text,
+        city: _cityCtrl.text,
+        phone: _phoneCtrl.text,
+        emergencyName: _emergencyNameCtrl.text,
+        emergencyPhone: _emergencyPhoneCtrl.text,
       );
 
       // If came from invite code, auto-join to club
       if (widget.inviteCode != null) {
         try {
-          await Supabase.instance.client.rpc('join_club_by_code', params: {
+          await _client.rpc('join_club_by_code', params: {
             'p_code': widget.inviteCode!.toUpperCase().trim(),
           });
         } catch (_) {
@@ -73,7 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
 
       if (!mounted) return;
-      // Return true to signal completion — app.dart will detect it
+      // Return true to signal completion — app.dart re-queries the users row
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -84,6 +115,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  String? _required(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'Requerido' : null;
 
   @override
   Widget build(BuildContext context) {
@@ -132,48 +166,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Phone
+                // Full name (REQUIRED — OP-R4)
                 TextFormField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
+                  controller: _nameCtrl,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                    labelText: 'Teléfono',
-                    prefixIcon: Icon(Icons.phone, color: AppColors.textMuted),
+                    labelText: 'Nombre completo',
+                    prefixIcon: Icon(Icons.person, color: AppColors.textMuted),
                     filled: true, fillColor: AppColors.input,
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
+                  validator: _required,
                 ),
                 const SizedBox(height: 16),
 
-                // Emergency contact name
-                TextFormField(
-                  controller: _emergencyNameCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Contacto de emergencia (nombre)',
-                    prefixIcon: Icon(Icons.emergency, color: AppColors.textMuted),
-                    filled: true, fillColor: AppColors.input,
-                  ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Emergency contact phone
-                TextFormField(
-                  controller: _emergencyPhoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Contacto de emergencia (teléfono)',
-                    prefixIcon: Icon(Icons.phone_in_talk, color: AppColors.textMuted),
-                    filled: true, fillColor: AppColors.input,
-                  ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Bike model
+                // Bike model (REQUIRED — OP-R4)
                 TextFormField(
                   controller: _bikeCtrl,
                   style: const TextStyle(color: Colors.white),
@@ -182,6 +188,60 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     hintText: 'Ej: Yamaha MT-07',
                     hintStyle: TextStyle(color: AppColors.textDisabled),
                     prefixIcon: Icon(Icons.motorcycle, color: AppColors.textMuted),
+                    filled: true, fillColor: AppColors.input,
+                  ),
+                  validator: _required,
+                ),
+                const SizedBox(height: 16),
+
+                // City (REQUIRED — OP-R4)
+                TextFormField(
+                  controller: _cityCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Ciudad',
+                    hintText: 'Ej: Medellín',
+                    hintStyle: TextStyle(color: AppColors.textDisabled),
+                    prefixIcon: Icon(Icons.location_city, color: AppColors.textMuted),
+                    filled: true, fillColor: AppColors.input,
+                  ),
+                  validator: _required,
+                ),
+                const SizedBox(height: 16),
+
+                // Phone (OPTIONAL — OP-R4)
+                TextFormField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono (opcional)',
+                    prefixIcon: Icon(Icons.phone, color: AppColors.textMuted),
+                    filled: true, fillColor: AppColors.input,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Emergency contact name (OPTIONAL — OP-R4)
+                TextFormField(
+                  controller: _emergencyNameCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Contacto de emergencia (nombre, opcional)',
+                    prefixIcon: Icon(Icons.emergency, color: AppColors.textMuted),
+                    filled: true, fillColor: AppColors.input,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Emergency contact phone (OPTIONAL — OP-R4)
+                TextFormField(
+                  controller: _emergencyPhoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Contacto de emergencia (teléfono, opcional)',
+                    prefixIcon: Icon(Icons.phone_in_talk, color: AppColors.textMuted),
                     filled: true, fillColor: AppColors.input,
                   ),
                 ),
