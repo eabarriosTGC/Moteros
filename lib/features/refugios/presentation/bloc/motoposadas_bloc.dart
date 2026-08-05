@@ -1,4 +1,11 @@
 /// Motoposadas Bloc — gestión de motoposadas comunitarias.
+///
+/// F-M13 (TS-R1): `_onLoad` / `_onLoadMy` extend the host join with public
+/// signal fields (`created_at`, `km_traveled`, `user_achievements` count)
+/// and fetch host trips via the `get_trip_counts` RPC (count-only, safe
+/// under saved_routes RLS) — a `saved_routes` count embed would silently
+/// show 0 trips for every non-owner. Host-moderation joins (`_onLoadRequests`
+/// / `_onLoadMyRequests`) that select `trust_score` stay untouched.
 library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,7 +14,11 @@ import 'motoposadas_event.dart';
 import 'motoposadas_state.dart';
 
 class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
-  MotoposadasBloc() : super(MotoposadasInitial()) {
+  final SupabaseClient? _injectedClient;
+
+  MotoposadasBloc({SupabaseClient? client})
+      : _injectedClient = client,
+        super(MotoposadasInitial()) {
     on<LoadMotoposadas>(_onLoad);
     on<LoadMyMotoposadas>(_onLoadMy);
     on<LoadMotoposadaRequests>(_onLoadRequests);
@@ -21,20 +32,43 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<CreateTouristPoi>(_onCreateTouristPoi);
   }
 
-  SupabaseClient get _db => Supabase.instance.client;
+  SupabaseClient get _db => _injectedClient ?? Supabase.instance.client;
   String? get _uid => _db.auth.currentUser?.id;
+
+  /// Batched trip counts (F-M13): one `get_trip_counts` RPC for all host
+  /// ids. Count-only SECURITY DEFINER — never returns GPS rows.
+  Future<Map<String, int>> _fetchTripsByHost(List<dynamic> rows) async {
+    final hostIds =
+        rows.map((r) => (r as Map)['user_id'] as String).toSet().toList();
+    if (hostIds.isEmpty) return const {};
+    final resp = await _db.rpc('get_trip_counts', params: {
+      'user_ids': hostIds,
+    });
+    return {
+      for (final row in (resp as List))
+        (row as Map)['user_id'] as String: ((row['trips'] as num?) ?? 0).toInt(),
+    };
+  }
 
   Future<void> _onLoad(LoadMotoposadas event, Emitter<MotoposadasState> emit) async {
     emit(MotoposadasLoading());
     try {
-      // Fetch public + visible motoposadas with host info
+      // Fetch public + visible motoposadas with host info + public signals.
       final resp = await _db
           .from('motoposadas')
-          .select('*, users!inner(username, user_xp!inner(level))')
+          .select(
+              '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))')
           .eq('is_active', true)
           .order('created_at', ascending: false);
 
-      final list = (resp as List).map((m) => MotoposadaModel.fromMap(m as Map<String, dynamic>)).toList();
+      final rows = resp as List;
+      final tripsByHost = await _fetchTripsByHost(rows);
+      final list = rows
+          .map((m) => MotoposadaModel.fromMap(
+                m as Map<String, dynamic>,
+                tripsByHost: tripsByHost,
+              ))
+          .toList();
       emit(MotoposadasLoaded(motoposadas: list));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
@@ -46,11 +80,19 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposadas')
-          .select('*, users!inner(username, user_xp!inner(level))')
+          .select(
+              '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))')
           .eq('user_id', _uid!)
           .order('created_at', ascending: false);
 
-      final list = (resp as List).map((m) => MotoposadaModel.fromMap(m as Map<String, dynamic>)).toList();
+      final rows = resp as List;
+      final tripsByHost = await _fetchTripsByHost(rows);
+      final list = rows
+          .map((m) => MotoposadaModel.fromMap(
+                m as Map<String, dynamic>,
+                tripsByHost: tripsByHost,
+              ))
+          .toList();
       emit(MyMotoposadasLoaded(motoposadas: list));
     } catch (e) {
       emit(MotoposadasError(e.toString()));

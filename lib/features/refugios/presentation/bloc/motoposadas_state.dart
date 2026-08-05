@@ -25,6 +25,14 @@ final class MotoposadaModel {
   final bool isTourist;
   final String? city;
 
+  // Public host signals (F-M13, TS-R1). hostTrips comes from the
+  // get_trip_counts RPC — never parsed from the join (saved_routes RLS
+  // routes_select_own would zero it for non-owners).
+  final DateTime? hostMemberSince;
+  final int hostKm;
+  final int hostTrips;
+  final int hostBadges;
+
   const MotoposadaModel({
     required this.id, required this.userId, required this.type,
     required this.title, this.description = '', this.rules = '',
@@ -33,13 +41,21 @@ final class MotoposadaModel {
     this.visibility = 'public', this.targetClanId,
     required this.createdAt, this.hostName, this.hostLevel,
     this.poiType = 'standard', this.isTourist = false, this.city,
+    this.hostMemberSince, this.hostKm = 0, this.hostTrips = 0,
+    this.hostBadges = 0,
   });
 
-  factory MotoposadaModel.fromMap(Map<String, dynamic> m) {
+  factory MotoposadaModel.fromMap(
+    Map<String, dynamic> m, {
+    Map<String, int>? tripsByHost,
+  }) {
     final host = m['users'] as Map<String, dynamic>?;
+    final hostXp = host?['user_xp'] as Map<String, dynamic>?;
+    final achievements = host?['user_achievements'] as List?;
+    final hostId = m['user_id'] as String;
     return MotoposadaModel(
       id: m['id'] as int,
-      userId: m['user_id'] as String,
+      userId: hostId,
       type: m['type'] as String? ?? 'casa',
       title: m['title'] as String,
       description: m['description'] as String? ?? '',
@@ -54,10 +70,18 @@ final class MotoposadaModel {
       targetClanId: m['target_clan_id'] as int?,
       createdAt: DateTime.parse(m['created_at'] as String),
       hostName: host?['username'] as String?,
-      hostLevel: host?['user_xp'] is Map ? (host!['user_xp']['level'] as int?) : null,
+      hostLevel: hostXp?['level'] as int?,
       poiType: m['poi_type'] as String? ?? 'standard',
       isTourist: m['is_tourist'] as bool? ?? false,
       city: m['city'] as String?,
+      hostMemberSince: host?['created_at'] != null
+          ? DateTime.tryParse(host!['created_at'] as String)
+          : null,
+      hostKm: ((hostXp?['km_traveled'] as num?) ?? 0).round(),
+      hostTrips: tripsByHost?[hostId] ?? 0,
+      hostBadges: achievements == null || achievements.isEmpty
+          ? 0
+          : ((achievements.first as Map)['count'] as num?)?.toInt() ?? 0,
     );
   }
 
