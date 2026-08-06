@@ -15,12 +15,19 @@ class MainShell extends StatefulWidget {
     required this.progresoScreen,
     required this.explorarScreen,
     this.initialTab = AppTab.rodar,
+    this.onTabSelected,
   });
 
   final Widget rodarScreen;
   final Widget progresoScreen;
   final Widget explorarScreen;
   final AppTab initialTab;
+
+  /// Notificado en cada cambio de tab. El IndexedStack mantiene vivos los
+  /// tabs (keep-alive): las pantallas no re-ejecutan initState al volver —
+  /// el host usa este callback para refrescar datos stale (p. ej. los
+  /// contadores de Progreso al re-entrar).
+  final ValueChanged<AppTab>? onTabSelected;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -37,6 +44,7 @@ class _MainShellState extends State<MainShell> {
 
   void _onTabSelected(AppTab tab) {
     setState(() => _currentTab = tab);
+    widget.onTabSelected?.call(tab);
   }
 
   @override

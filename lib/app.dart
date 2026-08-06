@@ -31,6 +31,7 @@ import 'features/mileage/presentation/bloc/mileage_bloc.dart';
 import 'features/progression/presentation/bloc/leaderboard_bloc.dart';
 import 'features/showcase/presentation/bloc/showcase_bloc.dart';
 import 'features/progression/presentation/bloc/progreso_bloc.dart';
+import 'features/progression/presentation/bloc/progreso_event.dart';
 import 'features/progression/presentation/screens/progreso_screen.dart';
 import 'features/explorar/presentation/bloc/explorar_bloc.dart';
 import 'features/explorar/presentation/screens/explorar_screen.dart';
@@ -252,6 +253,18 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
         progresoScreen: const ProgresoScreen(),
         explorarScreen: const ExplorarScreen(),
         initialTab: AppTab.rodar,
+        onTabSelected: (tab) {
+          // Keep-alive del IndexedStack: Progreso no re-ejecuta initState al
+          // volver → los contadores (KM/VIAJES/INSIGNIAS/FOTOS) quedarían
+          // stale. Recarga explícita al re-entrar al tab.
+          if (tab == AppTab.progreso) {
+            final userId =
+                Supabase.instance.client.auth.currentUser?.id ?? '';
+            if (userId.isNotEmpty) {
+              context.read<ProgresoBloc>().add(LoadProgreso(userId: userId));
+            }
+          }
+        },
       ),
     );
   }

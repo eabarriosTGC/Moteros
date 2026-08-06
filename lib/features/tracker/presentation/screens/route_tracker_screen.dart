@@ -17,6 +17,7 @@ import '../../../../core/services/geofence_service.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'post_trip_summary_screen.dart';
+import '../widgets/save_route_dialog.dart';
 import '../widgets/waypoint_hud_button.dart';
 
 // ── BLoC ──
@@ -431,7 +432,6 @@ class RouteTrackerScreen extends StatefulWidget {
 
 class _RouteTrackerScreenState extends State<RouteTrackerScreen>
     with WidgetsBindingObserver {
-  final _nameController = TextEditingController();
   final _pageController = PageController();
   int _currentPage = 0;
   final GeofenceService _geofence = GeofenceService();
@@ -466,7 +466,6 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _geofence.stop();
-    _nameController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -889,46 +888,12 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
   }
 
   void _showSaveDialog(BuildContext context) {
-    _nameController.clear();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Guardar ruta',
-            style: AppTypography.titleLarge),
-        content: TextField(
-          controller: _nameController,
-          autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'Nombre de la ruta',
-            hintStyle: TextStyle(color: AppColors.textMuted),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR',
-                style: AppTypography.buttonSmall),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = _nameController.text.trim();
-              if (name.isNotEmpty) {
-                Navigator.pop(ctx);
-                context.read<TrackerBloc>().add(SaveRoute(name));
-              }
-            },
-            child: const Text('GUARDAR',
-                style: AppTypography.buttonSmall),
-          ),
-        ],
+      builder: (ctx) => SaveRouteDialog(
+        onSave: (name) {
+          context.read<TrackerBloc>().add(SaveRoute(name));
+        },
       ),
     );
   }

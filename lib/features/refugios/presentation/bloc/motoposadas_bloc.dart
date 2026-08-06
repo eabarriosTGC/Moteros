@@ -282,24 +282,19 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
         'behavior_flags': 0,
       });
 
-      // Update trust_score — read current, apply delta
+      // Update trust_score — vía RPC SECURITY DEFINER (030). El UPDATE directo
+      // de user_xp cross-user FALLA SIEMPRE por RLS (007 solo define
+      // xp_select_all/xp_insert_own — sin policy de UPDATE); el catch vacío
+      // previo tragaba el fallo: la reputación del anfitrión nunca cambiaba
+      // tras una review. Ahora el error del RPC sube al catch externo →
+      // MotoposadasError VISIBLE (clase de bug _save: falla ruidosa, no
+      // silenciosa).
       final trustDelta = event.rating >= 4 ? 2 : (event.rating <= 2 ? -2 : 0);
       if (trustDelta != 0) {
-        try {
-          final current = await _db
-              .from('user_xp')
-              .select('trust_score')
-              .eq('user_id', event.toUserId)
-              .maybeSingle();
-          if (current != null) {
-            final newScore =
-                ((current['trust_score'] as int?) ?? 50) + trustDelta;
-            await _db
-                .from('user_xp')
-                .update({'trust_score': newScore.clamp(0, 100)})
-                .eq('user_id', event.toUserId);
-          }
-        } catch (_) {}
+        await _db.rpc('update_trust_score', params: {
+          'p_user_id': event.toUserId,
+          'p_delta': trustDelta,
+        });
       }
 
       emit(const ReviewSubmitted());
