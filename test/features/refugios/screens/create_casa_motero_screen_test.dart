@@ -21,6 +21,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moteros_app/core/location/blur_coordinates.dart';
 import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_event.dart';
 import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_state.dart';
@@ -239,12 +240,23 @@ void main() {
           // M-WA-1: phone normalized (digits only) before dispatch.
           expect(event.whatsappPhone, '573001234567');
           // M-MAPA-1: approx (public) coords are jittered away from exact.
+          // Distance-based (haversine), not per-axis: the polar-uniform jitter
+          // (300-500 m, blur_coordinates.dart) can land purely east-west,
+          // where the lat component is ~0 while the true distance still meets
+          // the floor. Per-axis assertion was a ~24% flake (deterministic fix).
           expect(event.lat, isNot(event.latExact));
           expect(event.lng, isNot(event.lngExact));
+          final jitterMeters = haversineMeters(
+            event.lat,
+            event.lng,
+            event.latExact,
+            event.lngExact,
+          );
           expect(
-            (event.lat - event.latExact).abs() > 0.001,
+            jitterMeters >= 250,
             isTrue,
-            reason: 'jitter must move the point >100 m (~0.001 deg lat)',
+            reason: 'jitter must move the point ≥250 m from exact '
+                '(found $jitterMeters m)',
           );
         },
       );
