@@ -39,9 +39,11 @@ class FeaturedMotoposadaCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                motoposada.typeLabel.toUpperCase(),
+                motoposada.poiTypeLabel.toUpperCase(),
                 style: AppTypography.caption.copyWith(
-                  color: AppColors.primary,
+                  color: motoposada.isCasaMotero
+                      ? AppColors.secondary
+                      : AppColors.primary,
                   fontWeight: FontWeight.w700,
                   fontSize: 9,
                 ),
@@ -67,14 +69,20 @@ class FeaturedMotoposadaCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             const Spacer(),
-            // Location
+            // Location — casa_motero never shows the address (M-WA-3):
+            // the public coords ARE approximate, so the line reads
+            // "Ubicación aproximada" instead.
             Row(
               children: [
                 const Icon(Icons.location_on, size: 12, color: AppColors.textMuted),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    motoposada.address.isNotEmpty ? motoposada.address : '${motoposada.lat.toStringAsFixed(4)}, ${motoposada.lng.toStringAsFixed(4)}',
+                    motoposada.isCasaMotero
+                        ? 'Ubicación aproximada'
+                        : motoposada.address.isNotEmpty
+                            ? motoposada.address
+                            : '${motoposada.lat.toStringAsFixed(4)}, ${motoposada.lng.toStringAsFixed(4)}',
                     style: AppTypography.caption.copyWith(color: AppColors.textMuted, fontSize: 9),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

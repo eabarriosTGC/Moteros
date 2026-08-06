@@ -29,6 +29,8 @@ import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import '../../../refugios/presentation/bloc/motoposadas_event.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
 import '../../../refugios/presentation/widgets/tourist_poi_marker.dart';
+import '../../../refugios/presentation/widgets/casa_motero_marker.dart';
+import '../../../refugios/presentation/widgets/casa_motero_card.dart';
 import '../../../../core/services/navigation_handler.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
@@ -213,11 +215,17 @@ class _RodarScreenState extends State<RodarScreen>
                               width: 120,
                               height: 60,
                               child: GestureDetector(
-                                onTap: () =>
-                                    _showMotoposadaCard(context, m),
-                                child: m.isTourist
-                                    ? TouristPoiMarker(title: m.title)
-                                    : _buildMotoposadaMarker(m),
+                                onTap: () => m.isCasaMotero
+                                    ? showCasaMoteroCard(context, m)
+                                    : _showMotoposadaCard(context, m),
+                                child: switch (markerKindFor(m)) {
+                                  MarkerKind.tourist =>
+                                    TouristPoiMarker(title: m.title),
+                                  MarkerKind.casaMotero =>
+                                    CasaMoteroMarker(title: m.title),
+                                  MarkerKind.standard =>
+                                    _buildMotoposadaMarker(m),
+                                },
                               ),
                             ))
                         .toList(),
