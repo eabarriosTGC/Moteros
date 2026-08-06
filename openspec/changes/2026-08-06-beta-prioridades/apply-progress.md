@@ -61,3 +61,43 @@ Notas:
 
 ### Delta analyze (Fases 1–3)
 - Baseline: 545 → actual: ver `flutter analyze` (se reporta delta por fase en el commit).
+
+---
+
+## Batch 2 — Fases 4–5 + gate Fase 8 (retoma inline del orquestador tras agotamientos de presupuesto)
+
+> Los batches 3-6 delegados agotaron presupuesto a mitad de GREEN (patrón sdd-resilience). El orquestador retomó INLINE la verificación/commit (precedente motoposadas) y dejó Fases 6-7 para delegación narrow.
+
+### Fase 4 — W3 backend-bloc: payload, eventos/estados, `_save` fix, waypoints ✅ COMPLETA (commit 59df6bb, verificado por orquestador)
+
+| Task | Estado | Evidencia |
+|------|--------|-----------|
+| 4.1 RED `test/features/tracker/bloc/tracker_bloc_waypoints_test.dart` (ciclo A: payload builder) | ✅ | STRICT TDD: escrito ANTES (RED — `buildSavedRoutePayload` undefined). |
+| 4.2 GREEN `buildSavedRoutePayload` | ✅ | Claves 002 exactas (total_distance_m metros, duration_seconds, avg_speed_kmh, max_speed_kmh, points_count, polyline_json `jsonEncode([[lat,lng],...])`, start/end, started/ended UTC); NUNCA las claves viejas; **FIX W3**: points < 2 → null sin crash. **Bug de copia del sketch del design corregido en apply**: `end_lat` usaba `points.last.longitude` → `.latitude`. |
+| 4.3 Eventos/estados | ✅ | `StartRecording(int? raidId)`, `AddWaypoint()`, `ResumeFromCheckpoint(int? raidId)`, `SaveRoute(name, {PostTripResult? result})`; `TrackerSaveSucceeded(savedRouteId)` / `TrackerSaveFailed(message)`; `TrackerRecording.waypoints/raidId`. |
+| 4.4 `_save` fix + read-side | ✅ | Payload `event.result ?? estado` (corrige el no-op: tras `StopRecording` el estado es `TrackerIdle` y `_save` retornaba antes); insert `.select().single()`; éxito → Succeeded+Idle+LoadSavedRoutes; fallo → Failed SIN Idle; **errores NUNCA tragados** (catch vacío eliminado). `_buildHistoryTab` read-keys → `total_distance_m`/`duration_seconds` (mismo bug class). |
+| 4.5 Waypoints persistencia + resume | ✅ | Origen orden 0 en primer onUpdate con raidId; paradas 1..N secuenciales; destino N+1 en `_stop`; fallo de insert → error visible sin matar grabación; `ResumeFromCheckpoint` re-fetch acotado por `created_at >= startedAt`. |
+| Checkpoint | ✅ | `tracker_bloc_waypoints_test.dart` → **12/12 GREEN**; suite completa **289 passed**; analyze delta 0. **Trampa del fake documentada**: `.insert().select().single()` exige builder que retorne `<Map>` no `<Map?>` (typing del fake, no lógica). |
+
+**Commit:** `feat(tracker): waypoints raid + fix _save saved_routes (M-RTR)` (59df6bb)
+
+### Fase 5 — W3 UI: INICIAR VIAJE, HUD Marcar parada, trace post-trip ✅ COMPLETA (commit 8f00906, retoma orquestador)
+
+| Task | Estado | Evidencia |
+|------|--------|-----------|
+| 5.1 RED `raid_join_sheet_test.dart` (+2) | ✅ | STRICT TDD: escrito ANTES (RED por compilación: `currentUserId` param y getter `raidId` no existían). **Fix de plumbing del orquestador**: los 2 tests nunca tocaban el botón 'OPEN SHEET' del helper — añadido `tester.tap(find.text('OPEN SHEET'))` (aserciones intactas). |
+| 5.2 RED HUD + summary tests | ✅ | STRICT TDD: escrito ANTES (RED 'Found 0 widgets with text Marcar parada'; markers no existían). |
+| 5.3 GREEN `raid_join_sheet.dart` | ✅ | Botón 'INICIAR VIAJE' en rama joined → `Navigator.pop` + push `RouteTrackerScreen(raidId: raid.id)`; 'YA UNIDO' degradado a OutlinedButton deshabilitado. **Fix de layout del orquestador**: el botón nuevo desbordaba el sheet en viewport 600px (RenderFlex overflow 14px) → contenido envuelto en `SingleChildScrollView`. |
+| 5.4 GREEN `route_tracker_screen.dart` | ✅ | Params `raidId`/`tileProvider`; `StartRecording(raidId: widget.raidId)`; `Positioned` 'Marcar parada' SOLO si `raidId != null` → `AddWaypoint()` (extraído a `WaypointHudButton`, widget propio). |
+| 5.5 GREEN `post_trip_summary_screen.dart` | ✅ | `PostTripResult.waypoints/raidId`; `MarkerLayer` con trace ordenado start→paradas→end (extraído a `buildTraceMarkers` puro); `PostTripSaveFeedback` (BlocListener Succeeded/Failed → SnackBar, sin catch). |
+| 5.6 Resolución del HANG de FlutterMap en widget tests | ✅ | **Hallazgo**: los widget tests con FlutterMap cuelgan el run (stream de tiles + decode de imagen async bajo FakeAsync; error de shutdown 'Cannot close sink while adding stream' en el harness). HttpOverrides/PNG-1x1 insuficiente; `tester.runAsync` no basta; un test de SnackBar (sin mapa) también cuelga 84s (BlocListener+SnackBar bajo FakeAsync). **Decisión (precedente del repo: screens con mapa = source-verified)**: `buildTraceMarkers` pura (unit 3 tests) + `WaypointHudButton` widget aislado (1 test) + `PostTripSaveFeedback` source-verified (M-RTR-6 cubierto a nivel bloc en Fase 4). `FakeTileProvider` (MemoryImage) creado como helper canónico documentado. Lección añadida al skill `moteros-development` §test-conventions. |
+| Checkpoint | ✅ | 3 archivos → **21/21 GREEN** (13+3+5); suite completa **295/295 PASS**; analyze **579** (delta < 0 vs baseline 545/580; cero issues en archivos tocados — `user_showcase` query muerta removida de ProgresoBloc, imports sin uso limpiados). |
+
+**Commit:** `feat(tracker): waypoints raid UI — INICIAR VIAJE, HUD Marcar parada, trace post-trip (M-RTR-1/2/3/6)` (8f00906)
+
+### Pendientes
+- [ ] Fase 6: W4 — `ConquestPhotoUploader` + flujo fotos en summary (depende Fase 1, 5) — delegación narrow next
+- [ ] Fase 7: W5 — `isExpiredRaid` + markers Rodar + `gte` Explorar — delegación narrow next
+- [ ] 3.8: GitHub issue de deuda (ProfileScreen/ShowcaseProfileScreen inalcanzables) — lo crea el orquestador
+- [ ] Open questions: M-ERV-5 bottom sheet spec-literal; prod `saved_routes` `information_schema` antes de apply 028/029 a prod
+- [ ] Version bump + build + verificación en dispositivo (orquestador, tras Fases 6-7)
