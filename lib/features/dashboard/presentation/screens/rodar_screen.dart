@@ -578,10 +578,7 @@ class _RodarScreenState extends State<RodarScreen>
     return BlocBuilder<RaidBloc, RaidState>(
       builder: (context, state) {
         if (state is RaidsLoaded) {
-          final activeRaids = state.raids
-              .where((r) => r['status'] == 'lobby' || r['status'] == 'active')
-              .take(3)
-              .toList();
+          final activeRaids = visibleUpcomingRaids(state.raids);
           if (activeRaids.isEmpty) {
             return _buildNoRaidsCard();
           }
@@ -1086,4 +1083,20 @@ bool isExpiredRaid(Map<String, dynamic> raid) {
   } catch (_) {
     return false;
   }
+}
+
+/// M-ERV-5 — raids visibles en la sección 'PRÓXIMOS RAIDS' de Rodar.
+/// Mismo criterio que los markers: status lobby/active + NO vencido
+/// (isExpiredRaid). Límite 3. Pura y unit-testable (la pantalla completa
+/// tiene FlutterMap → no se widget-testea; precedente del repo).
+List<Map<String, dynamic>> visibleUpcomingRaids(
+    List<Map<String, dynamic>> raids) {
+  return raids
+      .where(
+        (r) =>
+            (r['status'] == 'lobby' || r['status'] == 'active') &&
+            !isExpiredRaid(r),
+      )
+      .take(3)
+      .toList();
 }
