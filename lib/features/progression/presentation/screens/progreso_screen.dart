@@ -188,7 +188,7 @@ class _MiMotoposadaSectionState extends State<_MiMotoposadaSection> {
           icon: Icons.home_work_outlined,
           title: 'Mi motoposada',
           subtitle: 'Ofrecé tu casa como hospedaje para moteros',
-          actionLabel: 'OFrecer MI CASA',
+          actionLabel: 'Ofrecer MI CASA',
           onAction: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -220,77 +220,98 @@ class _MiMotoposadaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.mdCircular,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.secondary.withAlpha(30),
-            ),
-            child: Icon(icon, color: AppColors.secondary, size: 22),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // M-MPC-3: nunca un botón muerto ni un card en blanco — si no hay action,
+    // el footer informativo ocupa el slot (P0-3 class).
+    final hasAction = actionLabel != null && onAction != null;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 76),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppRadius.mdCircular,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
-                Text(
-                  title,
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.secondary.withAlpha(30),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Icon(icon, color: AppColors.secondary, size: 22),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textMuted,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
+                if (hasAction) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  ElevatedButton(
+                    onPressed: onAction,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textOnAmber,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadius.smCircular,
+                      ),
+                    ),
+                    child: Text(
+                      actionLabel!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
-          ),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(width: AppSpacing.sm),
-            ElevatedButton(
-              onPressed: onAction,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textOnAmber,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.smCircular,
+            if (!hasAction) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Gestiona tu casa de motero en el mapa',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textMuted,
                 ),
               ),
-              child: Text(
-                actionLabel!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

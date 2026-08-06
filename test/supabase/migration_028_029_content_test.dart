@@ -21,7 +21,8 @@ void main() {
       expect(
         migration.existsSync(),
         isTrue,
-        reason: '028_raid_waypoints.sql must ship before the app release '
+        reason:
+            '028_raid_waypoints.sql must ship before the app release '
             '(deploy-side apply, W3)',
       );
     });
@@ -43,7 +44,10 @@ void main() {
       expect(sql, contains('idx_raid_waypoints_raid_orden'));
       expect(sql, contains('ON raid_waypoints(raid_id, orden)'));
       expect(sql, contains('idx_raid_waypoints_user'));
-      expect(sql, contains('ALTER TABLE raid_waypoints ENABLE ROW LEVEL SECURITY'));
+      expect(
+        sql,
+        contains('ALTER TABLE raid_waypoints ENABLE ROW LEVEL SECURITY'),
+      );
     });
 
     test('owner-only direct policies rw_select/insert/update/delete_own '
@@ -56,55 +60,70 @@ void main() {
         'rw_delete_own',
       ]) {
         expect(sql, contains('CREATE POLICY "$policy" ON raid_waypoints'));
-        expect(sql, contains('DROP POLICY IF EXISTS "$policy" ON raid_waypoints'));
+        expect(
+          sql,
+          contains('DROP POLICY IF EXISTS "$policy" ON raid_waypoints'),
+        );
       }
     });
 
-    test('row-ownership guard: WITH CHECK (auth.uid() = user_id) (M-RTR-4)',
-        () {
-      final sql = read();
-      expect(
-        sql,
-        contains('WITH CHECK (auth.uid() = user_id)'),
-        reason: 'owner-only RLS must gate writes by the direct user_id column',
-      );
-    });
+    test(
+      'row-ownership guard: WITH CHECK (auth.uid() = user_id) (M-RTR-4)',
+      () {
+        final sql = read();
+        expect(
+          sql,
+          contains('WITH CHECK (auth.uid() = user_id)'),
+          reason:
+              'owner-only RLS must gate writes by the direct user_id column',
+        );
+      },
+    );
 
     test('rw_insert_own also requires raid membership via '
         'public.is_raid_participant(raid_id) (M-RTR-5, reviewer fix W2)', () {
       final sql = read();
       final start = sql.indexOf('"rw_insert_own" ON raid_waypoints');
       final end = sql.indexOf('DROP POLICY', start);
-      expect(start, greaterThan(-1), reason: 'rw_insert_own policy body missing');
+      expect(
+        start,
+        greaterThan(-1),
+        reason: 'rw_insert_own policy body missing',
+      );
       final insertBody = sql.substring(start, end);
       expect(
         insertBody,
         contains('public.is_raid_participant(raid_id)'),
-        reason: 'a non-participant insert must be rejected atomically by RLS '
+        reason:
+            'a non-participant insert must be rejected atomically by RLS '
             '— no subquery, the SECURITY DEFINER helper (020) does the check',
       );
     });
 
-    test('NO EXISTS ( subqueries in any policy body (012/013 recursion class)',
-        () {
-      final sql = read();
-      final policiesStart = sql.indexOf('CREATE POLICY');
-      final policiesEnd = sql.indexOf('COMMIT', policiesStart);
-      final policySection = sql.substring(policiesStart, policiesEnd);
-      expect(
-        policySection,
-        isNot(contains('EXISTS (')),
-        reason: 'cross-table subquery policies are the recursion bug class '
-            'that forced migrations 012/013 — direct own-policies only',
-      );
-    });
+    test(
+      'NO EXISTS ( subqueries in any policy body (012/013 recursion class)',
+      () {
+        final sql = read();
+        final policiesStart = sql.indexOf('CREATE POLICY');
+        final policiesEnd = sql.indexOf('COMMIT', policiesStart);
+        final policySection = sql.substring(policiesStart, policiesEnd);
+        expect(
+          policySection,
+          isNot(contains('EXISTS (')),
+          reason:
+              'cross-table subquery policies are the recursion bug class '
+              'that forced migrations 012/013 — direct own-policies only',
+        );
+      },
+    );
 
     test('BEGIN/COMMIT wrapping', () {
       final sql = read();
       expect(
         sql,
         contains('BEGIN;'),
-        reason: 'repo migration convention: transaction-wrapped (comment '
+        reason:
+            'repo migration convention: transaction-wrapped (comment '
             'header precedes BEGIN, as in 026/008)',
       );
       expect(sql.trimRight(), endsWith('COMMIT;'));
@@ -112,13 +131,16 @@ void main() {
   });
 
   group('Migration 029 — conquest-photos bucket guard (M-CPU-3/M-CPU-4)', () {
-    final File migration = File('supabase/migrations/029_conquest_photos_bucket.sql');
+    final File migration = File(
+      'supabase/migrations/029_conquest_photos_bucket.sql',
+    );
 
     test('file exists', () {
       expect(
         migration.existsSync(),
         isTrue,
-        reason: '029_conquest_photos_bucket.sql must ship before the app '
+        reason:
+            '029_conquest_photos_bucket.sql must ship before the app '
             'release (deploy-side apply, W4)',
       );
     });
@@ -134,9 +156,24 @@ void main() {
 
     test('the 3 storage policies are present', () {
       final sql = read();
-      expect(sql, contains('CREATE POLICY "conquest_photos_select_public" ON storage.objects'));
-      expect(sql, contains('CREATE POLICY "conquest_photos_insert_own" ON storage.objects'));
-      expect(sql, contains('CREATE POLICY "conquest_photos_delete_own" ON storage.objects'));
+      expect(
+        sql,
+        contains(
+          'CREATE POLICY "conquest_photos_select_public" ON storage.objects',
+        ),
+      );
+      expect(
+        sql,
+        contains(
+          'CREATE POLICY "conquest_photos_insert_own" ON storage.objects',
+        ),
+      );
+      expect(
+        sql,
+        contains(
+          'CREATE POLICY "conquest_photos_delete_own" ON storage.objects',
+        ),
+      );
     });
 
     test('insert/delete scoped by user prefix auth.uid()::text || /% '
@@ -150,7 +187,8 @@ void main() {
       expect(
         sql,
         isNot(contains('place-photos')),
-        reason: 'conquest photos are user-owned content namespaced by '
+        reason:
+            'conquest photos are user-owned content namespaced by '
             'user_id — reusing place-photos would mix POI assets with '
             'personal album rows',
       );

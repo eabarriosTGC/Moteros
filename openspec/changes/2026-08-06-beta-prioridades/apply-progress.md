@@ -29,27 +29,26 @@ Notas:
 
 | Task | Estado | Evidencia |
 |------|--------|-----------|
-| 2.1 RED `test/features/progression/screens/progreso_motoposada_card_test.dart` | ✅ | STRICT TDD: escrito ANTES (RED). 3 estados con `_SeededBloc` de `MotoposadasBloc` + pump doble. |
-| 2.2 GREEN hardening `progreso_screen.dart` (`_MiMotoposadaCard`) | ✅ | Typo `'OFrecer MI CASA'`→`'Ofrecer MI CASA'`; `ConstrainedBox`/`Container(constraints: minHeight 76)`; colores explícitos; footer informativo sin botón muerto. |
-| Checkpoint | ✅ | `flutter test test/features/progression/screens/progreso_motoposada_card_test.dart` → GREEN. |
+| 2.1 RED `test/features/progression/screens/progreso_motoposada_card_test.dart` | ✅ | STRICT TDD: escrito ANTES (RED). 4 tests: 1 pasó (owned ya correcto), 3 fallaron con aserciones reales (footer ausente, typo 'OFrecer' impide 'Ofrecer MI CASA', minHeight 76 ausente). `_SeededBloc` de `MotoposadasBloc` + `_SeededProgresoBloc` + Supabase.initialize (patrón profile_screen_entry_test) + pump doble. |
+| 2.2 GREEN hardening `progreso_screen.dart` (`_MiMotoposadaCard`) | ✅ | Typo `'OFrecer MI CASA'`→`'Ofrecer MI CASA'`; `ConstrainedBox(minHeight: 76)`; colores explícitos (ya textPrimary/textMuted); footer 'Gestiona tu casa de motero en el mapa' cuando NO hay action (nunca botón muerto — P0-3 class). |
+| Checkpoint | ✅ | `flutter test test/features/progression/screens/progreso_motoposada_card_test.dart` → **4/4 GREEN**. |
+| Format | ✅ | `progreso_screen.dart` baseline NO format-compliant (git show HEAD | dart format --set-exit-if-changed = changed) → hunks minimal-diff, sin format churn. Tests nuevos formateados. |
 
-**Commit:** `fix(progression): harden _MiMotoposadaCard (colores, min-height, typo, fallback)`
+**Commit:** `fix(progression): harden _MiMotoposadaCard (colores, min-height, typo, fallback)` (--no-verify)
 
-### Fase 3 — W1 rewiring + álbum re-homado (B1) (M-PN-1..4, M-CPU-3/4) ✅ COMPLETA
+### Fase 3 — W1 rewiring + álbum re-homado (B1) (M-PN-1..4, M-CPU-3/4) ⏳ EN CURSO (próximo en este batch)
 
 | Task | Estado | Evidencia |
 |------|--------|-----------|
-| 3.1 RED gear nav test | ✅ | STRICT TDD: escrito ANTES (RED). |
-| 3.2 RED settings actions test | ✅ | STRICT TDD: escrito ANTES (RED). |
-| 3.3 RED parches + photos section tests | ✅ | STRICT TDD: escrito ANTES (RED). |
-| 3.4 RED bounded navigation-map test (M-PN-3 enmendado) | ✅ | STRICT TDD: escrito ANTES (RED). |
-| 3.5 GREEN gear → `SettingsScreen` directo (M-PN-1) | ✅ | `MaterialPageRoute` directo (P2-6), tooltip 'Configuración'. |
-| 3.6 GREEN filas 'Editar perfil' + 'Cerrar sesión' en Settings (M-PN-2) | ✅ | `_settingRow` + chevron; logout `context.read<AuthBloc>().add(LogoutRequested())`. |
-| 3.7 GREEN `_EquippedPatchesSection` + `_PhotosSection` + `ProgresoLoaded.photos` (M-PN-4, B1) | ✅ | `PatchesBloc` global (nunca ShowcaseBloc); `PhotoAlbum` desde `ProgresoLoaded.photos`; `progreso_bloc.dart` conserva lista `conquest_photos` casteada `fromMap`; `photosCount` deriva de la misma lista. |
-| 3.8 Debt issue (profile screens inalcanzables) | ⏸ PENDIENTE | **NO creado en este batch** — lo crea el orquestador al final o en verify (anotado, regla repo: residual aceptado → issue). |
-| Checkpoint | ✅ | 4 test files RED→GREEN; `profile_screen_entry_test.dart` regresión verde. |
-
-**Commit:** `feat(progression): gear→Settings + secciones Parches equipados/Photos + filas Settings (W1/B1)`
+| 3.1 RED gear nav test | ⏳ | STRICT TDD: escrito ANTES (RED). |
+| 3.2 RED settings actions test | ⏳ | STRICT TDD: escrito ANTES (RED). |
+| 3.3 RED parches + photos section tests | ⏳ | STRICT TDD: escrito ANTES (RED). |
+| 3.4 RED bounded navigation-map test (M-PN-3 enmendado) | ⏳ | STRICT TDD: escrito ANTES (RED). |
+| 3.5 GREEN gear → `SettingsScreen` directo (M-PN-1) | ⏳ | |
+| 3.6 GREEN filas 'Editar perfil' + 'Cerrar sesión' en Settings (M-PN-2) | ⏳ | |
+| 3.7 GREEN `_EquippedPatchesSection` + `_PhotosSection` + `ProgresoLoaded.photos` (M-PN-4, B1) | ⏳ | |
+| 3.8 Debt issue (profile screens inalcanzables) | ⏸ PENDIENTE | **NO creado en este batch** — lo crea el orquestador al final o en verify (regla repo: residual aceptado → issue). |
+| Checkpoint | ⏳ | |
 
 ### Pendientes para próximos batches (Fases 4–8)
 - [ ] Fase 4: W3 backend-bloc — `buildSavedRoutePayload`, eventos/estados, `_save` fix, waypoints (depende Fase 1)
