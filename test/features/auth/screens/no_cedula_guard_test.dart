@@ -10,10 +10,17 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:moteros_app/features/auth/data/repositories/profile_repository.dart';
 import 'package:moteros_app/features/auth/presentation/screens/onboarding_screen.dart';
 import 'package:moteros_app/features/profile/presentation/screens/profile_edit_screen.dart';
+import 'package:moteros_app/features/refugios/data/models/casa_motero_payload.dart';
+import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_bloc.dart';
+import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_event.dart';
+import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_state.dart';
+import 'package:moteros_app/features/refugios/presentation/screens/create_motoposada_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Regexes for identity-document concepts. `\bid\b` is deliberately NOT in
@@ -82,6 +89,76 @@ void expectNoIdentityPayloadKeys(Map<String, dynamic> payload) {
       );
     }
   }
+}
+
+/// Part 2 variant for TextField-based forms (the casa_motero create form
+/// uses bare TextFields, not TextFormFields): checks every hint + every
+/// visible Text for identity-document references (M-CRUD-4).
+void expectNoIdentityFieldsInForm(WidgetTester tester) {
+  for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+    final hint = field.decoration?.hintText ?? '';
+    final label = field.decoration?.labelText ?? '';
+    final haystack = '$label $hint';
+    for (final pattern in _identityPatterns) {
+      expect(
+        pattern.hasMatch(haystack),
+        isFalse,
+        reason:
+            'form field must not reference an identity document: '
+            '"$haystack" matches /${pattern.pattern}/',
+      );
+    }
+  }
+  for (final text in tester.widgetList<Text>(find.byType(Text))) {
+    for (final pattern in _identityPatterns) {
+      expect(
+        pattern.hasMatch(text.data ?? ''),
+        isFalse,
+        reason:
+            'screen text must not reference an identity document: '
+            '"${text.data}" matches /${pattern.pattern}/',
+      );
+    }
+  }
+}
+
+/// Mock bloc for the casa_motero form guard — records dispatched events so
+/// the create payload can be inspected (part 2).
+class MockMotoposadasBloc extends Mock implements MotoposadasBloc {}
+
+/// mocktail needs a concrete fallback for the sealed `MotoposadasEvent`
+/// parameter of `bloc.add` when tests use `any(that:)` / `captureAny(that:)`.
+void _registerEventFallbacks() {
+  registerFallbackValue(
+    CreateCasaMotero(
+      title: '',
+      description: '',
+      maxGuests: 1,
+      lat: 0,
+      lng: 0,
+      latExact: 0,
+      lngExact: 0,
+      whatsappPhone: '',
+      disclaimerAcceptedAt: null,
+    ),
+  );
+}
+
+/// Pumps the casa_motero create form with a controllable mock bloc.
+Future<MockMotoposadasBloc> _pumpCasaMoteroForm(WidgetTester tester) async {
+  final bloc = MockMotoposadasBloc();
+  when(() => bloc.state).thenReturn(MotoposadasInitial());
+  when(() => bloc.stream).thenAnswer((_) => Stream<MotoposadasState>.empty());
+  await tester.pumpWidget(
+    BlocProvider<MotoposadasBloc>.value(
+      value: bloc,
+      child: MaterialApp(
+        home: CreateMotoposadaScreen(mode: CreateMotoposadaMode.casaMotero),
+      ),
+    ),
+  );
+  await tester.pump();
+  return bloc;
 }
 
 /// Mock ProfileRepository — records saveProfile named args as a payload map
@@ -184,6 +261,8 @@ Future<void> _acceptTermsAndSubmit(WidgetTester tester) async {
 }
 
 void main() {
+  setUpAll(_registerEventFallbacks);
+
   group('OP-R2 — OnboardingScreen form (part 1, task 2.5)', () {
     testWidgets('form contains no cédula/documento field', (tester) async {
       final repo = MockProfileRepository();
@@ -302,6 +381,73 @@ void main() {
 
       expect(repo.saveCalls, hasLength(1));
       expectNoIdentityPayloadKeys(repo.saveCalls.first);
+    });
+  });
+
+  group('OP-R2 — casa_motero create form (part 2, task 4.3)', () {
+    testWidgets('casa_motero create form contains no cédula/documento field', (
+      tester,
+    ) async {
+      await _pumpCasaMoteroForm(tester);
+
+      expectNoIdentityFieldsInForm(tester);
+
+      // Sanity: the casa_motero field set is present (M-CRUD-5) and the
+      // address field is absent (M-WA-3: the app never collects it).
+      expect(find.text('WHATSAPP'), findsOneWidget);
+      expect(find.text('DIRECCIÓN'), findsNothing);
+    });
+
+    testWidgets('casa_motero create payload has no identity-document key', (
+      tester,
+    ) async {
+      final bloc = await _pumpCasaMoteroForm(tester);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Ej: Casa en La Calera'),
+        'Casa del Faro',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Ej: +57 300 123 4567'),
+        '+57 300 123 4567',
+      );
+      await tester.scrollUntilVisible(
+        find.textContaining('descargo'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.textContaining('descargo'));
+      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.text('PUBLICAR'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('PUBLICAR'));
+      await tester.pump();
+
+      final captured = verify(
+        () => bloc.add(captureAny(that: isA<CreateCasaMotero>())),
+      ).captured;
+      final event = captured.single as CreateCasaMotero;
+
+      // Inspect the payload that actually reaches the create RPC.
+      final payload = buildCasaMoteroCreateParams(
+        title: event.title,
+        description: event.description,
+        maxGuests: event.maxGuests,
+        lat: event.lat,
+        lng: event.lng,
+        latExact: event.latExact,
+        lngExact: event.lngExact,
+        whatsappPhone: event.whatsappPhone,
+        disclaimerAcceptedAt: event.disclaimerAcceptedAt!,
+      );
+      expectNoIdentityPayloadKeys(payload);
+      // M-CRUD-4/5 + M-WA-3: no address, no owner-id param.
+      expect(payload.containsKey('address'), isFalse);
+      expect(payload.containsKey('p_address'), isFalse);
+      expect(payload.containsKey('p_user_id'), isFalse);
     });
   });
 }

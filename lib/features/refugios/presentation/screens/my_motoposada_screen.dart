@@ -22,12 +22,18 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // Casa de motero (F-M9): cached eligibility (max-1 UX pre-check, M-CRUD-1)
+  // and last listings — eligibility/other states must not blank the tab.
+  bool? _eligibilityHas;
+  List<MotoposadaModel>? _cachedListings;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
+      context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
     });
   }
 
@@ -39,91 +45,225 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MotoposadasBloc, MotoposadasState>(
-      builder: (context, state) {
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            title: Text('MIS MOTOPOSADAS', style: AppTypography.h2.copyWith(color: AppColors.primary)),
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: AppColors.primary,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textMuted,
-              onTap: (i) {
-                if (i == 1) context.read<MotoposadasBloc>().add(const LoadMyRequests());
-              },
-              tabs: const [
-                Tab(text: 'MIS PUBLICACIONES'),
-                Tab(text: 'SOLICITUDES'),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildMyListings(state),
-              _buildRequests(state),
-            ],
-          ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateMotoposadaScreen())),
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.textOnAmber,
-            icon: const Icon(Icons.add),
-            label: const Text('CREAR'),
-          ),
-        );
+    return BlocListener<MotoposadasBloc, MotoposadasState>(
+      listener: (context, state) {
+        if (state is CasaMoteroEligibilityLoaded) {
+          setState(() => _eligibilityHas = state.has);
+        }
+        if (state is MyMotoposadasLoaded) {
+          _cachedListings = state.motoposadas;
+        }
       },
+      child: BlocBuilder<MotoposadasBloc, MotoposadasState>(
+        builder: (context, state) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: Text(
+                'MIS MOTOPOSADAS',
+                style: AppTypography.h2.copyWith(color: AppColors.primary),
+              ),
+              bottom: TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.primary,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textMuted,
+                onTap: (i) {
+                  if (i == 1) {
+                    context.read<MotoposadasBloc>().add(const LoadMyRequests());
+                  }
+                },
+                tabs: const [
+                  Tab(text: 'MIS PUBLICACIONES'),
+                  Tab(text: 'SOLICITUDES'),
+                ],
+              ),
+            ),
+            body: TabBarView(
+              controller: _tabController,
+              children: [_buildMyListings(state), _buildRequests(state)],
+            ),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CreateMotoposadaScreen(),
+                ),
+              ),
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnAmber,
+              icon: const Icon(Icons.add),
+              label: const Text('CREAR'),
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildMyListings(MotoposadasState state) {
-    if (state is MotoposadasLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    if (state is MotoposadasLoading && _cachedListings == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
     }
-    if (state is MyMotoposadasLoaded) {
-      if (state.motoposadas.isEmpty) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xxl),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    if (state is MotoposadasError && _cachedListings == null) {
+      return _buildError(state.message);
+    }
+    // Latest listings, or the last cached ones (eligibility/other states
+    // must not blank the tab — the listener keeps the cache fresh).
+    final listings = state is MyMotoposadasLoaded
+        ? state.motoposadas
+        : _cachedListings;
+    if (listings == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Casa de motero entry (M-CRUD-1 UX): only while the user does NOT
+        // already own a casa_motero (eligibility pre-check).
+        if (_eligibilityHas == false) _buildCasaMoteroEntry(),
+        Expanded(
+          child: listings.isEmpty
+              ? _buildEmptyListings()
+              : _buildListingsList(listings),
+        ),
+      ],
+    );
+  }
+
+  /// "Ofrecer casa de motero" entry — F-M9 (M-CRUD-1/5). Opens the
+  /// casa_motero create form.
+  Widget _buildCasaMoteroEntry() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: Material(
+        color: AppColors.secondary.withAlpha(12),
+        borderRadius: AppRadius.mdCircular,
+        child: InkWell(
+          borderRadius: AppRadius.mdCircular,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const CreateMotoposadaScreen(
+                mode: CreateMotoposadaMode.casaMotero,
+              ),
+            ),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              borderRadius: AppRadius.mdCircular,
+              border: Border.all(color: AppColors.secondary.withAlpha(60)),
+            ),
+            child: Row(
               children: [
-                Icon(AppIcons.shelter, size: 64, color: AppColors.textMuted.withAlpha(60)),
-                const SizedBox(height: AppSpacing.lg),
-                Text('Todavía no ofrecés nada', style: AppTypography.h2.copyWith(color: AppColors.textSecondary)),
-                const SizedBox(height: AppSpacing.md),
-                ElevatedButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateMotoposadaScreen())),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.textOnAmber),
-                  child: const Text('OFRECER MI ESPACIO'),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withAlpha(25),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: const Icon(
+                    Icons.home_work_outlined,
+                    color: AppColors.secondary,
+                    size: 24,
+                  ),
                 ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ofrecer casa de motero',
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Recibí moteros con tu espacio',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppColors.secondary),
               ],
             ),
           ),
-        );
-      }
-      return RefreshIndicator(
-        onRefresh: () async => context.read<MotoposadasBloc>().add(const LoadMyMotoposadas()),
-        child: ListView.builder(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          itemCount: state.motoposadas.length,
-          itemBuilder: (_, i) => _buildListingCard(state.motoposadas[i]),
         ),
-      );
-    }
-    if (state is MotoposadasError) return _buildError(state.message);
-    return const SizedBox.shrink();
+      ),
+    );
+  }
+
+  Widget _buildEmptyListings() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              AppIcons.shelter,
+              size: 64,
+              color: AppColors.textMuted.withAlpha(60),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Todavía no ofrecés nada',
+              style: AppTypography.h2.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CreateMotoposadaScreen(),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnAmber,
+              ),
+              child: const Text('OFRECER MI ESPACIO'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListingsList(List<MotoposadaModel> listings) {
+    return RefreshIndicator(
+      onRefresh: () async =>
+          context.read<MotoposadasBloc>().add(const LoadMyMotoposadas()),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        itemCount: listings.length,
+        itemBuilder: (_, i) => _buildListingCard(listings[i]),
+      ),
+    );
   }
 
   Widget _buildListingCard(MotoposadaModel mp) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => MotoposadaDetailScreen(motoposadaId: mp.id)),
+        MaterialPageRoute(
+          builder: (_) => MotoposadaDetailScreen(motoposadaId: mp.id),
+        ),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -131,43 +271,243 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: AppRadius.mdCircular,
-          border: Border.all(color: mp.isActive ? AppColors.primary.withAlpha(30) : AppColors.border),
+          border: Border.all(
+            color: mp.isActive
+                ? AppColors.primary.withAlpha(30)
+                : AppColors.border,
+          ),
         ),
-        child: Row(children: [
-          Container(
-            width: 48, height: 48,
-            decoration: BoxDecoration(
-              color: mp.isActive ? AppColors.primary.withAlpha(15) : AppColors.input,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: mp.isActive
+                        ? AppColors.primary.withAlpha(15)
+                        : AppColors.input,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Icon(
+                    mp.isCasaMotero
+                        ? Icons.home_work_outlined
+                        : (mp.type == 'casa'
+                              ? Icons.home
+                              : Icons.garage_outlined),
+                    color: mp.isCasaMotero
+                        ? AppColors.secondary
+                        : AppColors.primary,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mp.title,
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${mp.poiTypeLabel} · ${mp.visibilityLabel}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: mp.isActive
+                        ? AppColors.success.withAlpha(20)
+                        : AppColors.textDisabled.withAlpha(20),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    mp.isActive ? 'ACTIVO' : 'INACTIVO',
+                    style: AppTypography.caption.copyWith(
+                      color: mp.isActive
+                          ? AppColors.success
+                          : AppColors.textDisabled,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: Icon(mp.type == 'casa' ? Icons.home : Icons.garage_outlined, color: AppColors.primary, size: 24),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(mp.title, style: AppTypography.body.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-              Text('${mp.typeLabel} · ${mp.visibilityLabel}', style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
-            ]),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: mp.isActive ? AppColors.success.withAlpha(20) : AppColors.textDisabled.withAlpha(20),
-              borderRadius: BorderRadius.circular(4),
+            // Casa de motero owner actions (M-CRUD-2/5): edit, disponible
+            // toggle and delete — only rendered for the owner's casa_motero.
+            if (mp.isCasaMotero) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const Divider(color: AppColors.border, height: 1),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openCasaMoteroEdit(mp),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text(
+                        'EDITAR',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.secondary,
+                        side: const BorderSide(color: AppColors.secondary),
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _confirmDeleteCasaMotero(mp),
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: const Text(
+                        'ELIMINAR',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'DISPONIBLE',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Switch(
+                        value: mp.isActive,
+                        activeThumbColor: AppColors.primary,
+                        onChanged: (_) => context.read<MotoposadasBloc>().add(
+                          UpdateCasaMotero(
+                            id: mp.id,
+                            title: mp.title,
+                            description: mp.description,
+                            maxGuests: mp.maxGuests,
+                            lat: mp.lat,
+                            lng: mp.lng,
+                            isActive: !mp.isActive,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Edit flow (M-CRUD-5): reuses the create form in casa_motero edit mode;
+  /// the form prefetches owner-only details via LoadCasaMoteroDetails.
+  void _openCasaMoteroEdit(MotoposadaModel mp) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateMotoposadaScreen(
+          mode: CreateMotoposadaMode.casaMotero,
+          existing: mp,
+        ),
+      ),
+    );
+  }
+
+  /// Delete flow (M-CRUD-2): confirm dialog, then `mp_delete_own` — the
+  /// details row disappears via FK CASCADE (atomic).
+  void _confirmDeleteCasaMotero(MotoposadaModel mp) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline, color: AppColors.error, size: 22),
+            const SizedBox(width: AppSpacing.sm),
+            const Text(
+              'Eliminar tu casa de motero',
+              style: TextStyle(color: AppColors.textPrimary),
             ),
-            child: Text(mp.isActive ? 'ACTIVO' : 'INACTIVO', style: AppTypography.caption.copyWith(
-              color: mp.isActive ? AppColors.success : AppColors.textDisabled,
-              fontWeight: FontWeight.w700, fontSize: 10,
-            )),
+          ],
+        ),
+        content: Text(
+          'Se va a eliminar "${mp.title}" y ya no aparecerá en el mapa. '
+          'Esta acción no se puede deshacer.',
+          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'CANCELAR',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
-        ]),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<MotoposadasBloc>().add(DeleteMotoposada(id: mp.id));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text(
+              'SÍ, ELIMINAR',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildRequests(MotoposadasState state) {
     if (state is MotoposadasLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
     }
     if (state is RequestsLoaded) {
       if (state.requests.isEmpty) {
@@ -175,15 +515,23 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.inbox_outlined, size: 64, color: AppColors.textMuted.withAlpha(60)),
+              Icon(
+                Icons.inbox_outlined,
+                size: 64,
+                color: AppColors.textMuted.withAlpha(60),
+              ),
               const SizedBox(height: AppSpacing.lg),
-              Text('Sin solicitudes aún', style: AppTypography.body.copyWith(color: AppColors.textMuted)),
+              Text(
+                'Sin solicitudes aún',
+                style: AppTypography.body.copyWith(color: AppColors.textMuted),
+              ),
             ],
           ),
         );
       }
       return RefreshIndicator(
-        onRefresh: () async => context.read<MotoposadasBloc>().add(const LoadMyRequests()),
+        onRefresh: () async =>
+            context.read<MotoposadasBloc>().add(const LoadMyRequests()),
         child: ListView.builder(
           padding: const EdgeInsets.all(AppSpacing.md),
           itemCount: state.requests.length,
@@ -191,7 +539,9 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         ),
       );
     }
-    return const Center(child: Text('Cargando...', style: TextStyle(color: AppColors.textMuted)));
+    return const Center(
+      child: Text('Cargando...', style: TextStyle(color: AppColors.textMuted)),
+    );
   }
 
   Widget _buildRequestCard(MotoposadaRequestModel req) {
@@ -203,95 +553,173 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         borderRadius: AppRadius.mdCircular,
         border: Border.all(color: _statusColor(req.status)),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.input, borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(Icons.person_outline, color: AppColors.textMuted),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.input,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      req.guestName ?? req.guestId.substring(0, 8),
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (req.guestLevel != null)
+                      Text(
+                        'Nv. ${req.guestLevel} · Trust: ${req.guestTrustScore ?? 50}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _statusBadge(req.status),
+            ],
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(req.guestName ?? req.guestId.substring(0, 8), style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
-              if (req.guestLevel != null)
-                Text('Nv. ${req.guestLevel} · Trust: ${req.guestTrustScore ?? 50}', style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
-            ]),
-          ),
-          _statusBadge(req.status),
-        ]),
-        const SizedBox(height: AppSpacing.sm),
-        Text('${_formatDate(req.checkIn)} → ${_formatDate(req.checkOut)} · ${req.guestCount} huésped(es)', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-        if (req.message.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(req.message, style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-        ],
-        if (req.status == 'pending') ...[
           const SizedBox(height: AppSpacing.sm),
-          Row(children: [
-            Expanded(
-              child: SizedBox(
-                height: 36,
-                child: ElevatedButton(
-                  onPressed: () => context.read<MotoposadasBloc>().add(RespondToRequest(
-                    requestId: req.id, status: 'approved',
-                  )),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success, foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('ACEPTAR', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                ),
+          Text(
+            '${_formatDate(req.checkIn)} → ${_formatDate(req.checkOut)} · ${req.guestCount} huésped(es)',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (req.message.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              req.message,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textMuted,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: SizedBox(
-                height: 36,
-                child: OutlinedButton(
-                  onPressed: () => context.read<MotoposadasBloc>().add(RespondToRequest(
-                    requestId: req.id, status: 'rejected',
-                  )),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    side: const BorderSide(color: AppColors.error),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ],
+          if (req.status == 'pending') ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: ElevatedButton(
+                      onPressed: () => context.read<MotoposadasBloc>().add(
+                        RespondToRequest(requestId: req.id, status: 'approved'),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'ACEPTAR',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: const Text('RECHAZAR', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                 ),
-              ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: OutlinedButton(
+                      onPressed: () => context.read<MotoposadasBloc>().add(
+                        RespondToRequest(requestId: req.id, status: 'rejected'),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'RECHAZAR',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ]),
+          ],
         ],
-      ]),
+      ),
     );
   }
 
   Color _statusColor(String s) {
     switch (s) {
-      case 'pending': return AppColors.warning.withAlpha(60);
-      case 'approved': return AppColors.success.withAlpha(60);
-      case 'rejected': return AppColors.error.withAlpha(60);
-      case 'completed': return AppColors.info.withAlpha(60);
-      default: return AppColors.border;
+      case 'pending':
+        return AppColors.warning.withAlpha(60);
+      case 'approved':
+        return AppColors.success.withAlpha(60);
+      case 'rejected':
+        return AppColors.error.withAlpha(60);
+      case 'completed':
+        return AppColors.info.withAlpha(60);
+      default:
+        return AppColors.border;
     }
   }
 
   Widget _statusBadge(String s) {
-    Color c; String l;
+    Color c;
+    String l;
     switch (s) {
-      case 'pending': c = AppColors.warning; l = 'PENDIENTE';
-      case 'approved': c = AppColors.success; l = 'ACEPTADO';
-      case 'rejected': c = AppColors.error; l = 'RECHAZADO';
-      case 'completed': c = AppColors.info; l = 'COMPLETADO';
-      default: c = AppColors.textMuted; l = s.toUpperCase();
+      case 'pending':
+        c = AppColors.warning;
+        l = 'PENDIENTE';
+      case 'approved':
+        c = AppColors.success;
+        l = 'ACEPTADO';
+      case 'rejected':
+        c = AppColors.error;
+        l = 'RECHAZADO';
+      case 'completed':
+        c = AppColors.info;
+        l = 'COMPLETADO';
+      default:
+        c = AppColors.textMuted;
+        l = s.toUpperCase();
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: c.withAlpha(20), borderRadius: BorderRadius.circular(4)),
-      child: Text(l, style: AppTypography.caption.copyWith(color: c, fontWeight: FontWeight.w700, fontSize: 10)),
+      decoration: BoxDecoration(
+        color: c.withAlpha(20),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        l,
+        style: AppTypography.caption.copyWith(
+          color: c,
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+        ),
+      ),
     );
   }
 
@@ -304,11 +732,20 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
           children: [
             const Icon(AppIcons.error, size: 48, color: AppColors.error),
             const SizedBox(height: AppSpacing.md),
-            Text(msg, style: AppTypography.body.copyWith(color: AppColors.textMuted), textAlign: TextAlign.center),
+            Text(
+              msg,
+              style: AppTypography.body.copyWith(color: AppColors.textMuted),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppSpacing.lg),
             ElevatedButton(
-              onPressed: () => context.read<MotoposadasBloc>().add(const LoadMyMotoposadas()),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.textOnAmber),
+              onPressed: () => context.read<MotoposadasBloc>().add(
+                const LoadMyMotoposadas(),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnAmber,
+              ),
               child: const Text('REINTENTAR'),
             ),
           ],
@@ -317,5 +754,6 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
     );
   }
 
-  String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 }
