@@ -96,8 +96,32 @@ Notas:
 **Commit:** `feat(tracker): waypoints raid UI — INICIAR VIAJE, HUD Marcar parada, trace post-trip (M-RTR-1/2/3/6)` (8f00906)
 
 ### Pendientes
-- [ ] Fase 6: W4 — `ConquestPhotoUploader` + flujo fotos en summary (depende Fase 1, 5) — delegación narrow next
 - [ ] Fase 7: W5 — `isExpiredRaid` + markers Rodar + `gte` Explorar — delegación narrow next
 - [ ] 3.8: GitHub issue de deuda (ProfileScreen/ShowcaseProfileScreen inalcanzables) — lo crea el orquestador
 - [ ] Open questions: M-ERV-5 bottom sheet spec-literal; prod `saved_routes` `information_schema` antes de apply 028/029 a prod
 - [ ] Version bump + build + verificación en dispositivo (orquestador, tras Fases 6-7)
+
+---
+
+## Batch 3 — Fase 6 ✅ COMPLETA (retoma inline del orquestador tras mid-GREEN)
+
+> El sub-agente escribió RED verificado (8 upload + 4 widget) + GREEN sin compilar; el orquestador cerró el ciclo inline.
+
+### Fase 6 — W4: fotos de conquista post-viaje (M-CPU-1..4) ✅
+
+| Task | Estado | Evidencia |
+|------|--------|-----------|
+| 6.1 RED `test/features/showcase/data/conquest_photo_upload_test.dart` (8 tests) | ✅ | STRICT TDD: escrito ANTES (RED por compilación — repository no existía). Cubre: firma real `insertConquestPhoto` ({userId, source, sourceId?, photoUrl, caption?} → payload user_id/source/source_id/photo_url/caption), `uploadConquestPhoto` (bucket 'conquest-photos', path `<userId>/<millis>_<n>.jpg`, getPublicUrl, errores propagados, 2 uploads → paths distintos), `resolveConquestPhotoSource` puro (raid→'raid'/raidId; standalone→'route'/savedRouteId; raid gana). |
+| 6.2 GREEN `conquest_photo_repository.dart` | ✅ | typedefs `ConquestPhotoUploader`/`ConquestPhotoInserter` (patrón whatsapp_launcher) + `uploadConquestPhoto` + `insertConquestPhotoRow` (primer call site del datasource) + `resolveConquestPhotoSource` puro. |
+| 6.3 RED `post_trip_summary_photos_test.dart` (4 widget tests aislados) | ✅ | STRICT TDD: escrito ANTES (RED por compilación). `ConquestPhotoButton` aislado (SIN FlutterMap — precedente Fase 5). |
+| 6.4 GREEN `conquest_photo_button.dart` + wiring | ✅ | Picker inyectable (galería 1920/85); raid → upload+insert inmediato source 'raid'/raidId; standalone → upload inmediato + cola `_pendingInserts` flush en `TrackerSaveSucceeded` (source 'route'/savedRouteId), `TrackerSaveFailed` → SnackBar 'Guarda la ruta…' + cola NO vaciada; fila NUNCA con source_id null (M-CPU-2); residual huérfano en storage documentado (design §4.1). Wiring: `post_trip_summary_screen.dart` (param userId + botón reemplaza placeholder 'Fotos — próximamente') + `route_tracker_screen.dart` (userId del auth en el push). |
+| 6.5 Fixes del orquestador | ✅ | (a) `BlocProvider.value(value:)` → `BlocProvider(create:)` — patrón probado del repo (los tests que pasan usan create:); (b) assert del SnackBar 'Guarda la ruta' convertido a source-verified: el 'Foto añadida' (4s) queda visible y el segundo SnackBar se ENCOLA en el ScaffoldMessenger — bajo FakeAsync es timing-frágil (mismo pozo que el hang de Fase 5); se mantiene el núcleo M-CPU-2 (inserter.calls vacío, cola no vaciada); (c) 3 lints del test limpiados (param unused + 2 @override). |
+| Checkpoint | ✅ | 12/12 GREEN (8+4); suite completa **307/307 PASS**; analyze **579** = baseline (cero issues en tocados). |
+
+**Commit:** `feat(showcase): upload de fotos de conquista post-viaje (M-CPU)` (bc815b9)
+
+### Pendientes
+- [ ] Fase 7: W5 — `isExpiredRaid` + markers Rodar + `gte` Explorar (última fase de implementación)
+- [ ] 3.8: GitHub issue de deuda — orquestador
+- [ ] Open questions: M-ERV-5; prod `saved_routes` information_schema
+- [ ] Version bump + build + verificación en dispositivo — orquestador
