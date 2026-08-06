@@ -223,8 +223,7 @@ class CasaMoteroCard extends StatelessWidget {
                     icon: Icons.navigation_rounded,
                     label: 'Waze',
                     color: const Color(0xFF33CCFF),
-                    onTap: () =>
-                        NavigationHandler.launchWaze(mp.lat, mp.lng),
+                    onTap: () => NavigationHandler.launchWaze(mp.lat, mp.lng),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -244,9 +243,9 @@ class CasaMoteroCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => context
-                    .read<MotoposadasBloc>()
-                    .add(FetchCasaMoteroWhatsapp(id: mp.id)),
+                onPressed: () => context.read<MotoposadasBloc>().add(
+                  FetchCasaMoteroWhatsapp(id: mp.id),
+                ),
                 icon: const Icon(Icons.chat_bubble_outline, size: 18),
                 label: const Text('Contactar', style: AppTypography.button),
                 style: ElevatedButton.styleFrom(

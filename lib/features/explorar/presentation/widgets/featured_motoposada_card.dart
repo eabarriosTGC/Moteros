@@ -64,7 +64,9 @@ class FeaturedMotoposadaCard extends StatelessWidget {
             if (motoposada.hostName != null)
               Text(
                 'Anfitrión: ${motoposada.hostName}',
-                style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -74,16 +76,23 @@ class FeaturedMotoposadaCard extends StatelessWidget {
             // "Ubicación aproximada" instead.
             Row(
               children: [
-                const Icon(Icons.location_on, size: 12, color: AppColors.textMuted),
+                const Icon(
+                  Icons.location_on,
+                  size: 12,
+                  color: AppColors.textMuted,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     motoposada.isCasaMotero
                         ? 'Ubicación aproximada'
                         : motoposada.address.isNotEmpty
-                            ? motoposada.address
-                            : '${motoposada.lat.toStringAsFixed(4)}, ${motoposada.lng.toStringAsFixed(4)}',
-                    style: AppTypography.caption.copyWith(color: AppColors.textMuted, fontSize: 9),
+                        ? motoposada.address
+                        : '${motoposada.lat.toStringAsFixed(4)}, ${motoposada.lng.toStringAsFixed(4)}',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textMuted,
+                      fontSize: 9,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

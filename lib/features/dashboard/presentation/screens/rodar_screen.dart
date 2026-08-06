@@ -107,8 +107,10 @@ class _RodarScreenState extends State<RodarScreen>
           children: [
             Icon(Icons.route_rounded, color: AppColors.primary, size: 22),
             const SizedBox(width: AppSpacing.sm),
-            const Text('Viaje pendiente',
-                style: TextStyle(color: AppColors.textPrimary)),
+            const Text(
+              'Viaje pendiente',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
           ],
         ),
         content: const Text(
@@ -119,8 +121,10 @@ class _RodarScreenState extends State<RodarScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'discard'),
-            child: const Text('DESCARTAR',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: const Text(
+              'DESCARTAR',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, 'continue'),
@@ -128,8 +132,10 @@ class _RodarScreenState extends State<RodarScreen>
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.textOnAmber,
             ),
-            child: const Text('CONTINUAR',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: const Text(
+              'CONTINUAR',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -142,8 +148,7 @@ class _RodarScreenState extends State<RodarScreen>
       context.read<TrackerBloc>().add(ResumeFromCheckpoint());
       Navigator.push(
         context,
-        MaterialPageRoute(
-            builder: (_) => const RouteTrackerScreen()),
+        MaterialPageRoute(builder: (_) => const RouteTrackerScreen()),
       );
     }
   }
@@ -178,39 +183,40 @@ class _RodarScreenState extends State<RodarScreen>
         }
       },
       child: Scaffold(
-      backgroundColor: isDark ? AppColors.monitor : AppColors.lightMonitor,
-      body: Stack(
-        children: [
-          // ── Base map layer ──
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _defaultCenter,
-              initialZoom: 5,
-              minZoom: 3,
-              maxZoom: 18,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
+        backgroundColor: isDark ? AppColors.monitor : AppColors.lightMonitor,
+        body: Stack(
+          children: [
+            // ── Base map layer ──
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _defaultCenter,
+                initialZoom: 5,
+                minZoom: 3,
+                maxZoom: 18,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all,
+                ),
               ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c'],
-                userAgentPackageName: 'com.moteros.moteros_app',
-              ),
-              // Motoposada POI markers
-              BlocBuilder<MotoposadasBloc, MotoposadasState>(
-                builder: (context, state) {
-                  if (state is! MotoposadasLoaded) {
-                    return const SizedBox.shrink();
-                  }
-                  return MarkerLayer(
-                    markers: state.motoposadas
-                        .where((m) => m.isActive)
-                        .map((m) => Marker(
+              children: [
+                TileLayer(
+                  urlTemplate: isDark
+                      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                  subdomains: const ['a', 'b', 'c'],
+                  userAgentPackageName: 'com.moteros.moteros_app',
+                ),
+                // Motoposada POI markers
+                BlocBuilder<MotoposadasBloc, MotoposadasState>(
+                  builder: (context, state) {
+                    if (state is! MotoposadasLoaded) {
+                      return const SizedBox.shrink();
+                    }
+                    return MarkerLayer(
+                      markers: state.motoposadas
+                          .where((m) => m.isActive)
+                          .map(
+                            (m) => Marker(
                               point: LatLng(m.lat, m.lng),
                               width: 120,
                               height: 60,
@@ -219,215 +225,231 @@ class _RodarScreenState extends State<RodarScreen>
                                     ? showCasaMoteroCard(context, m)
                                     : _showMotoposadaCard(context, m),
                                 child: switch (markerKindFor(m)) {
-                                  MarkerKind.tourist =>
-                                    TouristPoiMarker(title: m.title),
-                                  MarkerKind.casaMotero =>
-                                    CasaMoteroMarker(title: m.title),
-                                  MarkerKind.standard =>
-                                    _buildMotoposadaMarker(m),
+                                  MarkerKind.tourist => TouristPoiMarker(
+                                    title: m.title,
+                                  ),
+                                  MarkerKind.casaMotero => CasaMoteroMarker(
+                                    title: m.title,
+                                  ),
+                                  MarkerKind.standard => _buildMotoposadaMarker(
+                                    m,
+                                  ),
                                 },
                               ),
-                            ))
-                        .toList(),
-                  );
-                },
-              ),
-              // Raid markers — public upcoming/active rides (F-M8)
-              BlocBuilder<RaidBloc, RaidState>(
-                builder: (context, state) {
-                  if (state is! RaidsLoaded) {
-                    return const SizedBox.shrink();
-                  }
-                  final markers = state.raids
-                      .where((r) =>
-                          (r['status'] == 'lobby' ||
-                              r['status'] == 'planned' ||
-                              r['status'] == 'active') &&
-                          r['origin_lat'] != null &&
-                          r['origin_lng'] != null)
-                      .map((r) {
-                    final isActive = r['status'] == 'active';
-                    return Marker(
-                      point: LatLng(
-                        (r['origin_lat'] as num).toDouble(),
-                        (r['origin_lng'] as num).toDouble(),
-                      ),
-                      width: 40,
-                      height: 40,
-                      child: GestureDetector(
-                        onTap: () => showRaidJoinSheet(context, r),
-                        child: RaidMarker(isActive: isActive),
-                      ),
+                            ),
+                          )
+                          .toList(),
                     );
-                  }).toList();
-                  if (markers.isEmpty) return const SizedBox.shrink();
-                  return MarkerLayer(markers: markers);
-                },
-              ),
-              // Blue dot — user's current location with heading
-              if (_currentPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _currentPosition!,
-                      width: 32,
-                      height: 32,
-                      child: BlueDotMarker(
-                        position: _currentPosition!,
-                        heading: _currentHeading,
-                      ),
-                    ),
-                  ],
+                  },
                 ),
-              // Search result marker (cyan, temporary)
-              if (_searchResultMarker != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _searchResultMarker!,
-                      width: 28,
-                      height: 28,
-                      child: _buildSearchResultMarker(),
-                    ),
-                  ],
+                // Raid markers — public upcoming/active rides (F-M8)
+                BlocBuilder<RaidBloc, RaidState>(
+                  builder: (context, state) {
+                    if (state is! RaidsLoaded) {
+                      return const SizedBox.shrink();
+                    }
+                    final markers = state.raids
+                        .where(
+                          (r) =>
+                              (r['status'] == 'lobby' ||
+                                  r['status'] == 'planned' ||
+                                  r['status'] == 'active') &&
+                              r['origin_lat'] != null &&
+                              r['origin_lng'] != null,
+                        )
+                        .map((r) {
+                          final isActive = r['status'] == 'active';
+                          return Marker(
+                            point: LatLng(
+                              (r['origin_lat'] as num).toDouble(),
+                              (r['origin_lng'] as num).toDouble(),
+                            ),
+                            width: 40,
+                            height: 40,
+                            child: GestureDetector(
+                              onTap: () => showRaidJoinSheet(context, r),
+                              child: RaidMarker(isActive: isActive),
+                            ),
+                          );
+                        })
+                        .toList();
+                    if (markers.isEmpty) return const SizedBox.shrink();
+                    return MarkerLayer(markers: markers);
+                  },
                 ),
-            ],
-          ),
-
-          // ── Top overlay: KM counter card ──
-          BlocBuilder<DashboardBloc, DashboardState>(
-            builder: (context, state) {
-              if (state is DashboardLoaded) {
-                WidgetsBinding.instance
-                    .addPostFrameCallback((_) => _animateKm());
-                return Positioned(
-                  top: MediaQuery.of(context).padding.top + 8,
-                  left: 12,
-                  right: 12,
-                  child: _buildKmOverlay(state),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-
-          // ── Recenter button (above Rodar FAB) ──
-          if (_currentPosition != null)
-            Positioned(
-              bottom: 100,
-              right: 16,
-              child: RecenterButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _mapController.move(_currentPosition!, _mapController.camera.zoom);
-                },
-              ),
-            ),
-
-          // ── Search bar + results ──
-          const Positioned(
-            top: 72,
-            left: 12,
-            right: 12,
-            child: PlaceSearchBar(),
-          ),
-          const Positioned(
-            top: 116,
-            left: 12,
-            right: 12,
-            child: SearchResultsList(),
-          ),
-
-          // ── Rodar FAB ──
-          Positioned(
-            bottom: 24,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: FloatingActionButton.large(
-                onPressed: () {
-                  _tap();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const RouteTrackerScreen()),
-                  );
-                },
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-                shape: const CircleBorder(),
-                elevation: 8,
-                child: const Icon(Icons.fiber_manual_record, size: 48),
-              ),
-            ),
-          ),
-
-          // ── Bottom sheet: raids + recent rides ──
-          DraggableScrollableSheet(
-            initialChildSize: 0.30,
-            minChildSize: 0.12,
-            maxChildSize: 0.50,
-            builder: (context, scrollController) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.overlay,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-                  border: Border(
-                    top: BorderSide(color: AppColors.border, width: 0.5),
-                  ),
-                ),
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    // Drag handle
-                    Center(
-                      child: Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppColors.textMuted.withAlpha(80),
-                          borderRadius: BorderRadius.circular(2),
+                // Blue dot — user's current location with heading
+                if (_currentPosition != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _currentPosition!,
+                        width: 32,
+                        height: 32,
+                        child: BlueDotMarker(
+                          position: _currentPosition!,
+                          heading: _currentHeading,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    // Stats subtitle
-                    BlocBuilder<DashboardBloc, DashboardState>(
-                      builder: (context, state) {
-                        if (state is! DashboardLoaded) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: Text(
-                            '${state.placesVisited} lugares · ${state.challengesCompleted} retos',
-                            style: AppTypography.body.copyWith(
-                              color: AppColors.textMuted,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      },
-                    ),
-                    // Section header
-                    _sectionHeader('PRÓXIMOS RAIDS'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildRaidSection(),
-                    const SizedBox(height: AppSpacing.sm),
-                    // Recent rides placeholder
-                    _sectionHeader('VIAJES RECIENTES'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildRecentRidesPlaceholder(),
-                  ],
+                    ],
+                  ),
+                // Search result marker (cyan, temporary)
+                if (_searchResultMarker != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _searchResultMarker!,
+                        width: 28,
+                        height: 28,
+                        child: _buildSearchResultMarker(),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+
+            // ── Top overlay: KM counter card ──
+            BlocBuilder<DashboardBloc, DashboardState>(
+              builder: (context, state) {
+                if (state is DashboardLoaded) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _animateKm(),
+                  );
+                  return Positioned(
+                    top: MediaQuery.of(context).padding.top + 8,
+                    left: 12,
+                    right: 12,
+                    child: _buildKmOverlay(state),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+
+            // ── Recenter button (above Rodar FAB) ──
+            if (_currentPosition != null)
+              Positioned(
+                bottom: 100,
+                right: 16,
+                child: RecenterButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _mapController.move(
+                      _currentPosition!,
+                      _mapController.camera.zoom,
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ],
+              ),
+
+            // ── Search bar + results ──
+            const Positioned(
+              top: 72,
+              left: 12,
+              right: 12,
+              child: PlaceSearchBar(),
+            ),
+            const Positioned(
+              top: 116,
+              left: 12,
+              right: 12,
+              child: SearchResultsList(),
+            ),
+
+            // ── Rodar FAB ──
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: FloatingActionButton.large(
+                  onPressed: () {
+                    _tap();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RouteTrackerScreen(),
+                      ),
+                    );
+                  },
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                  shape: const CircleBorder(),
+                  elevation: 8,
+                  child: const Icon(Icons.fiber_manual_record, size: 48),
+                ),
+              ),
+            ),
+
+            // ── Bottom sheet: raids + recent rides ──
+            DraggableScrollableSheet(
+              initialChildSize: 0.30,
+              minChildSize: 0.12,
+              maxChildSize: 0.50,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.overlay,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.lg),
+                    ),
+                    border: Border(
+                      top: BorderSide(color: AppColors.border, width: 0.5),
+                    ),
+                  ),
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    children: [
+                      // Drag handle
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.textMuted.withAlpha(80),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      // Stats subtitle
+                      BlocBuilder<DashboardBloc, DashboardState>(
+                        builder: (context, state) {
+                          if (state is! DashboardLoaded) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.sm,
+                            ),
+                            child: Text(
+                              '${state.placesVisited} lugares · ${state.challengesCompleted} retos',
+                              style: AppTypography.body.copyWith(
+                                color: AppColors.textMuted,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        },
+                      ),
+                      // Section header
+                      _sectionHeader('PRÓXIMOS RAIDS'),
+                      const SizedBox(height: AppSpacing.sm),
+                      _buildRaidSection(),
+                      const SizedBox(height: AppSpacing.sm),
+                      // Recent rides placeholder
+                      _sectionHeader('VIAJES RECIENTES'),
+                      const SizedBox(height: AppSpacing.sm),
+                      _buildRecentRidesPlaceholder(),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   // ── Search result marker (cyan dot + pin) ──
@@ -702,8 +724,7 @@ class _RodarScreenState extends State<RodarScreen>
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.textOnAmber,
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape:
-                  RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
               minimumSize: const Size(0, 36),
             ),
           ),
@@ -727,8 +748,7 @@ class _RodarScreenState extends State<RodarScreen>
               foregroundColor: AppColors.primary,
               side: const BorderSide(color: AppColors.primary),
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape:
-                  RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
               minimumSize: const Size(0, 36),
             ),
           ),
@@ -782,7 +802,9 @@ class _RodarScreenState extends State<RodarScreen>
         context: context,
         backgroundColor: AppColors.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.lg),
+          ),
         ),
         builder: (ctx) => SafeArea(
           child: Padding(
@@ -916,7 +938,12 @@ class _RodarScreenState extends State<RodarScreen>
 
   /// Build navigation buttons row — single button if only one app available,
   /// two side-by-side if both are available.
-  Widget _buildNavRow(BuildContext ctx, MotoposadaModel mp, bool wazeOk, bool mapsOk) {
+  Widget _buildNavRow(
+    BuildContext ctx,
+    MotoposadaModel mp,
+    bool wazeOk,
+    bool mapsOk,
+  ) {
     if (!wazeOk && !mapsOk) {
       return Container(
         width: double.infinity,
@@ -945,21 +972,27 @@ class _RodarScreenState extends State<RodarScreen>
     if (wazeOk && mapsOk) {
       return Row(
         children: [
-          Expanded(child: _navButton(
-            ctx, mp,
-            icon: Icons.navigation_rounded,
-            label: 'Waze',
-            color: const Color(0xFF33CCFF),
-            onTap: () => NavigationHandler.launchWaze(mp.lat, mp.lng),
-          )),
+          Expanded(
+            child: _navButton(
+              ctx,
+              mp,
+              icon: Icons.navigation_rounded,
+              label: 'Waze',
+              color: const Color(0xFF33CCFF),
+              onTap: () => NavigationHandler.launchWaze(mp.lat, mp.lng),
+            ),
+          ),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: _navButton(
-            ctx, mp,
-            icon: Icons.map_outlined,
-            label: 'Google Maps',
-            color: const Color(0xFF34A853),
-            onTap: () => NavigationHandler.launchGoogleMaps(mp.lat, mp.lng),
-          )),
+          Expanded(
+            child: _navButton(
+              ctx,
+              mp,
+              icon: Icons.map_outlined,
+              label: 'Google Maps',
+              color: const Color(0xFF34A853),
+              onTap: () => NavigationHandler.launchGoogleMaps(mp.lat, mp.lng),
+            ),
+          ),
         ],
       );
     }
@@ -967,7 +1000,8 @@ class _RodarScreenState extends State<RodarScreen>
     // Only one available → full width
     final isWaze = wazeOk;
     return _navButton(
-      ctx, mp,
+      ctx,
+      mp,
       icon: isWaze ? Icons.navigation_rounded : Icons.map_outlined,
       label: isWaze ? 'Abrir en Waze' : 'Abrir en Google Maps',
       color: isWaze ? const Color(0xFF33CCFF) : const Color(0xFF34A853),
@@ -1007,9 +1041,7 @@ class _RodarScreenState extends State<RodarScreen>
           const SizedBox(width: AppSpacing.sm),
           Text(
             label,
-            style: AppTypography.button.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: AppTypography.button.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -1017,10 +1049,10 @@ class _RodarScreenState extends State<RodarScreen>
   }
 
   Widget _sectionHeader(String text) => Text(
-        text,
-        style: AppTypography.label.copyWith(
-          color: AppColors.textMuted,
-          letterSpacing: 1.5,
-        ),
-      );
+    text,
+    style: AppTypography.label.copyWith(
+      color: AppColors.textMuted,
+      letterSpacing: 1.5,
+    ),
+  );
 }

@@ -19,10 +19,7 @@ import 'package:moteros_app/features/refugios/presentation/bloc/motoposadas_stat
 import 'package:moteros_app/features/refugios/presentation/widgets/casa_motero_marker.dart';
 import 'package:moteros_app/features/refugios/presentation/widgets/tourist_poi_marker.dart';
 
-MotoposadaModel _model({
-  String poiType = 'standard',
-  bool isTourist = false,
-}) =>
+MotoposadaModel _model({String poiType = 'standard', bool isTourist = false}) =>
     MotoposadaModel.fromMap({
       'id': 1,
       'user_id': 'user-1',
@@ -63,9 +60,7 @@ void main() {
   group('CasaMoteroMarker widget', () {
     testWidgets('renders Icons.home_rounded', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CasaMoteroMarker(title: 'Casa del Faro'),
-        ),
+        const MaterialApp(home: CasaMoteroMarker(title: 'Casa del Faro')),
       );
 
       expect(find.byIcon(Icons.home_rounded), findsOneWidget);
@@ -73,12 +68,11 @@ void main() {
       expect(find.byIcon(Icons.star_rounded), findsNothing);
     });
 
-    testWidgets('icon and chip use AppColors.secondary (not primary/warning)',
-        (tester) async {
+    testWidgets('icon and chip use AppColors.secondary (not primary/warning)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CasaMoteroMarker(title: 'Casa del Faro'),
-        ),
+        const MaterialApp(home: CasaMoteroMarker(title: 'Casa del Faro')),
       );
 
       final icon = tester.widget<Icon>(find.byIcon(Icons.home_rounded));
@@ -89,9 +83,7 @@ void main() {
 
     testWidgets('renders title chip with home emoji prefix', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: CasaMoteroMarker(title: 'Casa del Faro'),
-        ),
+        const MaterialApp(home: CasaMoteroMarker(title: 'Casa del Faro')),
       );
 
       // \u{1F3E0} is the 🏠 house emoji.

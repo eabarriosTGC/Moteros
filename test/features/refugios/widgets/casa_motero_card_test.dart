@@ -52,29 +52,32 @@ class _FakeSupabaseClient implements SupabaseClient {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
-MotoposadaModel _casaMotero() => MotoposadaModel.fromMap({
-      'id': 7,
-      'user_id': 'user-1',
-      'type': 'casa',
-      'title': 'Casa del Faro',
-      'description': 'Hospedaje para moteros con parqueadero techado',
-      'lat': 4.5991,
-      'lng': -74.0761,
-      'address': '',
-      'max_guests': 3,
-      'is_active': true,
-      'visibility': 'public',
-      'created_at': '2024-01-01T00:00:00.000Z',
-      'poi_type': 'casa_motero',
-      'users': {
-        'username': 'Che',
-        'created_at': '2023-08-01T00:00:00.000Z',
-        'user_xp': {'level': 5, 'km_traveled': 1200},
-        'user_achievements': [
-          {'count': 5},
-        ],
-      },
-    }, tripsByHost: {'user-1': 3});
+MotoposadaModel _casaMotero() => MotoposadaModel.fromMap(
+  {
+    'id': 7,
+    'user_id': 'user-1',
+    'type': 'casa',
+    'title': 'Casa del Faro',
+    'description': 'Hospedaje para moteros con parqueadero techado',
+    'lat': 4.5991,
+    'lng': -74.0761,
+    'address': '',
+    'max_guests': 3,
+    'is_active': true,
+    'visibility': 'public',
+    'created_at': '2024-01-01T00:00:00.000Z',
+    'poi_type': 'casa_motero',
+    'users': {
+      'username': 'Che',
+      'created_at': '2023-08-01T00:00:00.000Z',
+      'user_xp': {'level': 5, 'km_traveled': 1200},
+      'user_achievements': [
+        {'count': 5},
+      ],
+    },
+  },
+  tripsByHost: {'user-1': 3},
+);
 
 Future<_SeededBloc> _pumpCard(
   WidgetTester tester, {
@@ -86,7 +89,10 @@ Future<_SeededBloc> _pumpCard(
       value: bloc,
       child: MaterialApp(
         home: Scaffold(
-          body: CasaMoteroCard(mp: _casaMotero(), contactLauncher: contactLauncher),
+          body: CasaMoteroCard(
+            mp: _casaMotero(),
+            contactLauncher: contactLauncher,
+          ),
         ),
       ),
     ),
@@ -124,8 +130,9 @@ void main() {
       expect(find.text('Contactar'), findsOneWidget);
     });
 
-    testWidgets('NO phone and NO address in the tree (M-MAPA-3, M-WA-1)',
-        (tester) async {
+    testWidgets('NO phone and NO address in the tree (M-MAPA-3, M-WA-1)', (
+      tester,
+    ) async {
       await _pumpCard(tester);
 
       // The model carries no phone by construction; the card must not render
@@ -141,8 +148,9 @@ void main() {
   });
 
   group('CasaMoteroCard — Contactar (M-WA-1)', () {
-    testWidgets('tap dispatches FetchCasaMoteroWhatsapp with the listing id',
-        (tester) async {
+    testWidgets('tap dispatches FetchCasaMoteroWhatsapp with the listing id', (
+      tester,
+    ) async {
       final bloc = await _pumpCard(tester);
 
       await tester.scrollUntilVisible(
@@ -153,14 +161,16 @@ void main() {
       await tester.tap(find.text('Contactar'));
       await tester.pump();
 
-      final fetches =
-          bloc.dispatched.whereType<FetchCasaMoteroWhatsapp>().toList();
+      final fetches = bloc.dispatched
+          .whereType<FetchCasaMoteroWhatsapp>()
+          .toList();
       expect(fetches, hasLength(1));
       expect(fetches.single.id, 7);
     });
 
-    testWidgets('phone loaded → wa.me URL built with availability message',
-        (tester) async {
+    testWidgets('phone loaded → wa.me URL built with availability message', (
+      tester,
+    ) async {
       String? launchedPhone;
       String? launchedMessage;
       final bloc = await _pumpCard(
@@ -198,26 +208,24 @@ void main() {
   });
 
   group('CasaMoteroCard — phone null / fallback (M-WA-1/2)', () {
-    testWidgets('phone null → "El anfitrión no está disponible"',
-        (tester) async {
+    testWidgets('phone null → "El anfitrión no está disponible"', (
+      tester,
+    ) async {
       final bloc = await _pumpCard(tester);
 
       bloc.seed(const CasaMoteroWhatsappLoaded());
       await tester.pump();
       await tester.pump();
 
-      expect(
-        find.text('El anfitrión no está disponible'),
-        findsOneWidget,
-      );
+      expect(find.text('El anfitrión no está disponible'), findsOneWidget);
     });
 
-    testWidgets('canLaunch=false → WhatsApp Web fallback sheet (M-WA-2)',
-        (tester) async {
+    testWidgets('canLaunch=false → WhatsApp Web fallback sheet (M-WA-2)', (
+      tester,
+    ) async {
       final bloc = await _pumpCard(
         tester,
-        contactLauncher: (context, phone, message) =>
-            launchWhatsAppContact(
+        contactLauncher: (context, phone, message) => launchWhatsAppContact(
           context,
           phone,
           message,
@@ -234,9 +242,7 @@ void main() {
       await tester.tap(find.text('Contactar'));
       await tester.pump();
 
-      bloc.seed(
-        const CasaMoteroWhatsappLoaded(phone: '573001234567'),
-      );
+      bloc.seed(const CasaMoteroWhatsappLoaded(phone: '573001234567'));
       await tester.pump();
       await tester.pumpAndSettle();
 
