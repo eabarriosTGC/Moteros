@@ -6,12 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../patches/presentation/bloc/patches_bloc.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import '../../../refugios/presentation/bloc/motoposadas_event.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
 import '../../../refugios/presentation/screens/create_motoposada_screen.dart';
 import '../../../refugios/presentation/screens/my_motoposada_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../showcase/data/models/conquest_photo_model.dart';
+import '../../../showcase/presentation/widgets/photo_album.dart';
 import '../bloc/progreso_bloc.dart';
 import '../bloc/progreso_event.dart';
 import '../bloc/progreso_state.dart';
@@ -58,11 +61,14 @@ class _ProgresoScreenState extends State<ProgresoScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_rounded, color: AppColors.textMuted),
+            // W1 (M-PN-1): gear opens SettingsScreen directly (P2-6 —
+            // push directo, nunca pushNamed). ProfileScreen queda sin entry
+            // point vivo; sus acciones viven re-homedas en Settings.
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
-            tooltip: 'Perfil',
+            tooltip: 'Configuración',
           ),
         ],
       ),
@@ -89,7 +95,11 @@ class _ProgresoScreenState extends State<ProgresoScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     _BadgesSection(badges: state.badges),
                     const SizedBox(height: AppSpacing.lg),
+                    const _EquippedPatchesSection(),
+                    const SizedBox(height: AppSpacing.lg),
                     _RouteHistorySection(entries: state.routeHistory),
+                    const SizedBox(height: AppSpacing.lg),
+                    _PhotosSection(photos: state.photos),
                     const SizedBox(height: AppSpacing.xxl),
                   ],
                 ),
@@ -449,6 +459,157 @@ class _BadgeTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// ── Parches Equipados (M-PN-4) ──
+
+/// Sección que consume el PatchesBloc GLOBAL (app.dart:68) — NUNCA
+/// ShowcaseBloc/PatchesVitrine (M-PN-4: una sola fuente de datos, cero
+/// duplicación). Renderiza solo los earned + contador "X/Y equipados".
+class _EquippedPatchesSection extends StatefulWidget {
+  const _EquippedPatchesSection();
+
+  @override
+  State<_EquippedPatchesSection> createState() => _EquippedPatchesSectionState();
+}
+
+class _EquippedPatchesSectionState extends State<_EquippedPatchesSection> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<PatchesBloc>().add(LoadPatches());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PARCHES EQUIPADOS',
+          style: AppTypography.label.copyWith(
+            color: AppColors.textMuted,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        BlocBuilder<PatchesBloc, PatchesState>(
+          builder: (context, state) {
+            if (state is PatchesLoading) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              );
+            }
+            if (state is PatchesError) {
+              return Text(
+                'No se pudieron cargar los parches',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textMuted,
+                ),
+              );
+            }
+            if (state is! PatchesLoaded) {
+              return const SizedBox.shrink();
+            }
+            final earned = state.patches.where((p) => p.earned).toList();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${state.earned}/${state.total} equipados',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: AppSpacing.sm,
+                    mainAxisSpacing: AppSpacing.sm,
+                    childAspectRatio: 1.15,
+                  ),
+                  itemCount: earned.length,
+                  itemBuilder: (_, i) => _PatchTile(patch: earned[i]),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Tile de patch earned: glow ámbar (convención visual de
+/// PatchesVitrine._patchCard) sin su lógica de showcase.
+class _PatchTile extends StatelessWidget {
+  final PatchEntity patch;
+  const _PatchTile({required this.patch});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.primary.withAlpha(60)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withAlpha(25),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(patch.icon, style: const TextStyle(fontSize: 22)),
+          const SizedBox(height: 4),
+          Text(
+            patch.name,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ── Photos Section (B1 — M-CPU-4) ──
+
+/// Re-homes the PhotoAlbum into a live screen: the ONLY previous mount
+/// (ShowcaseProfileScreen) became unreachable when W1 killed the profile
+/// entry point. Renders the existing stateless PhotoAlbum from the SAME
+/// list ProgresoLoaded already carries — zero extra query, zero parallel
+/// source. Empty list → PhotoAlbum returns SizedBox.shrink (collapses).
+class _PhotosSection extends StatelessWidget {
+  final List<ConquestPhotoModel> photos;
+  const _PhotosSection({required this.photos});
+
+  @override
+  Widget build(BuildContext context) {
+    return PhotoAlbum(photos: photos);
   }
 }
 

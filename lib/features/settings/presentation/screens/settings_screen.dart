@@ -9,6 +9,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_event.dart';
+import '../../../profile/presentation/screens/profile_edit_screen.dart';
 import 'offline_maps_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -170,6 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? subtitle,
     required Widget trailing,
     VoidCallback? onTap,
+    Color iconColor = AppColors.textMuted,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -182,7 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Row(
         children: [
           Icon(icon,
-              color: AppColors.textMuted, size: AppSpacing.iconSm),
+              color: iconColor, size: AppSpacing.iconSm),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -286,6 +290,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: _displayName,
             trailing: Icon(Icons.edit_outlined,
                 color: AppColors.textMuted, size: 18),
+          ),
+          // W1 (M-PN-2): acciones re-homedas desde ProfileScreen — la
+          // acción de editar sobrevive al cierre del entry point.
+          _settingRow(
+            icon: Icons.badge_outlined,
+            title: 'Editar perfil',
+            trailing: const Icon(AppIcons.chevronRight,
+                color: AppColors.textMuted, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
+            ),
+          ),
+          _settingRow(
+            icon: Icons.logout,
+            iconColor: AppColors.error,
+            title: 'Cerrar sesión',
+            trailing: const Icon(AppIcons.chevronRight,
+                color: AppColors.textMuted, size: 20),
+            onTap: () => context.read<AuthBloc>().add(LogoutRequested()),
           ),
         ]),
       ],

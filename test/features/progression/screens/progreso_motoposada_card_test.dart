@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moteros_app/core/theme/design_tokens.dart';
+import 'package:moteros_app/features/patches/presentation/bloc/patches_bloc.dart';
 import 'package:moteros_app/features/progression/presentation/bloc/progreso_bloc.dart';
 import 'package:moteros_app/features/progression/presentation/bloc/progreso_event.dart';
 import 'package:moteros_app/features/progression/presentation/bloc/progreso_state.dart';
@@ -41,6 +42,13 @@ class _SeededBloc extends MotoposadasBloc {
   void add(MotoposadasEvent event) {
     dispatched.add(event);
   }
+}
+
+/// Progreso mounts _EquippedPatchesSection (M-PN-4) which reads the global
+/// PatchesBloc — provide a no-op subclass (never processes).
+class _SeededPatchesBloc extends PatchesBloc {
+  @override
+  void add(PatchesEvent event) {}
 }
 
 class _FakeSupabaseClient implements SupabaseClient {
@@ -102,6 +110,7 @@ Future<_SeededBloc> _pumpProgreso(
       providers: [
         BlocProvider<MotoposadasBloc>.value(value: motoposadasBloc),
         BlocProvider<ProgresoBloc>.value(value: progresoBloc),
+        BlocProvider<PatchesBloc>(create: (_) => _SeededPatchesBloc()),
       ],
       child: const MaterialApp(home: ProgresoScreen()),
     ),

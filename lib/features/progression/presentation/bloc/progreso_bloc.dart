@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../showcase/data/models/conquest_photo_model.dart';
 import 'progreso_event.dart';
 import 'progreso_state.dart';
 
@@ -45,7 +46,12 @@ class ProgresoBloc extends Bloc<ProgresoEvent, ProgresoState> {
 
       final totalKm = (xpData?['km_traveled'] as num?)?.toInt() ?? 0;
       final tripsCount = (xpData?['raids_completed'] as int?) ?? 0;
-      final photosCount = photosList.length;
+      // B1 (M-CPU-4): conservar la lista — el contador y el álbum derivan de
+      // la MISMA lista, sin query ni fuente paralela.
+      final photos = photosList
+          .map(ConquestPhotoModel.fromMap)
+          .toList();
+      final photosCount = photos.length;
 
       // Build badge list: mark which achievements are earned
       final earnedSet = <int>{};
@@ -75,6 +81,7 @@ class ProgresoBloc extends Bloc<ProgresoEvent, ProgresoState> {
         photosCount: photosCount,
         badges: badges,
         routeHistory: routeHistory,
+        photos: photos,
       ));
     } catch (e) {
       emit(ProgresoError('Error al cargar progreso: $e'));
