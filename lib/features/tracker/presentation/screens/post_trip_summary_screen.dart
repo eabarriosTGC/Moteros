@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../widgets/conquest_photo_button.dart';
 import 'route_tracker_screen.dart'; // for TrackerBloc, TrackerRecording, SaveRoute
 
 /// Holds the result of a completed ride for display on the summary screen.
@@ -49,6 +50,7 @@ class PostTripSummaryScreen extends StatefulWidget {
     super.key,
     required this.result,
     this.tileProvider,
+    this.userId = '',
   });
 
   final PostTripResult result;
@@ -56,6 +58,10 @@ class PostTripSummaryScreen extends StatefulWidget {
   /// Injectable TileProvider for widget tests (FakeTileProvider). Null in
   /// prod → FlutterMap usa su provider por defecto (red/FMTC).
   final TileProvider? tileProvider;
+
+  /// Owner de las fotos de conquista (W4 — M-CPU-1/2). Deriva de
+  /// `auth.currentUser.id` en el caller (route_tracker_screen).
+  final String userId;
 
   @override
   State<PostTripSummaryScreen> createState() => _PostTripSummaryScreenState();
@@ -364,29 +370,12 @@ class _PostTripSummaryScreenState extends State<PostTripSummaryScreen>
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Fotos — próximamente'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                label: const Text(
-                  'AÑADIR FOTOS',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.secondary,
-                  side: const BorderSide(color: AppColors.secondary),
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                ),
+              // W4 — M-CPU-1/2: flujo real de fotos (pick → upload → insert).
+              // Raid-linked inserta inmediato; standalone encola hasta
+              // TrackerSaveSucceeded (ver conquest_photo_button.dart).
+              child: ConquestPhotoButton(
+                userId: widget.userId,
+                raidId: widget.result.raidId,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),

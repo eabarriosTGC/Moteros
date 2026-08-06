@@ -601,6 +601,10 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
                               raidId: recording.raidId,
                             ),
                             tileProvider: widget.tileProvider,
+                            // W4 — owner de las fotos de conquista.
+                            userId:
+                                Supabase.instance.client.auth.currentUser?.id ??
+                                    '',
                           ),
                         ),
                       );
