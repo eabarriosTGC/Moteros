@@ -220,7 +220,7 @@ Map<String, dynamic>? buildSavedRoutePayload({
     ),                                                      // NO GeoJSON (el mapa
                                                             //  consume List<LatLng>)
     'start_lat': points.first.latitude, 'start_lng': points.first.longitude,
-    'end_lat': points.last.longitude,  'end_lng': points.last.longitude,
+    'end_lat': points.last.latitude,  'end_lng': points.last.longitude,
     'started_at': startedAt?.toUtc().toIso8601String(),
     'ended_at': DateTime.now().toUtc().toIso8601String(),
   };

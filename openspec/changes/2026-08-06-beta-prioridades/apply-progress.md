@@ -3,7 +3,7 @@
 > Change: `2026-08-06-beta-prioridades` (W1 profile leak closure, W2 motoposada CTA, W3 raid trip registration, W4 conquest photos, W5 expired raids)
 > Branch: `beta-prioridades` (size:exception — single branch, no PR chain)
 > Mode: **STRICT TDD** (`flutter test`, RED first, `git commit --no-verify` — pre-commit hook roto)
-> Baseline: analyze = **545 issues** (`/tmp/analyze_baseline.txt`), test = **250 passed** (previo a Fase 1)
+> Baseline: analyze = **580 issues en main** (medido — delta del apply: **-1**, 579; la primera medición de 545 del batch 1 fue sobre el árbol en construcción, no main), test = **250 passed** (previo a Fase 1)
 > apply-progress.md es **merge-only**: cada batch appenda bajo su propio encabezado, nunca sobreescribe.
 
 ---
@@ -36,26 +36,26 @@ Notas:
 
 **Commit:** `fix(progression): harden _MiMotoposadaCard (colores, min-height, typo, fallback)` (--no-verify)
 
-### Fase 3 — W1 rewiring + álbum re-homado (B1) (M-PN-1..4, M-CPU-3/4) ⏳ EN CURSO (próximo en este batch)
+### Fase 3 — W1 rewiring + álbum re-homado (B1) (M-PN-1..4, M-CPU-3/4) ✅ COMPLETA (commit 1fab033)
 
 | Task | Estado | Evidencia |
 |------|--------|-----------|
-| 3.1 RED gear nav test | ⏳ | STRICT TDD: escrito ANTES (RED). |
-| 3.2 RED settings actions test | ⏳ | STRICT TDD: escrito ANTES (RED). |
-| 3.3 RED parches + photos section tests | ⏳ | STRICT TDD: escrito ANTES (RED). |
-| 3.4 RED bounded navigation-map test (M-PN-3 enmendado) | ⏳ | STRICT TDD: escrito ANTES (RED). |
-| 3.5 GREEN gear → `SettingsScreen` directo (M-PN-1) | ⏳ | |
-| 3.6 GREEN filas 'Editar perfil' + 'Cerrar sesión' en Settings (M-PN-2) | ⏳ | |
-| 3.7 GREEN `_EquippedPatchesSection` + `_PhotosSection` + `ProgresoLoaded.photos` (M-PN-4, B1) | ⏳ | |
+| 3.1 RED gear nav test | ✅ | STRICT TDD: escrito ANTES (RED). `progreso_gear_navigation_test.dart`. |
+| 3.2 RED settings actions test | ✅ | STRICT TDD: escrito ANTES (RED). `settings_screen_actions_test.dart`. |
+| 3.3 RED parches + photos section tests | ✅ | STRICT TDD: escrito ANTES (RED). `progreso_equipped_patches_test.dart` + `progreso_photos_section_test.dart`. |
+| 3.4 RED bounded navigation-map test (M-PN-3 enmendado) | ✅ | STRICT TDD: escrito ANTES (RED). `profile_navigation_map_test.dart` — excluye las 3 rutas permitidas. |
+| 3.5 GREEN gear → `SettingsScreen` directo (M-PN-1) | ✅ | progreso_screen.dart:66-74 (tooltip 'Configuración'). |
+| 3.6 GREEN filas 'Editar perfil' + 'Cerrar sesión' en Settings (M-PN-2) | ✅ | settings_screen.dart:294-313 (logout con color error). |
+| 3.7 GREEN `_EquippedPatchesSection` + `_PhotosSection` + `ProgresoLoaded.photos` (M-PN-4, B1) | ✅ | PatchesBloc (sin path paralelo); PhotoAlbum desde ProgresoLoaded.photos; query user_showcase muerta removida (progreso_bloc.dart:28-30). |
 | 3.8 Debt issue (profile screens inalcanzables) | ⏸ PENDIENTE | **NO creado en este batch** — lo crea el orquestador al final o en verify (regla repo: residual aceptado → issue). |
-| Checkpoint | ⏳ | |
+| Checkpoint | ✅ | 16/16 GREEN (5 archivos + 2 de regresión). |
 
 ### Pendientes para próximos batches (Fases 4–8)
-- [ ] Fase 4: W3 backend-bloc — `buildSavedRoutePayload`, eventos/estados, `_save` fix, waypoints (depende Fase 1)
-- [ ] Fase 5: W3 UI — 'INICIAR VIAJE' en RaidJoinSheet, HUD 'Marcar parada', trace en summary
-- [ ] Fase 6: W4 — `ConquestPhotoUploader` + flujo fotos en summary (depende Fase 1, 5)
-- [ ] Fase 7: W5 — `isExpiredRaid` + markers Rodar + `gte` Explorar
-- [ ] Fase 8: gate final (test + analyze delta 0) + version bump + build + verificación en dispositivo
+- [x] Fase 4: W3 backend-bloc — `buildSavedRoutePayload`, eventos/estados, `_save` fix, waypoints (depende Fase 1) — ✅ 59df6bb
+- [x] Fase 5: W3 UI — 'INICIAR VIAJE' en RaidJoinSheet, HUD 'Marcar parada', trace en summary — ✅ 8f00906
+- [x] Fase 6: W4 — `ConquestPhotoUploader` + flujo fotos en summary (depende Fase 1, 5) — ✅ bc815b9
+- [x] Fase 7: W5 — `isExpiredRaid` + markers Rodar + `gte` Explorar — ✅ 9d78530
+- [x] Fase 8: gate final (test + analyze delta 0) + version bump + build + verificación en dispositivo — ⏳ bump/build/device pendientes (orquestador)
 - [ ] 3.8: GitHub issue de deuda (ProfileScreen/ShowcaseProfileScreen inalcanzables) — lo crea el orquestador
 - [ ] Open questions: M-ERV-5 bottom sheet spec-literal; prod `saved_routes` `information_schema` antes de apply 028/029 a prod
 
