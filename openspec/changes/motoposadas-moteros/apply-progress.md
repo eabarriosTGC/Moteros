@@ -24,3 +24,13 @@
 - **Checkpoint parcial: 63/63** en `test/features/refugios/widgets/ + test/features/dashboard/ + test/features/explorar/`; `dart analyze` de archivos tocados: 0 issues.
 
 ## Batch 4 (parte 2) — Fase 6 (verificación final)
+
+- **Fase 5 commiteada**: `1fe7bf2` (7 files, +791/-13).
+- **Fase 6 DONE**: `8521acd` (dart format + cierre) — **250/250 suite completa, flutter analyze 580 = baseline main (delta 0)** verificado por el orquestador (re-run final).
+
+## ✅ APPLY COMPLETO — motoposadas-moteros (fases 0-6)
+
+Commits: `3c50788` (migración 026 + blur + payload), `95064b4` (wa launcher), `ea0f436` (bloc), `be1f604` (forms + My casa), `1fe7bf2` (marker + card + mapa), `8521acd` (format + cierre).
+- **250/250 tests, analyze 580 = baseline main (delta 0)**
+- ⚠ DEPLOY: migración 026 NO aplicada — deploy-side, ANTES del release (create RPC, details table, triggers, mp_insert_own re-create dependen de ella)
+- Siguiente: gatekeeper de apply (reviewer fresh-context) → sdd-verify → sdd-archive
