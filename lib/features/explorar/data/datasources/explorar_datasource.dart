@@ -43,6 +43,7 @@ class ExplorarDatasource {
             '*, raid_participants(*), users!raids_host_id_fkey(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
           )
           .eq('status', 'lobby')
+          .gte('scheduled_at', DateTime.now().toUtc().toIso8601String())
           .order('scheduled_at', ascending: true)
           .limit(10);
       final rows = (resp as List).cast<Map<String, dynamic>>();

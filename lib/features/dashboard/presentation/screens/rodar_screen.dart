@@ -255,7 +255,8 @@ class _RodarScreenState extends State<RodarScreen>
                                   r['status'] == 'planned' ||
                                   r['status'] == 'active') &&
                               r['origin_lat'] != null &&
-                              r['origin_lng'] != null,
+                              r['origin_lng'] != null &&
+                              !isExpiredRaid(r),
                         )
                         .map((r) {
                           final isActive = r['status'] == 'active';
@@ -1071,4 +1072,18 @@ class _RodarScreenState extends State<RodarScreen>
       letterSpacing: 1.5,
     ),
   );
+}
+
+/// M-ERV-1 — raid con `scheduled_at` en el pasado NO se marca en el mapa de
+/// Rodar. Pura y unit-testable. `scheduled_at` es TIMESTAMPTZ (ISO con Z →
+/// `DateTime.parse` devuelve UTC). null/ausente/corrupto → false (las filas
+/// legacy nunca rompen el filtro).
+bool isExpiredRaid(Map<String, dynamic> raid) {
+  final raw = raid['scheduled_at'];
+  if (raw == null) return false;
+  try {
+    return DateTime.parse(raw.toString()).isBefore(DateTime.now().toUtc());
+  } catch (_) {
+    return false;
+  }
 }
