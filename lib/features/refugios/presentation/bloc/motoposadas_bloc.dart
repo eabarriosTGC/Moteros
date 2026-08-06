@@ -10,6 +10,7 @@ library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/models/casa_motero_payload.dart';
 import 'motoposadas_event.dart';
 import 'motoposadas_state.dart';
 
@@ -30,6 +31,12 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<SubmitReview>(_onSubmitReview);
     on<DeleteMotoposada>(_onDelete);
     on<CreateTouristPoi>(_onCreateTouristPoi);
+    on<CheckCasaMoteroEligibility>(_onCheckCasaMoteroEligibility);
+    on<CreateCasaMotero>(_onCreateCasaMotero);
+    on<UpdateCasaMotero>(_onUpdateCasaMotero);
+    on<UpdateCasaMoteroDetails>(_onUpdateCasaMoteroDetails);
+    on<FetchCasaMoteroWhatsapp>(_onFetchCasaMoteroWhatsapp);
+    on<LoadCasaMoteroDetails>(_onLoadCasaMoteroDetails);
   }
 
   SupabaseClient get _db => _injectedClient ?? Supabase.instance.client;
@@ -359,6 +366,155 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
           .single();
 
       emit(TouristPoiCreated(resp['id'] as int));
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  // ── Casa de motero (F-M9 / F-M11) ──
+
+  /// Max-1 pre-check (M-CRUD-1): `SELECT id ... WHERE user_id = auth.uid()
+  /// AND poi_type = 'casa_motero'` — requests `id` only, never private
+  /// columns (M-MAPA-1). UX only; the DB partial unique index is the real
+  /// boundary.
+  Future<void> _onCheckCasaMoteroEligibility(
+    CheckCasaMoteroEligibility event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    try {
+      final resp = await _db
+          .from('motoposadas')
+          .select(buildCasaMoteroEligibilitySelect())
+          .eq('user_id', _uid!)
+          .eq('poi_type', 'casa_motero')
+          .maybeSingle();
+      emit(CasaMoteroEligibilityLoaded(has: resp != null));
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Create via the `create_casa_motero` RPC (SECURITY DEFINER, atomic
+  /// two-row insert, ≥300 m blur floor). Phone normalized by the payload
+  /// builder BEFORE the RPC (M-WA-1). `PostgrestException.code == '23505'`
+  /// (partial unique index) maps to `CasaMoteroAlreadyExists` — friendly
+  /// message, never a crash (M-CRUD-1).
+  Future<void> _onCreateCasaMotero(
+    CreateCasaMotero event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      final resp = await _db.rpc(
+        'create_casa_motero',
+        params: buildCasaMoteroCreateParams(
+          title: event.title,
+          description: event.description,
+          maxGuests: event.maxGuests,
+          lat: event.lat,
+          lng: event.lng,
+          latExact: event.latExact,
+          lngExact: event.lngExact,
+          whatsappPhone: event.whatsappPhone,
+          disclaimerAcceptedAt: event.disclaimerAcceptedAt!,
+        ),
+      );
+      emit(MotoposadaCreated(resp as int));
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        emit(const CasaMoteroAlreadyExists());
+      } else {
+        emit(MotoposadasError(e.message));
+      }
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Public fields + disponible toggle → `mp_update_own` (009). Carries the
+  /// re-jittered approx coords — the form re-runs blurCoordinates before
+  /// saving (design §1.4).
+  Future<void> _onUpdateCasaMotero(
+    UpdateCasaMotero event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      await _db.from('motoposadas').update({
+        'title': event.title,
+        'description': event.description,
+        'max_guests': event.maxGuests,
+        'lat': event.lat,
+        'lng': event.lng,
+        'is_active': event.isActive,
+      }).eq('id', event.id);
+      emit(const MotoposadaUpdated());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Private fields (phone + exact coords) → `cmd_update_own` on
+  /// `casa_motero_details` — owner-only RLS (M-CRUD-5). Phone normalized.
+  Future<void> _onUpdateCasaMoteroDetails(
+    UpdateCasaMoteroDetails event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      await _db.from('casa_motero_details').update({
+        'whatsapp_phone': normalizePhoneDigits(event.whatsappPhone),
+        'lat_exact': event.latExact,
+        'lng_exact': event.lngExact,
+      }).eq('user_id', _uid!);
+      emit(const MotoposadaUpdated());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Phone on demand (M-WA-1): `get_motoposada_whatsapp(id)` — returns only
+  /// the phone (never coords), NULL for inactive / non-casa_motero ids.
+  Future<void> _onFetchCasaMoteroWhatsapp(
+    FetchCasaMoteroWhatsapp event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    try {
+      final phone = await _db.rpc(
+        'get_motoposada_whatsapp',
+        params: buildCasaMoteroWhatsappParams(event.id),
+      );
+      emit(CasaMoteroWhatsappLoaded(phone: phone as String?));
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Owner-only details select for edit-form prefill (reviewer fix): phone +
+  /// exact coords — only the owner's RLS policy exposes them.
+  Future<void> _onLoadCasaMoteroDetails(
+    LoadCasaMoteroDetails event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    try {
+      final resp = await _db
+          .from('casa_motero_details')
+          .select('motoposada_id, whatsapp_phone, lat_exact, lng_exact')
+          .eq('user_id', _uid!)
+          .eq('motoposada_id', event.id)
+          .maybeSingle();
+      if (resp == null) {
+        emit(const MotoposadasError(
+          'No se encontraron los datos privados de tu casa de motero',
+        ));
+        return;
+      }
+      emit(CasaMoteroDetailsLoaded(
+        motoposadaId: resp['motoposada_id'] as int,
+        whatsappPhone: resp['whatsapp_phone'] as String,
+        latExact: (resp['lat_exact'] as num).toDouble(),
+        lngExact: (resp['lng_exact'] as num).toDouble(),
+      ));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }

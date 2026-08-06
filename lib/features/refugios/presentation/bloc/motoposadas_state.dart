@@ -105,6 +105,15 @@ final class MotoposadaModel {
       : type == 'parqueadero'
       ? 'Parqueadero'
       : 'Garage';
+
+  /// Casa de motero (F-M9): poi_type='casa_motero' — distinct marker/card
+  /// path and blurred public location (M-MAPA-2).
+  bool get isCasaMotero => poiType == 'casa_motero';
+
+  /// Badge label honoring the poi_type override: casa_motero renders
+  /// "Casa de motero" instead of the generic type label.
+  String get poiTypeLabel => isCasaMotero ? 'Casa de motero' : typeLabel;
+
   String get visibilityLabel {
     switch (visibility) {
       case 'public':
@@ -245,4 +254,52 @@ final class TouristPoiCreated extends MotoposadasState {
 
 final class TouristPoiForbidden extends MotoposadasState {
   const TouristPoiForbidden();
+}
+
+// ── Casa de motero states (F-M9 / F-M11) ──
+
+/// Max-1 UX pre-check result (M-CRUD-1): `has=true` → the create form shows
+/// the blocked UI with the "IR A MI CASA" link. UX only, never a security
+/// boundary.
+final class CasaMoteroEligibilityLoaded extends MotoposadasState {
+  final bool has;
+  const CasaMoteroEligibilityLoaded({required this.has});
+  @override
+  List<Object?> get props => [has];
+}
+
+/// Phone on demand result (M-WA-1). `phone == null` means the RPC returned
+/// NULL (inactive / not a casa_motero / unknown id) → card shows
+/// "El anfitrión no está disponible".
+final class CasaMoteroWhatsappLoaded extends MotoposadasState {
+  final String? phone;
+  const CasaMoteroWhatsappLoaded({this.phone});
+  @override
+  List<Object?> get props => [phone];
+}
+
+/// Duplicate insert mapped from PostgrestException.code == '23505'
+/// (M-CRUD-1) — the form surfaces the friendly "ya tienes una casa de
+/// motero" message. Never a crash.
+final class CasaMoteroAlreadyExists extends MotoposadasState {
+  const CasaMoteroAlreadyExists();
+}
+
+/// Owner-only details row for edit-form prefill (reviewer fix): phone +
+/// exact coords from `casa_motero_details` — never exposed on the public
+/// model.
+final class CasaMoteroDetailsLoaded extends MotoposadasState {
+  final int motoposadaId;
+  final String whatsappPhone;
+  final double latExact;
+  final double lngExact;
+  const CasaMoteroDetailsLoaded({
+    required this.motoposadaId,
+    required this.whatsappPhone,
+    required this.latExact,
+    required this.lngExact,
+  });
+  @override
+  List<Object?> get props =>
+      [motoposadaId, whatsappPhone, latExact, lngExact];
 }
