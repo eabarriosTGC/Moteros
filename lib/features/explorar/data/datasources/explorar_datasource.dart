@@ -18,7 +18,7 @@ class ExplorarDatasource {
       final resp = await _client
           .from('motoposadas')
           .select(
-            '*, users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
+            '*, users!inner(username, full_name, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
           )
           .eq('is_active', true)
           .order('created_at', ascending: false)

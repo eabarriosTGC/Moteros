@@ -177,7 +177,7 @@ void main() {
       expect(
         selectStr,
         contains(
-          'users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
+          'users!inner(username, full_name, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
         ),
         reason:
             'signals join must include created_at, km_traveled and the '
@@ -242,7 +242,7 @@ void main() {
       expect(
         selectStr,
         contains(
-          'users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
+          'users!inner(username, full_name, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
         ),
       );
       expect(selectStr, isNot(contains('saved_routes')));
@@ -326,7 +326,7 @@ void main() {
       expect(
         selectStr,
         contains(
-          'users!inner(username, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
+          'users!inner(username, full_name, created_at, user_xp!inner(level, km_traveled), user_achievements(count))',
         ),
       );
       expect(selectStr, isNot(contains('saved_routes')));

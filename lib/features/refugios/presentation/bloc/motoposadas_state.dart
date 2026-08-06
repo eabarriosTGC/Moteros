@@ -84,7 +84,9 @@ final class MotoposadaModel {
       visibility: m['visibility'] as String? ?? 'public',
       targetClanId: m['target_clan_id'] as int?,
       createdAt: DateTime.parse(m['created_at'] as String),
-      hostName: host?['username'] as String?,
+      hostName: (host?['full_name'] as String?)?.isNotEmpty == true
+          ? host!['full_name'] as String
+          : host?['username'] as String?,
       hostLevel: hostXp?['level'] as int?,
       poiType: m['poi_type'] as String? ?? 'standard',
       isTourist: m['is_tourist'] as bool? ?? false,

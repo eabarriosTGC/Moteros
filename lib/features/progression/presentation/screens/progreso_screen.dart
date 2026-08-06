@@ -7,6 +7,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
+import '../../../refugios/presentation/bloc/motoposadas_event.dart';
+import '../../../refugios/presentation/bloc/motoposadas_state.dart';
+import '../../../refugios/presentation/screens/create_motoposada_screen.dart';
+import '../../../refugios/presentation/screens/my_motoposada_screen.dart';
 import '../bloc/progreso_bloc.dart';
 import '../bloc/progreso_event.dart';
 import '../bloc/progreso_state.dart';
@@ -80,6 +85,8 @@ class _ProgresoScreenState extends State<ProgresoScreen> {
                   children: [
                     _StatsHeader(state: state),
                     const SizedBox(height: AppSpacing.lg),
+                    const _MiMotoposadaSection(),
+                    const SizedBox(height: AppSpacing.lg),
                     _BadgesSection(badges: state.badges),
                     const SizedBox(height: AppSpacing.lg),
                     _RouteHistorySection(entries: state.routeHistory),
@@ -122,6 +129,168 @@ class _ProgresoScreenState extends State<ProgresoScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// ── Mi motoposada (F-M9 entry point, P0-1) ──
+
+/// Card that surfaces the casa_motero entry point on Progreso: if the user
+/// has no casa_motero listing, it offers to create one; if they already own
+/// one, it links to the management screen. Uses the globally-provided
+/// MotoposadasBloc (app.dart) — same bloc as MyMotoposadaScreen.
+class _MiMotoposadaSection extends StatefulWidget {
+  const _MiMotoposadaSection();
+
+  @override
+  State<_MiMotoposadaSection> createState() => _MiMotoposadaSectionState();
+}
+
+class _MiMotoposadaSectionState extends State<_MiMotoposadaSection> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
+    context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<MotoposadasBloc, MotoposadasState>(
+      builder: (context, state) {
+        if (state is MotoposadasLoading) {
+          return const _MiMotoposadaCard(
+            icon: Icons.home_work_outlined,
+            title: 'Mi motoposada',
+            subtitle: 'Cargando…',
+          );
+        }
+        final hasCasa = state is MyMotoposadasLoaded &&
+            state.motoposadas.any((m) => m.isCasaMotero);
+        if (state is MyMotoposadasLoaded && hasCasa) {
+          final casa =
+              state.motoposadas.firstWhere((m) => m.isCasaMotero);
+          return _MiMotoposadaCard(
+            icon: Icons.home_work_outlined,
+            title: casa.title.isEmpty ? 'Mi motoposada' : casa.title,
+            subtitle:
+                'Casa de motero · ${casa.isActive ? 'Disponible' : 'No disponible'}',
+            actionLabel: 'GESTIONAR',
+            onAction: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyMotoposadaScreen()),
+            ),
+          );
+        }
+        // No casa_motero yet → offer to create one (the casa_motero form).
+        return _MiMotoposadaCard(
+          icon: Icons.home_work_outlined,
+          title: 'Mi motoposada',
+          subtitle: 'Ofrecé tu casa como hospedaje para moteros',
+          actionLabel: 'OFrecer MI CASA',
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const CreateMotoposadaScreen(
+                mode: CreateMotoposadaMode.casaMotero,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MiMotoposadaCard extends StatelessWidget {
+  const _MiMotoposadaCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.secondary.withAlpha(30),
+            ),
+            child: Icon(icon, color: AppColors.secondary, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            ElevatedButton(
+              onPressed: onAction,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnAmber,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.smCircular,
+                ),
+              ),
+              child: Text(
+                actionLabel!,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -305,13 +474,34 @@ class _RouteHistoryTile extends StatelessWidget {
   final Map<String, dynamic> entry;
   const _RouteHistoryTile({required this.entry});
 
+  /// Human-readable date for unnamed routes: "5 ago 2026" instead of "Ruta".
+  static String _friendlyDate(String isoDate) {
+    final parts = isoDate.split('-');
+    if (parts.length != 3) return isoDate;
+    const months = [
+      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+    ];
+    final month = int.tryParse(parts[1]);
+    final day = int.tryParse(parts[2]);
+    if (month == null || day == null || month < 1 || month > 12) {
+      return isoDate;
+    }
+    return '$day ${months[month - 1]} ${parts[0]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final km = (entry['distance_km'] as num?)?.toDouble() ?? 0;
     final duration = entry['duration_minutes'] as int? ?? 0;
     final completedAt = entry['completed_at'] as String? ?? entry['created_at'] as String? ?? '';
+    final routeName = entry['route_name'] as String? ?? entry['name'] as String?;
     final date = completedAt.length >= 10 ? completedAt.substring(0, 10) : completedAt;
-    final routeName = entry['route_name'] as String? ?? entry['name'] as String? ?? 'Ruta';
+    // P2-7: when no custom name exists, prefer a human date over the generic
+    // "Ruta" so history reads like memories, not a technical log.
+    final displayName = routeName != null && routeName.isNotEmpty
+        ? routeName
+        : _friendlyDate(date);
 
     return Container(
       width: double.infinity,
@@ -337,7 +527,7 @@ class _RouteHistoryTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(routeName, style: AppTypography.body.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                Text(displayName, style: AppTypography.body.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
                 Text(date, style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
               ],
             ),

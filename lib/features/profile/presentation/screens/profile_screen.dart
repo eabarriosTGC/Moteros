@@ -12,6 +12,7 @@ import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../../../features/auth/presentation/bloc/auth_event.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../showcase/presentation/screens/showcase_profile_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -57,7 +58,12 @@ class ProfileScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(AppIcons.settings, color: AppColors.textMuted),
             onPressed: () {
-              Navigator.pushNamed(context, '/settings');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
             },
           ),
           IconButton(

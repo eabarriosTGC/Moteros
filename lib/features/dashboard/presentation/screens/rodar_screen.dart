@@ -342,17 +342,33 @@ class _RodarScreenState extends State<RodarScreen>
               ),
 
             // ── Search bar + results ──
-            const Positioned(
-              top: 72,
-              left: 12,
-              right: 12,
-              child: PlaceSearchBar(),
+            // Positioned below the KM overlay: the KM card lives at
+            // padding.top + 8 and is ~52px tall; a fixed top:72 overlapped it
+            // on notched devices (P0-2). Search bar top now derives from the
+            // real status-bar inset.
+            Builder(
+              builder: (context) {
+                final statusBarTop =
+                    MediaQuery.of(context).padding.top + 8;
+                return Positioned(
+                  top: statusBarTop + 60,
+                  left: 12,
+                  right: 12,
+                  child: const PlaceSearchBar(),
+                );
+              },
             ),
-            const Positioned(
-              top: 116,
-              left: 12,
-              right: 12,
-              child: SearchResultsList(),
+            Builder(
+              builder: (context) {
+                final statusBarTop =
+                    MediaQuery.of(context).padding.top + 8;
+                return Positioned(
+                  top: statusBarTop + 108,
+                  left: 12,
+                  right: 12,
+                  child: const SearchResultsList(),
+                );
+              },
             ),
 
             // ── Rodar FAB ──
