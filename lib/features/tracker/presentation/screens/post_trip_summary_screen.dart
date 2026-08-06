@@ -19,12 +19,21 @@ class PostTripResult {
   final double avgSpeed;
   final double maxSpeed;
 
+  /// Stops marked during the trip (M-RTR-2/3): rendered between start and
+  /// end on the mini-map. Empty for standalone trips without waypoints.
+  final List<LatLng> waypoints;
+
+  /// Raid this trip is linked to, when started from a raid (M-RTR-1).
+  final int? raidId;
+
   const PostTripResult({
     required this.distanceKm,
     required this.durationSec,
     required this.points,
     required this.avgSpeed,
     required this.maxSpeed,
+    this.waypoints = const [],
+    this.raidId,
   });
 
   String get durationStr {

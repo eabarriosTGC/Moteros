@@ -21,6 +21,25 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ══════════════════════════════════════════════════════════════════════
+// GPS session contract
+// ══════════════════════════════════════════════════════════════════════
+
+/// Contract for a GPS recording session used by the tracker bloc.
+///
+/// Testable seam: the bloc depends on this interface (defaulting to
+/// [LocationTrackingService.instance]) so tests can inject a controllable
+/// fake instead of touching Geolocator platform channels.
+abstract class TrackerGpsService {
+  Future<bool> start();
+  void stop();
+  Future<bool> restoreFromCheckpoint();
+  void Function(TrackingSnapshot snapshot)? get onUpdate;
+  set onUpdate(void Function(TrackingSnapshot snapshot)? callback);
+  List<LatLng> get tracePoints;
+  DateTime? get startedAt;
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // Data classes
 // ══════════════════════════════════════════════════════════════════════
 
@@ -75,7 +94,7 @@ class TrackingSnapshot {
 // Service
 // ══════════════════════════════════════════════════════════════════════
 
-class LocationTrackingService {
+class LocationTrackingService implements TrackerGpsService {
   LocationTrackingService._();
   static final LocationTrackingService instance = LocationTrackingService._();
 
@@ -95,10 +114,13 @@ class LocationTrackingService {
   static const int _checkpointInterval = 10; // save every N points
 
   bool get isRecording => _positionSub != null;
+  @override
   List<LatLng> get tracePoints => List.unmodifiable(_tracePoints);
+  @override
   DateTime? get startedAt => _startedAt;
 
   // ── Callbacks ──
+  @override
   void Function(TrackingSnapshot snapshot)? onUpdate;
   VoidCallback? onError;
 
@@ -119,6 +141,7 @@ class LocationTrackingService {
 
   /// Start recording GPS position at the given accuracy.
   /// Returns false if permissions are denied.
+  @override
   Future<bool> start({
     LocationAccuracy accuracy = LocationAccuracy.best,
     int distanceFilter = 10,
@@ -192,6 +215,7 @@ class LocationTrackingService {
   }
 
   /// Stop recording entirely and reset state.
+  @override
   void stop() {
     _positionSub?.cancel();
     _positionSub = null;
@@ -246,6 +270,7 @@ class LocationTrackingService {
 
   /// Restore tracking state from a saved checkpoint.
   /// Returns true if state was restored, false if no checkpoint exists.
+  @override
   Future<bool> restoreFromCheckpoint() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_ckKey);

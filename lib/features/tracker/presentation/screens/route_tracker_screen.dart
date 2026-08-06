@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +28,8 @@ final class TrackerRecording extends TrackerState {
   final int durationSec;
   final double avgSpeed;
   final double maxSpeed;
+  final List<LatLng> waypoints;
+  final int? raidId;
 
   TrackerRecording({
     required this.points,
@@ -34,6 +37,8 @@ final class TrackerRecording extends TrackerState {
     this.durationSec = 0,
     this.avgSpeed = 0,
     this.maxSpeed = 0,
+    this.waypoints = const [],
+    this.raidId,
   });
 
   String get durationStr {
@@ -49,22 +54,72 @@ final class TrackerSavedRoutes extends TrackerState {
   TrackerSavedRoutes({required this.routes});
 }
 
-sealed class TrackerEvent {}
-final class StartRecording extends TrackerEvent {}
-final class StopRecording extends TrackerEvent {}
-final class SaveRoute extends TrackerEvent { final String name; SaveRoute(this.name); }
-final class LoadSavedRoutes extends TrackerEvent {}
-final class ResumeFromCheckpoint extends TrackerEvent {}
+/// Save exitoso: el summary/la ruta se guardó con id.
+final class TrackerSaveSucceeded extends TrackerState {
+  final String savedRouteId;
+  TrackerSaveSucceeded({required this.savedRouteId});
+}
+
+/// Save fallido: el usuario puede reintentar (no se emite TrackerIdle).
+final class TrackerSaveFailed extends TrackerState {
+  final String message;
+  TrackerSaveFailed(this.message);
+}
+
+/// Error transitorio (p. ej. fallo de insert de waypoint): se muestra un
+/// SnackBar y la grabación continúa.
+final class TrackerError extends TrackerState {
+  final String message;
+  TrackerError(this.message);
+}
+
+sealed class TrackerEvent {
+  const TrackerEvent();
+}
+final class StartRecording extends TrackerEvent {
+  final int? raidId;
+  const StartRecording({this.raidId});
+}
+final class StopRecording extends TrackerEvent {
+  const StopRecording();
+}
+final class SaveRoute extends TrackerEvent {
+  final String name;
+  final PostTripResult? result;
+  const SaveRoute(this.name, {this.result});
+}
+final class LoadSavedRoutes extends TrackerEvent {
+  const LoadSavedRoutes();
+}
+final class AddWaypoint extends TrackerEvent {
+  const AddWaypoint();
+}
+final class ResumeFromCheckpoint extends TrackerEvent {
+  final int? raidId;
+  const ResumeFromCheckpoint({this.raidId});
+}
 
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
-  final _tracker = LocationTrackingService.instance;
+  final TrackerGpsService _tracker;
+  final SupabaseClient _db;
   GeofenceService? _geofenceService;
 
-  TrackerBloc() : super(TrackerIdle()) {
+  // Estado del viaje raid-linked (M-RTR-1/2)
+  int? _raidId;
+  List<LatLng> _waypoints = [];
+  bool _originPersisted = false;
+  LatLng? _lastFix;
+  TrackingSnapshot? _lastSnapshot;
+
+  TrackerBloc({SupabaseClient? client, TrackerGpsService? tracker})
+      : _db = client ?? Supabase.instance.client,
+        _tracker = tracker ?? LocationTrackingService.instance,
+        super(TrackerIdle()) {
     on<StartRecording>(_start);
     on<StopRecording>(_stop);
     on<SaveRoute>(_save);
     on<LoadSavedRoutes>(_loadRoutes);
+    on<AddWaypoint>(_addWaypoint);
     on<ResumeFromCheckpoint>(_resumeFromCheckpoint);
   }
 
@@ -79,88 +134,234 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   }
 
   Future<void> _start(StartRecording event, Emitter<TrackerState> emit) async {
+    _raidId = event.raidId;
+    _waypoints = [];
+    _originPersisted = false;
+    _lastFix = null;
+    _lastSnapshot = null;
     final ok = await _tracker.start();
     if (!ok) return;
 
-    _tracker.onUpdate = (snap) {
-      // Feed geofence service for visit detection
-      if (_geofenceService != null) {
-        _geofenceService!.feedPoint(snap.position, speedKmh: snap.speedKmh);
-      }
+    _tracker.onUpdate = _handleUpdate;
+  }
 
-      if (!isClosed) {
-        emit(TrackerRecording(
-          points: List.from(_tracker.tracePoints),
-          distanceKm: snap.distanceKm,
-          durationSec: snap.durationSec,
-          avgSpeed: snap.avgSpeedKmh,
-          maxSpeed: snap.maxSpeedKmh,
-        ));
-      }
-    };
+  void _handleUpdate(TrackingSnapshot snap) {
+    _lastFix = snap.position;
+    _lastSnapshot = snap;
+    // Feed geofence service for visit detection
+    if (_geofenceService != null) {
+      _geofenceService!.feedPoint(snap.position, speedKmh: snap.speedKmh);
+    }
+
+    // Origen automático (M-RTR-1): orden 0 en el PRIMER fix de un viaje
+    // raid-linked. Optimista: evita inserts duplicados concurrentes; el
+    // fallo emite TrackerError (SnackBar) sin matar la grabación.
+    if (_raidId != null && !_originPersisted) {
+      _originPersisted = true;
+      _insertWaypoint(orden: 0, point: snap.position);
+    }
+
+    if (!isClosed) {
+      // Este callback (GPS onUpdate) vive MÁS que el handler del evento que
+      // lo registró; el Emitter del handler lanza un assert tras completar
+      // el handler, así que la única vía segura es BlocBase.emit (solo
+      // chequea isClosed).
+      // ignore: invalid_use_of_visible_for_testing_member
+      emit(_recordingFrom(snap));
+    }
+  }
+
+  TrackerRecording _recordingFrom(TrackingSnapshot snap) {
+    return TrackerRecording(
+      points: List.from(_tracker.tracePoints),
+      distanceKm: snap.distanceKm,
+      durationSec: snap.durationSec,
+      avgSpeed: snap.avgSpeedKmh,
+      maxSpeed: snap.maxSpeedKmh,
+      waypoints: List.from(_waypoints),
+      raidId: _raidId,
+    );
+  }
+
+  TrackerRecording _recordingFromResult(PostTripResult r) {
+    return TrackerRecording(
+      points: r.points,
+      distanceKm: r.distanceKm,
+      durationSec: r.durationSec,
+      avgSpeed: r.avgSpeed,
+      maxSpeed: r.maxSpeed,
+      waypoints: r.waypoints,
+      raidId: r.raidId,
+    );
   }
 
   Future<void> _resumeFromCheckpoint(
       ResumeFromCheckpoint event, Emitter<TrackerState> emit) async {
+    _raidId = event.raidId;
+    _waypoints = [];
+    _originPersisted = false;
+    _lastFix = null;
+    _lastSnapshot = null;
     final restored = await _tracker.restoreFromCheckpoint();
     if (!restored) return;
 
-    _tracker.onUpdate = (snap) {
-      if (_geofenceService != null) {
-        _geofenceService!.feedPoint(snap.position, speedKmh: snap.speedKmh);
+    if (_raidId != null) {
+      final userId = _db.auth.currentUser?.id ?? '';
+      if (userId.isNotEmpty) {
+        try {
+          // Re-fetch ACOTADO de la MISMA sesión (M-RTR-2/3): nunca mezcla
+          // viajes del mismo raid (ventana created_at >= startedAt del trip).
+          final rows = await _db
+              .from('raid_waypoints')
+              .select('raid_id, orden, lat, lng')
+              .eq('raid_id', _raidId!)
+              .eq('user_id', userId)
+              .gte('created_at',
+                  _tracker.startedAt?.toUtc().toIso8601String() ?? '')
+              .order('orden');
+          final list = (rows as List).cast<Map<String, dynamic>>();
+          _originPersisted = list.any((r) => r['orden'] == 0);
+          _waypoints = list
+              .where((r) => (r['orden'] as int) > 0)
+              .map((r) => LatLng(
+                  (r['lat'] as num).toDouble(), (r['lng'] as num).toDouble()))
+              .toList();
+        } catch (_) {
+          // FIX: si el re-fetch falla, continuar la grabación sin waypoints
+          // previos. Un checkpoint implica >=10 fixes, por lo que el origen
+          // casi con certeza ya se persistió: NO re-insertar orden 0.
+          _waypoints = [];
+          _originPersisted = true;
+        }
       }
-      if (!isClosed) {
-        emit(TrackerRecording(
-          points: List.from(_tracker.tracePoints),
-          distanceKm: snap.distanceKm,
-          durationSec: snap.durationSec,
-          avgSpeed: snap.avgSpeedKmh,
-          maxSpeed: snap.maxSpeedKmh,
-        ));
-      }
-    };
+    }
+    _tracker.onUpdate = _handleUpdate;
   }
 
-  void _stop(StopRecording event, Emitter<TrackerState> emit) {
+  void _addWaypoint(AddWaypoint event, Emitter<TrackerState> emit) {
+    final s = state;
+    if (s is! TrackerRecording) return;
+    final fix = _lastFix;
+    if (fix == null) return;
+    // Contador derivado del estado: origen 0, paradas 1..N, destino N+1.
+    final orden = s.waypoints.length + 1;
+    _waypoints = [...s.waypoints, fix];
+    _insertWaypoint(orden: orden, point: fix);
+    emit(TrackerRecording(
+      points: List.from(s.points),
+      distanceKm: s.distanceKm,
+      durationSec: s.durationSec,
+      avgSpeed: s.avgSpeed,
+      maxSpeed: s.maxSpeed,
+      waypoints: List.from(_waypoints),
+      raidId: s.raidId,
+    ));
+  }
+
+  Future<void> _stop(StopRecording event, Emitter<TrackerState> emit) async {
+    final raidId = _raidId;
+    final fix = _lastFix;
+    final waypointsCount = state is TrackerRecording
+        ? (state as TrackerRecording).waypoints.length
+        : _waypoints.length;
     _tracker.stop();
     _tracker.onUpdate = null;
     _geofenceService?.stop();
+    if (raidId != null && fix != null) {
+      // Destino automático (M-RTR-1): orden N+1 con el último fix.
+      await _insertWaypoint(orden: waypointsCount + 1, point: fix);
+    }
+    _raidId = null;
+    _waypoints = [];
+    _originPersisted = false;
+    _lastFix = null;
+    _lastSnapshot = null;
     emit(TrackerIdle());
   }
 
-  Future<void> _save(SaveRoute event, Emitter<TrackerState> emit) async {
-    final current = state;
-    if (current is! TrackerRecording) return;
-    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+  Future<void> _insertWaypoint(
+      {required int orden, required LatLng point}) async {
+    final raidId = _raidId;
+    if (raidId == null) return;
+    final userId = _db.auth.currentUser?.id ?? '';
     if (userId.isEmpty) return;
-
     try {
-      await Supabase.instance.client.from('saved_routes').insert({
-        'user_id': userId,
-        'name': event.name,
-        'distance': (current.distanceKm * 1000).round(),
-        'duration': current.durationSec,
-        'avg_speed': current.avgSpeed,
-        'max_speed': current.maxSpeed,
-        'points_count': current.points.length,
-        'polyline': current.points.map((p) => [p.latitude, p.longitude]).toList(),
-        'start_lat': current.points.first.latitude,
-        'start_lng': current.points.first.longitude,
-        'end_lat': current.points.last.latitude,
-        'end_lng': current.points.last.longitude,
-        'started_at': _tracker.startedAt?.toUtc().toIso8601String(),
-        'ended_at': DateTime.now().toUtc().toIso8601String(),
+      await _db.from('raid_waypoints').insert({
+        'raid_id': raidId,
+        'user_id': userId, // row ownership (M-RTR-4/5: rw_insert_own)
+        'orden': orden,
+        'lat': point.latitude,
+        'lng': point.longitude,
       });
-      emit(TrackerIdle());
-      add(LoadSavedRoutes());
-    } catch (_) {}
+    } catch (e) {
+      // Los errores NUNCA se tragan: TrackerError (SnackBar vía BlocListener)
+      // y la grabación continúa (re-emit en el mismo frame, sin flash).
+      if (!isClosed) {
+        // Mismo motivo que en _handleUpdate: emit desde un callback/future
+        // que sobrevive al handler (el Emitter del handler ya completó).
+        // ignore: invalid_use_of_visible_for_testing_member
+        emit(TrackerError('No se pudo guardar la parada: $e'));
+        final last = _lastSnapshot;
+        if (last != null && state is TrackerError) {
+          // ignore: invalid_use_of_visible_for_testing_member
+          emit(_recordingFrom(last));
+        }
+      }
+    }
   }
 
-  Future<void> _loadRoutes(LoadSavedRoutes event, Emitter<TrackerState> emit) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+  Future<void> _save(SaveRoute event, Emitter<TrackerState> emit) async {
+    final TrackerRecording? recording;
+    if (event.result != null) {
+      // El summary pasa el resultado: corrige el no-op (tras StopRecording
+      // el estado es TrackerIdle y el estado ya no es la fuente).
+      recording = _recordingFromResult(event.result!);
+    } else if (state is TrackerRecording) {
+      recording = state as TrackerRecording;
+    } else {
+      recording = null;
+    }
+    if (recording == null) return;
+    final userId = _db.auth.currentUser?.id ?? '';
+    if (userId.isEmpty) return;
+
+    final payload = buildSavedRoutePayload(
+      userId: userId,
+      name: event.name,
+      distanceKm: recording.distanceKm,
+      durationSec: recording.durationSec,
+      avgSpeedKmh: recording.avgSpeed,
+      maxSpeedKmh: recording.maxSpeed,
+      points: recording.points,
+      startedAt: _tracker.startedAt,
+    );
+    if (payload == null) {
+      // FIX W3: sin trace (points < 2) no se inserta nada.
+      emit(TrackerSaveFailed('No hay puntos de ruta para guardar'));
+      return;
+    }
+    try {
+      final res = await _db
+          .from('saved_routes')
+          .insert(payload)
+          .select()
+          .single();
+      final id = (res as Map)['id'];
+      emit(TrackerSaveSucceeded(savedRouteId: id?.toString() ?? ''));
+      emit(TrackerIdle());
+      add(LoadSavedRoutes());
+    } catch (e) {
+      // El fallo surface (TrackerSaveFailed) — el usuario puede reintentar.
+      emit(TrackerSaveFailed(e.toString()));
+    }
+  }
+
+  Future<void> _loadRoutes(
+      LoadSavedRoutes event, Emitter<TrackerState> emit) async {
+    final userId = _db.auth.currentUser?.id ?? '';
     if (userId.isEmpty) return;
     try {
-      final resp = await Supabase.instance.client
+      final resp = await _db
           .from('saved_routes')
           .select()
           .eq('user_id', userId)
@@ -171,6 +372,42 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       ));
     } catch (_) {}
   }
+}
+
+// ── Payload builder (M-RTR-6) ──
+//
+// Función pura, unit-testable. Mapea el estado de grabación a las columnas
+// REALES de saved_routes (002_existing_tables.sql:161-178). FIX W3: devuelve
+// null si no hay trace (points < 2) en vez de reventar en points.first/last.
+Map<String, dynamic>? buildSavedRoutePayload({
+  required String userId,
+  required String name,
+  required double distanceKm,
+  required int durationSec,
+  required double avgSpeedKmh,
+  required double maxSpeedKmh,
+  required List<LatLng> points,
+  required DateTime? startedAt,
+}) {
+  if (points.length < 2) return null;
+  return {
+    'user_id': userId,
+    'name': name,
+    'total_distance_m': (distanceKm * 1000).round(), // metros (002:165)
+    'duration_seconds': durationSec, // INT (002:166)
+    'avg_speed_kmh': avgSpeedKmh, // (002:167)
+    'max_speed_kmh': maxSpeedKmh, // (002:168)
+    'points_count': points.length, // (002:169)
+    'polyline_json': jsonEncode( // TEXT (002:170):
+      points.map((p) => [p.latitude, p.longitude]).toList(), // [[lat,lng],...] plano
+    ), // NO GeoJSON (el mapa consume List<LatLng>)
+    'start_lat': points.first.latitude,
+    'start_lng': points.first.longitude,
+    'end_lat': points.last.latitude,
+    'end_lng': points.last.longitude,
+    'started_at': startedAt?.toUtc().toIso8601String(),
+    'ended_at': DateTime.now().toUtc().toIso8601String(),
+  };
 }
 
 // ── Screen ──
@@ -573,8 +810,11 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
                       .copyWith(color: AppColors.textPrimary)),
               const SizedBox(height: 4),
               Text(
-                '${(r['distance'] ?? 0) ~/ 1000} km · '
-                '${r['duration'] ?? 0 ~/ 60} min',
+                // Read-keys alineadas a 002 (M-RTR-6): total_distance_m es
+                // METROS y duration_seconds segundos. (Los viejos
+                // distance/duration no existen → historial mostraba 0 km.)
+                '${(r['total_distance_m'] ?? 0) ~/ 1000} km · '
+                '${(r['duration_seconds'] ?? 0) ~/ 60} min',
                 style: AppTypography.bodySmall
                     .copyWith(color: AppColors.textSecondary),
               ),
