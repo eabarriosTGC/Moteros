@@ -121,7 +121,30 @@ Notas:
 **Commit:** `feat(showcase): upload de fotos de conquista post-viaje (M-CPU)` (bc815b9)
 
 ### Pendientes
-- [ ] Fase 7: W5 — `isExpiredRaid` + markers Rodar + `gte` Explorar (última fase de implementación)
 - [ ] 3.8: GitHub issue de deuda — orquestador
 - [ ] Open questions: M-ERV-5; prod `saved_routes` information_schema
 - [ ] Version bump + build + verificación en dispositivo — orquestador
+
+---
+
+## Batch 4 — Fase 7 ✅ COMPLETA (inline orquestador — fase pequeña)
+
+### Fase 7 — W5: raids vencidos fuera del mapa/upcoming (M-ERV-1..5) ✅
+
+| Task | Estado | Evidencia |
+|------|--------|-----------|
+| 7.1 RED `test/features/dashboard/screens/rodar_expired_raid_test.dart` (5 unit) | ✅ | STRICT TDD: escrito ANTES (RED por compilación — `isExpiredRaid` no existía). Pasado→true; futuro→false; null→false; ausente→false; corrupto→false sin throw. |
+| 7.2 RED `test/features/explorar/data/explorar_datasource_test.dart` (2) | ✅ | STRICT TDD: escrito ANTES. M-ERV-2: `fetchUpcomingRaids` registra `gte('scheduled_at', <ISO UTC>)` (assert: termina en Z) y sin `lt`; M-ERV-3: `RaidBloc._onLoadRaids` NO registra gte/lt (fake con recorder — raid_list_screen intacto). |
+| 7.3 GREEN `rodar_screen.dart` | ✅ | `isExpiredRaid` pura (try/catch: null/ausente/corrupto → false — hardening sobre el sketch del design que lanzaría en corrupto) + `!isExpiredRaid(r)` en el filtro de markers (:251-259). |
+| 7.4 GREEN `explorar_datasource.dart` | ✅ | `.gte('scheduled_at', DateTime.now().toUtc().toIso8601String())` entre `.eq('status','lobby')` y `.order` (:43-46). |
+| Checkpoint | ✅ | 7/7 GREEN; suite completa **314/314 PASS**; analyze **579** = baseline. M-ERV-3/4/5 verificados: RaidBloc y raid_list_screen intactos; route_history (Progreso) no tocado; post-trip sin riesgo (PostTripResult en memoria). |
+
+**Commit:** `feat(raids): ocultar raids vencidos del mapa y Próximas Raids (M-ERV)` (9d78530)
+
+---
+
+## Apply COMPLETO — las 7 fases de implementación + gate
+
+- **Fases 1-7 commiteadas**: 6a6d369 (F1 migraciones) · d2c8ed1 (F2 card) · 1fab033 (F3 rewiring W1) · 59df6bb (F4 waypoints backend) · 8f00906 (F5 waypoints UI) · bc815b9 (F6 fotos) · 9d78530 (F7 raids vencidos) · 2 docs commits (apply-progress).
+- **Suite completa: 314/314 PASS** · **analyze: 579 = baseline (delta 0)** · cero issues en archivos tocados.
+- Siguiente: reviewer fresh-context del apply → sdd-verify → sdd-archive → issue deuda (3.8) → version bump + build + SQL 028/029 al usuario.
