@@ -8,12 +8,16 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moteros_app/core/services/location_tracking_service.dart';
 import 'package:moteros_app/features/tracker/presentation/screens/post_trip_summary_screen.dart';
 import 'package:moteros_app/features/tracker/presentation/screens/route_tracker_screen.dart';
+import 'package:moteros_app/features/tracker/presentation/widgets/waypoint_hud_button.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+// ── Helpers ──
 
 // ── Fakes (patrón noSuchMethod del repo — raid_bloc_test.dart) ──
 
@@ -536,6 +540,37 @@ void main() {
         1,
       );
       await bloc.close();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // CYCLE C — HUD 'Marcar parada' (M-RTR-2) — widget tests
+  // STRICT TDD: escritos ANTES del botón. El control se testea como widget
+  // aislado (WaypointHudButton): la pantalla con FlutterMap no se
+  // widget-testea (stream de tiles cuelga bajo FakeAsync — precedente del
+  // repo). La condición de visibilidad (raidId != null) queda source-verified
+  // en _buildRecordingView.
+  // ══════════════════════════════════════════════════════════════════════
+
+  group('WaypointHudButton (M-RTR-2)', () {
+    testWidgets('renderiza "Marcar parada" y dispara onPressed',
+        (tester) async {
+      var pressed = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WaypointHudButton(onPressed: () => pressed++),
+          ),
+        ),
+      );
+
+      expect(find.text('Marcar parada'), findsOneWidget);
+
+      await tester.tap(find.text('Marcar parada'));
+      await tester.pump();
+
+      expect(pressed, 1);
     });
   });
 }

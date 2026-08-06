@@ -11,16 +11,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
 
 /// Opens the ride join sheet for [raid]. Safe to call from any screen under
-/// the app-level MultiBlocProvider.
+/// the app-level MultiBlocProvider. [currentUserId] is injected for
+/// testability (falls back to the Supabase singleton inside the sheet).
 Future<void> showRaidJoinSheet(
   BuildContext context,
-  Map<String, dynamic> raid,
-) {
+  Map<String, dynamic> raid, {
+  String? currentUserId,
+}) {
   HapticFeedback.lightImpact();
   return showModalBottomSheet(
     context: context,
@@ -28,7 +31,7 @@ Future<void> showRaidJoinSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
-    builder: (_) => RaidJoinSheet(raid: raid),
+    builder: (_) => RaidJoinSheet(raid: raid, currentUserId: currentUserId),
   );
 }
 
@@ -91,7 +94,7 @@ class RaidJoinSheet extends StatelessWidget {
                 : _formatCoords(originLat, originLng);
 
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -194,18 +197,34 @@ class RaidJoinSheet extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
+                      onPressed: () => _startTrip(context, raid),
+                      icon: const Icon(Icons.route_outlined, size: 18),
+                      label: const Text(
+                        'INICIAR VIAJE',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textOnAmber,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.mdCircular,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
                       onPressed: null,
                       icon: const Icon(Icons.check_circle, size: 18),
                       label: const Text(
                         'YA UNIDO',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success.withAlpha(30),
+                      style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.success,
-                        disabledBackgroundColor:
-                            AppColors.success.withAlpha(30),
-                        disabledForegroundColor: AppColors.success,
+                        side: const BorderSide(color: AppColors.success),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadius.mdCircular,
                         ),
@@ -283,6 +302,21 @@ class RaidJoinSheet extends StatelessWidget {
           userId: userId,
         ));
     HapticFeedback.mediumImpact();
+  }
+
+  /// M-RTR-1 — arranca el viaje raid-linked: cierra el sheet y abre el
+  /// tracker con el raidId del raid (BIGSERIAL → int Dart). El HUD
+  /// 'Marcar parada' y los waypoints dependen de ese raidId.
+  void _startTrip(BuildContext context, Map<String, dynamic> raid) {
+    final raidId = (raid['id'] as num?)?.toInt();
+    HapticFeedback.mediumImpact();
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RouteTrackerScreen(raidId: raidId),
+      ),
+    );
   }
 
   void _snack(BuildContext context, String message) {

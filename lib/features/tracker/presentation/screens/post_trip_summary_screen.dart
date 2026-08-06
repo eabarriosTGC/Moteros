@@ -45,9 +45,17 @@ class PostTripResult {
 }
 
 class PostTripSummaryScreen extends StatefulWidget {
-  const PostTripSummaryScreen({super.key, required this.result});
+  const PostTripSummaryScreen({
+    super.key,
+    required this.result,
+    this.tileProvider,
+  });
 
   final PostTripResult result;
+
+  /// Injectable TileProvider for widget tests (FakeTileProvider). Null in
+  /// prod → FlutterMap usa su provider por defecto (red/FMTC).
+  final TileProvider? tileProvider;
 
   @override
   State<PostTripSummaryScreen> createState() => _PostTripSummaryScreenState();
@@ -130,7 +138,8 @@ class _PostTripSummaryScreenState extends State<PostTripSummaryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PostTripSaveFeedback(
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -165,7 +174,8 @@ class _PostTripSummaryScreenState extends State<PostTripSummaryScreen>
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   // ── Stats Card ──
@@ -308,6 +318,7 @@ class _PostTripSummaryScreenState extends State<PostTripSummaryScreen>
                 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
             subdomains: const ['a', 'b', 'c'],
             userAgentPackageName: 'com.moteros.moteros_app',
+            tileProvider: widget.tileProvider,
           ),
           if (hasPoints)
             PolylineLayer(polylines: [
@@ -317,35 +328,10 @@ class _PostTripSummaryScreenState extends State<PostTripSummaryScreen>
                 strokeWidth: 4,
               ),
             ]),
-          // Start and end markers
-          if (hasPoints) ...[
-            MarkerLayer(markers: [
-              Marker(
-                point: r.points.first,
-                width: 24,
-                height: 24,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.success,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-              Marker(
-                point: r.points.last,
-                width: 24,
-                height: 24,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.error,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-            ]),
-          ],
+          // Trace completo en orden: start → paradas (M-RTR-3) → end.
+          // Un solo MarkerLayer para que el orden de árbol sea el del trace.
+          if (hasPoints)
+            MarkerLayer(markers: buildTraceMarkers(r.points, r.waypoints)),
         ],
       ),
     );
@@ -473,6 +459,83 @@ class _PostTripSummaryScreenState extends State<PostTripSummaryScreen>
           ),
         ],
       ),
+    );
+  }
+}
+
+/// M-RTR-3 — markers del trace en orden: start → paradas → end.
+/// Pura y unit-testable (las screens con FlutterMap no se widget-testean:
+/// el stream de tiles cuelga bajo FakeAsync — precedente del repo).
+List<Marker> buildTraceMarkers(List<LatLng> points, List<LatLng> waypoints) {
+  return [
+    Marker(
+      point: points.first,
+      width: 24,
+      height: 24,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.success,
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+      ),
+    ),
+    for (final stop in waypoints)
+      Marker(
+        point: stop,
+        width: 18,
+        height: 18,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+        ),
+      ),
+    Marker(
+      point: points.last,
+      width: 24,
+      height: 24,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.error,
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+      ),
+    ),
+  ];
+}
+
+/// M-RTR-6 — el resultado del save surface SIEMPRE (nunca catch vacío).
+/// Extraído como widget propio para testear el feedback sin el mapa.
+class PostTripSaveFeedback extends StatelessWidget {
+  const PostTripSaveFeedback({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<TrackerBloc, TrackerState>(
+      listener: (context, state) {
+        if (state is TrackerSaveSucceeded) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ruta guardada'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else if (state is TrackerSaveFailed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: child,
     );
   }
 }

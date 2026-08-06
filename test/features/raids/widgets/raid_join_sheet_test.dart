@@ -4,9 +4,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:moteros_app/core/services/location_tracking_service.dart';
 import 'package:moteros_app/features/raids/presentation/bloc/raid_bloc.dart';
 import 'package:moteros_app/features/raids/presentation/bloc/raid_event.dart';
 import 'package:moteros_app/features/raids/presentation/widgets/raid_join_sheet.dart';
+import 'package:moteros_app/features/tracker/presentation/screens/route_tracker_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Same fake chain as raid_bloc_test.dart (see that file for details).
@@ -47,7 +50,52 @@ class FakeSupabaseClient implements SupabaseClient {
       final t = invocation.positionalArguments.first as String;
       return tables.putIfAbsent(t, () => FakeQueryBuilder());
     }
+    // TrackerBloc (push de RouteTrackerScreen) lee auth.currentUser en
+    // LoadSavedRoutes — responder auth con usuario null evita el
+    // NoSuchMethodError en la cadena null.currentUser.
+    if (invocation.memberName == #auth) return _FakeAuthClient();
     return null;
+  }
+}
+
+class _FakeAuthClient implements GoTrueClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+
+  @override
+  User? get currentUser => null;
+}
+
+/// Fake GPS service para TrackerBloc (el push de RouteTrackerScreen lo
+/// construye; ningún test de este archivo llega a grabar).
+class _FakeGps implements TrackerGpsService {
+  bool startResult = true;
+  bool restoreResult = false;
+  DateTime? startedAtValue;
+  List<LatLng> points = [];
+  void Function(TrackingSnapshot)? _onUpdate;
+
+  @override
+  Future<bool> start() async => startResult;
+
+  @override
+  void stop() {}
+
+  @override
+  Future<bool> restoreFromCheckpoint() async => restoreResult;
+
+  @override
+  List<LatLng> get tracePoints => List.unmodifiable(points);
+
+  @override
+  DateTime? get startedAt => startedAtValue;
+
+  @override
+  void Function(TrackingSnapshot)? get onUpdate => _onUpdate;
+
+  @override
+  set onUpdate(void Function(TrackingSnapshot)? callback) {
+    _onUpdate = callback;
   }
 }
 
@@ -68,6 +116,37 @@ Widget _wrap(Widget child, {required FakeSupabaseClient client}) {
     home: BlocProvider<RaidBloc>(
       create: (_) => RaidBloc(client: client),
       child: Scaffold(body: child),
+    ),
+  );
+}
+
+/// Wraps con RaidBloc + TrackerBloc y un home que abre el sheet vía
+/// `showRaidJoinSheet` (entry point real, M-RTR-1) — el push de
+/// RouteTrackerScreen necesita ambos blocs. currentUserId se pasa por el
+/// seam de testabilidad del entry point para la rama `joined`.
+Widget _wrapStartTrip(
+  FakeSupabaseClient client, {
+  required Map<String, dynamic> raid,
+}) {
+  return MultiBlocProvider(
+    providers: [
+      BlocProvider<RaidBloc>(create: (_) => RaidBloc(client: client)),
+      BlocProvider<TrackerBloc>(
+        create: (_) => TrackerBloc(client: client, tracker: _FakeGps()),
+      ),
+    ],
+    child: MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: TextButton(
+              onPressed: () =>
+                  showRaidJoinSheet(context, raid, currentUserId: 'u1'),
+              child: const Text('OPEN SHEET'),
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -144,5 +223,59 @@ void main() {
 
     expect(find.text('YA UNIDO'), findsOneWidget);
     expect(find.text('UNIRME'), findsNothing);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // M-RTR-1 — 'INICIAR VIAJE' (Fase 5, W3 UI)
+  // STRICT TDD: escritos ANTES del botón en RaidJoinSheet (RED).
+  // ══════════════════════════════════════════════════════════════════════
+
+  testWidgets('joined → INICIAR VIAJE visible; tap → pop + push '
+      'RouteTrackerScreen(raidId)', (tester) async {
+    final raidJoined = <String, dynamic>{
+      ..._raid,
+      'id': 42, // BIGSERIAL → int Dart
+      'raid_participants': [
+        {'user_id': 'u1', 'is_ready': false},
+      ],
+    };
+    final client = FakeSupabaseClient();
+    client.tables['raids'] = FakeQueryBuilder(result: [raidJoined]);
+    client.tables['raid_participants'] = FakeQueryBuilder();
+
+    await tester.pumpWidget(_wrapStartTrip(client, raid: raidJoined));
+    await tester.pump();
+    await tester.tap(find.text('OPEN SHEET'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // sheet anim
+
+    expect(find.text('INICIAR VIAJE'), findsOneWidget);
+
+    await tester.tap(find.text('INICIAR VIAJE'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // pop + push anim
+
+    // El sheet se cerró y el tracker se abrió con el raidId del raid.
+    expect(find.byType(RaidJoinSheet), findsNothing);
+    expect(find.byType(RouteTrackerScreen), findsOneWidget);
+    final pushed =
+        tester.widget<RouteTrackerScreen>(find.byType(RouteTrackerScreen));
+    expect(pushed.raidId, 42);
+  });
+
+  testWidgets('no joined → INICIAR VIAJE ausente', (tester) async {
+    final client = FakeSupabaseClient();
+    client.tables['raids'] = FakeQueryBuilder(result: [_raid]);
+    client.tables['raid_participants'] = FakeQueryBuilder();
+
+    await tester.pumpWidget(_wrapStartTrip(client, raid: _raid));
+    await tester.pump();
+    await tester.tap(find.text('OPEN SHEET'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // sheet anim
+
+    expect(find.text('INICIAR VIAJE'), findsNothing);
+    expect(find.text('UNIRME'), findsOneWidget);
+    expect(find.byType(RouteTrackerScreen), findsNothing);
   });
 }

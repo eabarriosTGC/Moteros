@@ -17,6 +17,7 @@ import '../../../../core/services/geofence_service.dart';
 import '../../../refugios/presentation/bloc/motoposadas_state.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'post_trip_summary_screen.dart';
+import '../widgets/waypoint_hud_button.dart';
 
 // ── BLoC ──
 
@@ -413,7 +414,16 @@ Map<String, dynamic>? buildSavedRoutePayload({
 // ── Screen ──
 
 class RouteTrackerScreen extends StatefulWidget {
-  const RouteTrackerScreen({super.key});
+  const RouteTrackerScreen({super.key, this.raidId, this.tileProvider});
+
+  /// Raid this trip belongs to when started from a raid (M-RTR-1).
+  /// The HUD 'Marcar parada' and waypoint persistence only apply to
+  /// raid-linked trips (`raidId != null`).
+  final int? raidId;
+
+  /// Injectable TileProvider for widget tests (FakeTileProvider). Null in
+  /// prod → FlutterMap usa su provider por defecto (red/FMTC).
+  final TileProvider? tileProvider;
 
   @override
   State<RouteTrackerScreen> createState() => _RouteTrackerScreenState();
@@ -523,12 +533,38 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TrackerBloc, TrackerState>(
-      builder: (context, state) {
-        final isRecording = state is TrackerRecording;
-        final isSaved = state is TrackerSavedRoutes;
+    return BlocListener<TrackerBloc, TrackerState>(
+      listener: (context, state) {
+        // M-RTR-6 — los errores de save surface SIEMPRE (nunca catch vacío).
+        if (state is TrackerSaveSucceeded) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ruta guardada'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else if (state is TrackerSaveFailed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else if (state is TrackerError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: BlocBuilder<TrackerBloc, TrackerState>(
+        builder: (context, state) {
+          final isRecording = state is TrackerRecording;
+          final isSaved = state is TrackerSavedRoutes;
 
-        return Scaffold(
+          return Scaffold(
           backgroundColor: AppColors.monitor,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -561,7 +597,10 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
                               points: List.from(recording.points),
                               avgSpeed: recording.avgSpeed,
                               maxSpeed: recording.maxSpeed,
+                              waypoints: List.from(recording.waypoints),
+                              raidId: recording.raidId,
                             ),
+                            tileProvider: widget.tileProvider,
                           ),
                         ),
                       );
@@ -591,7 +630,8 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
                 : _buildIdleView(isSaved ? state : null),
           ),
         );
-      },
+        },
+      ),
     );
   }
 
@@ -620,6 +660,7 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
                   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
               subdomains: const ['a', 'b', 'c'],
               userAgentPackageName: 'com.moteros.moteros_app',
+              tileProvider: widget.tileProvider,
             ),
             if (recording.points.length >= 2)
               PolylineLayer(polylines: [
@@ -631,6 +672,19 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
               ]),
           ],
         ),
+
+        // M-RTR-2 — 'Marcar parada' SOLO en viajes raid-linkeados: persiste
+        // la posición actual como parada (orden 1..N) en raid_waypoints.
+        if (recording.raidId != null)
+          Positioned(
+            bottom: 96,
+            left: 24,
+            right: 24,
+            child: WaypointHudButton(
+              onPressed: () =>
+                  context.read<TrackerBloc>().add(const AddWaypoint()),
+            ),
+          ),
 
         // Stats overlay
         Positioned(
@@ -746,7 +800,12 @@ class _RouteTrackerScreenState extends State<RouteTrackerScreen>
             child: ElevatedButton(
               onPressed: () {
                 _startGeofence();
-                context.read<TrackerBloc>().add(StartRecording());
+                // M-RTR-1 — el raidId del widget viaja en el evento: el
+                // primer fix GPS persiste el origen (orden 0) y el HUD
+                // muestra 'Marcar parada'.
+                context
+                    .read<TrackerBloc>()
+                    .add(StartRecording(raidId: widget.raidId));
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,

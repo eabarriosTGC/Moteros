@@ -25,24 +25,21 @@ class ProgresoBloc extends Bloc<ProgresoEvent, ProgresoState> {
       final results = await Future.wait([
         // 0 — user_xp (km_traveled, raids_completed)
         client.from('user_xp').select().eq('user_id', userId).maybeSingle(),
-        // 1 — user_showcase (equipped_patches)
-        client.from('user_showcase').select().eq('user_id', userId).maybeSingle(),
-        // 2 — conquest_photos (fetch all to count)
+        // 1 — conquest_photos (fetch all to count + album, B1/M-CPU-4)
         client.from('conquest_photos').select().eq('user_id', userId).order('created_at', ascending: false),
-        // 3 — all achievements (for badge grid)
+        // 2 — all achievements (for badge grid)
         client.from('achievements').select().order('sort_order'),
-        // 4 — user_achievements (for which are earned)
+        // 3 — user_achievements (for which are earned)
         client.from('user_achievements').select('achievement_id, earned_at').eq('user_id', userId),
-        // 5 — route_history (last 50)
+        // 4 — route_history (last 50)
         client.from('route_history').select().eq('user_id', userId).order('completed_at', ascending: false).limit(50),
       ]);
 
       final xpData = results[0] as Map<String, dynamic>?;
-      final showcase = results[1] as Map<String, dynamic>?;
-      final photosList = (results[2] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final allAchievements = (results[3] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final userAchievements = (results[4] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final routeHistory = (results[5] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final photosList = (results[1] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final allAchievements = (results[2] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final userAchievements = (results[3] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final routeHistory = (results[4] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
       final totalKm = (xpData?['km_traveled'] as num?)?.toInt() ?? 0;
       final tripsCount = (xpData?['raids_completed'] as int?) ?? 0;
