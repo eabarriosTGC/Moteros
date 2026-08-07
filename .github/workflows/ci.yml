@@ -35,5 +35,10 @@ jobs:
             grep -q "GRANT EXECUTE ON FUNCTION public.$rpc" supabase/migrations/031_secure_motoposada_flow.sql
           done
 
+      - name: Migration 031 must target the production club schema
+        run: |
+          grep -q 'club_members' supabase/migrations/031_secure_motoposada_flow.sql
+          ! grep -q 'clan_members' supabase/migrations/031_secure_motoposada_flow.sql
+
       - name: Migration 031 must keep trust_score clamped 0-100 server-side
         run: grep -q 'GREATEST(0, LEAST(100, COALESCE(trust_score, 50)' supabase/migrations/031_secure_motoposada_flow.sql
