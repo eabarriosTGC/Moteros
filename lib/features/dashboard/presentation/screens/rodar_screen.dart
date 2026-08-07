@@ -3,10 +3,13 @@
 /// próximos raids, recent rides, and a prominent Rodar FAB.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/theme_cubit.dart';
@@ -53,6 +56,14 @@ class _RodarScreenState extends State<RodarScreen>
   // ── Position tracking for blue dot + recenter ──
   LatLng? _currentPosition;
   double _currentHeading = 0;
+  LocationStreamFailure? _locationFailure;
+  StreamSubscription<Position>? _passivePositionSub;
+  Timer? _locationRetryTimer;
+
+  /// Reintento tras un fallo del stream pasivo: el stream de geolocator
+  /// muere con el error, y si el usuario activa el GPS o concede el permiso,
+  /// la resuscripción lo recupera sin reiniciar la app.
+  static const Duration _locationRetryDelay = Duration(seconds: 5);
 
   // ── Search state ──
   LatLng? _searchResultMarker;
@@ -79,16 +90,77 @@ class _RodarScreenState extends State<RodarScreen>
     });
 
     // Start passive position stream for blue dot (map only, no tracking).
-    LocationTrackingService.instance.passivePositionStream.listen((pos) {
-      if (!mounted) return;
-      setState(() {
-        _currentPosition = LatLng(pos.latitude, pos.longitude);
-        if (pos.heading.isFinite && pos.heading >= 0) {
-          _currentHeading = pos.heading;
-        }
-      });
+    // Chequeo activo primero: con el GPS ya apagado o el permiso negado
+    // ANTES de abrir la app, GMS no emite error al suscribirse (stream
+    // silencioso) — el banner saldría recién tras un timeout mudo.
+    _ensureLocation();
+  }
+
+  /// Verifica el estado de ubicación y suscribe el stream pasivo.
+  ///
+  /// Cubre los DOS caminos de fallo por separado:
+  /// - GPS apagado (batería baja, modo avión) → banner "Activa el GPS"
+  /// - Permiso denegado (primera vez, "denegar y no preguntar") → banner
+  ///   "ábrelo en Ajustes"
+  /// El stream en sí también tiene onError por si el estado cambia en vivo.
+  Future<void> _ensureLocation() async {
+    if (!mounted) return;
+
+    final enabled = await Geolocator.isLocationServiceEnabled();
+    if (!mounted) return;
+    if (!enabled) {
+      setState(() => _locationFailure = LocationStreamFailure.gpsDisabled);
+      _scheduleLocationRetry();
+      return;
+    }
+
+    final perm = await Geolocator.checkPermission();
+    if (!mounted) return;
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
+      setState(() => _locationFailure = LocationStreamFailure.permissionDenied);
+      _scheduleLocationRetry();
+      return;
+    }
+
+    _subscribePassivePosition();
+  }
+
+  void _scheduleLocationRetry() {
+    // Reintento periódico: cuando el usuario active el GPS o conceda el
+    // permiso, el banner se limpia solo sin reiniciar la app.
+    _locationRetryTimer?.cancel();
+    _locationRetryTimer = Timer(_locationRetryDelay, _ensureLocation);
+  }
+
+  void _subscribePassivePosition() {
+    _passivePositionSub?.cancel();
+    _passivePositionSub = LocationTrackingService.instance.passivePositionStream
+        .listen(_onPassivePosition, onError: _onPassivePositionError);
+  }
+
+  void _onPassivePosition(Position pos) {
+    if (!mounted) return;
+    setState(() {
+      _locationFailure = null;
+      _currentPosition = LatLng(pos.latitude, pos.longitude);
+      if (pos.heading.isFinite && pos.heading >= 0) {
+        _currentHeading = pos.heading;
+      }
     });
   }
+
+  void _onPassivePositionError(Object error) {
+    if (!mounted) return;
+    setState(() => _locationFailure = classifyLocationFailure(error));
+    // El stream de geolocator muere con el error; reintentar para
+    // auto-recuperarse cuando el usuario active el GPS o conceda el permiso.
+    _scheduleLocationRetry();
+  }
+
+  Future<void> _openLocationSettings() => Geolocator.openLocationSettings();
+
+  Future<void> _openAppSettings() => Geolocator.openAppSettings();
 
   /// Check if there's a trip checkpoint from a prior session (process kill).
   Future<void> _checkPendingTrip() async {
@@ -155,6 +227,8 @@ class _RodarScreenState extends State<RodarScreen>
 
   @override
   void dispose() {
+    _passivePositionSub?.cancel();
+    _locationRetryTimer?.cancel();
     _kmController.dispose();
     _mapController.dispose();
     super.dispose();
@@ -371,6 +445,29 @@ class _RodarScreenState extends State<RodarScreen>
                 );
               },
             ),
+
+            // ── Location failure banner (GPS off / permission denied) ──
+            // Visible y accionable: informa la causa y ofrece la acción
+            // correcta (activar GPS vs abrir Ajustes). No se traga el error.
+            if (_locationFailure != null)
+              Builder(
+                builder: (context) {
+                  final statusBarTop =
+                      MediaQuery.of(context).padding.top + 8;
+                  return Positioned(
+                    top: statusBarTop + 172,
+                    left: 12,
+                    right: 12,
+                    child: LocationFailureBanner(
+                      failure: _locationFailure!,
+                      onAction: _locationFailure ==
+                              LocationStreamFailure.gpsDisabled
+                          ? _openLocationSettings
+                          : _openAppSettings,
+                    ),
+                  );
+                },
+              ),
 
             // ── Rodar FAB ──
             Positioned(
@@ -1099,4 +1196,129 @@ List<Map<String, dynamic>> visibleUpcomingRaids(
       )
       .take(3)
       .toList();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Location stream failures — GPS off / permission denied
+// ══════════════════════════════════════════════════════════════════════
+
+/// Causas del fallo del stream de ubicación pasivo (blue dot).
+///
+/// GPS apagado y permiso denegado son caminos de fallo DISTINTOS con
+/// acciones DISTINTAS para el usuario: no es una esquina rara, es el camino
+/// de fallo principal de Rodar (batería baja apaga el GPS, permiso negado
+/// por error la primera vez, modo avión).
+enum LocationStreamFailure { gpsDisabled, permissionDenied, other }
+
+/// Clasifica el error emitido por el stream de geolocator en una causa
+/// accionable. Pura y unit-testable.
+///
+/// Códigos reales (geolocator_platform_interface / geolocator_android):
+/// - `LOCATION_SERVICES_DISABLED` → [LocationServiceDisabledException]
+/// - `PERMISSION_DENIED` → [PermissionDeniedException]
+LocationStreamFailure classifyLocationFailure(Object error) {
+  if (error is LocationServiceDisabledException) {
+    return LocationStreamFailure.gpsDisabled;
+  }
+  if (error is PermissionDeniedException) {
+    return LocationStreamFailure.permissionDenied;
+  }
+  if (error is PlatformException) {
+    // Fallback defensivo por si llega la PlatformException cruda.
+    return switch (error.code) {
+      'LOCATION_SERVICES_DISABLED' => LocationStreamFailure.gpsDisabled,
+      'PERMISSION_DENIED' => LocationStreamFailure.permissionDenied,
+      _ => LocationStreamFailure.other,
+    };
+  }
+  return LocationStreamFailure.other;
+}
+
+/// Mensaje visible y accionable por causa — el usuario debe saber QUÉ hacer,
+/// no quedarse mirando un mapa sin punto azul sin explicación.
+String locationFailureMessage(LocationStreamFailure failure) => switch (
+      failure) {
+    LocationStreamFailure.gpsDisabled => 'Activa el GPS para ver tu ubicación',
+    LocationStreamFailure.permissionDenied =>
+      'Permiso de ubicación necesario, ábrelo en Ajustes',
+    LocationStreamFailure.other => 'No se pudo obtener tu ubicación',
+  };
+
+/// Banner de fallo de ubicación. No traga el error: informa la causa y
+/// ofrece la acción correcta (activar GPS vs abrir Ajustes de la app).
+class LocationFailureBanner extends StatelessWidget {
+  const LocationFailureBanner({
+    super.key,
+    required this.failure,
+    required this.onAction,
+  });
+
+  final LocationStreamFailure failure;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, actionLabel) = switch (failure) {
+      LocationStreamFailure.gpsDisabled => (
+        Icons.location_off_rounded,
+        'ACTIVAR GPS',
+      ),
+      LocationStreamFailure.permissionDenied => (
+        Icons.location_disabled_rounded,
+        'ABRIR AJUSTES',
+      ),
+      LocationStreamFailure.other => (
+        Icons.location_off_rounded,
+        'REINTENTAR',
+      ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.sm,
+        horizontal: AppSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.error.withAlpha(140), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(120),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.error, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              locationFailureMessage(failure),
+              style: AppTypography.body.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            ),
+            child: Text(
+              actionLabel,
+              style: AppTypography.label.copyWith(
+                color: AppColors.primary,
+                letterSpacing: 1,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
