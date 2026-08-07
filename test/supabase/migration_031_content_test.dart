@@ -61,6 +61,18 @@ void main() {
       }
     });
 
+    test('privilegios directos de tabla revocados: PostgREST responde 403', () {
+      final sql = read();
+      expect(
+        sql,
+        contains('REVOKE INSERT, UPDATE, DELETE ON public.motoposada_requests FROM anon, authenticated;'),
+      );
+      expect(
+        sql,
+        contains('REVOKE INSERT, UPDATE, DELETE ON public.motoposada_reviews FROM anon, authenticated;'),
+      );
+    });
+
     test('las 5 RPC existen con SECURITY DEFINER y GRANT a authenticated', () {
       final sql = read();
       const rpcs = [
