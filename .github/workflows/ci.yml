@@ -47,3 +47,10 @@ jobs:
 
       - name: Migration 031 must keep trust_score clamped 0-100 server-side
         run: grep -q 'GREATEST(0, LEAST(100, COALESCE(trust_score, 50)' supabase/migrations/031_secure_motoposada_flow.sql
+
+      - name: Migration 032 must repair and secure leaderboard refresh
+        run: |
+          grep -q 'v.verified_at >= v_cutoff' supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
+          ! grep -q 'v.created_at' supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
+          grep -q "period IN ('monthly', 'yearly', 'historical')" supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
+          grep -q 'FROM anon, authenticated' supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
