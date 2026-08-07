@@ -126,13 +126,13 @@ BEGIN
     END IF;
     IF v_mp.visibility = 'clan_specific'
        AND (v_mp.target_clan_id IS NULL OR NOT EXISTS (
-           SELECT 1 FROM clan_members cm
-           WHERE cm.user_id = v_uid AND cm.clan_id = v_mp.target_clan_id
+           SELECT 1 FROM club_members cm
+           WHERE cm.user_id = v_uid AND cm.club_id = v_mp.target_clan_id
        )) THEN
         RAISE EXCEPTION 'motoposada_not_visible';
     END IF;
     IF v_mp.visibility = 'clan_only' AND NOT EXISTS (
-        SELECT 1 FROM clan_members cm WHERE cm.user_id = v_uid
+        SELECT 1 FROM club_members cm WHERE cm.user_id = v_uid
     ) THEN
         RAISE EXCEPTION 'motoposada_not_visible';
     END IF;
