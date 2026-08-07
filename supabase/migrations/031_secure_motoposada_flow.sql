@@ -43,6 +43,12 @@ DROP POLICY IF EXISTS "mr_insert_guest" ON motoposada_requests;
 DROP POLICY IF EXISTS "mr_update_host" ON motoposada_requests;
 DROP POLICY IF EXISTS "mrev_insert_participant" ON motoposada_reviews;
 
+-- RLS sin policy impide cambios, pero UPDATE/DELETE pueden ser no-op con 2xx.
+-- Revocar los privilegios de tabla garantiza 403 desde PostgREST; las RPC
+-- SECURITY DEFINER conservan el único camino autorizado de escritura.
+REVOKE INSERT, UPDATE, DELETE ON public.motoposada_requests FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.motoposada_reviews FROM anon, authenticated;
+
 -- ============================================================
 -- 2. Índices para los chequeos de solapamiento
 -- ============================================================
