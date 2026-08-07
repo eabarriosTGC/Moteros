@@ -31,6 +31,7 @@ jobs:
         run: |
           for rpc in request_motoposada respond_motoposada_request complete_motoposada_request cancel_motoposada_request submit_motoposada_review; do
             grep -q "CREATE OR REPLACE FUNCTION public.$rpc(" supabase/migrations/031_secure_motoposada_flow.sql
+            grep -q "REVOKE EXECUTE ON FUNCTION public.$rpc" supabase/migrations/031_secure_motoposada_flow.sql
             grep -q "GRANT EXECUTE ON FUNCTION public.$rpc" supabase/migrations/031_secure_motoposada_flow.sql
           done
 
