@@ -1,12 +1,15 @@
-/// Trust-score RPC tests — fix del catch silencioso (motoposadas_bloc:302).
+/// Trust-score RPC tests — reseña + reputación server-side (031).
 ///
-/// El UPDATE directo de user_xp cross-user FALLA SIEMPRE por RLS (007 solo
-/// define xp_select_all/xp_insert_own — sin policy de UPDATE). El fix: RPC
-/// SECURITY DEFINER `update_trust_score` (migración 030). El error del RPC
-/// debe ser VISIBLE (MotoposadasError), nunca tragado.
+/// Contexto (2026-08-07, rama agent/secure-motoposada-flow): el flujo previo
+/// insertaba la review directo en `motoposada_reviews` y calculaba el delta
+/// en el cliente (`update_trust_score`/030 tras el insert). Con 031 toda la
+/// validación vive en el server: `submit_motoposada_review` (SECURITY
+/// DEFINER) exige estancia COMPLETADA, participante según tipo y rating
+/// 1..5, inserta la reseña Y actualiza trust_score con clamp 0..100 — el
+/// cliente ya no puede "regalarse" reputación: no inserta, no calcula deltas.
 ///
-/// STRICT TDD: escritos ANTES del fix (RED — el bloc aún hacía select+update
-/// con catch vacío y no llamaba al RPC).
+/// STRICT TDD: reescritos ANTES del refactor del bloc (RED — el bloc aún
+/// llamaba update_trust_score y no existía submit_motoposada_review).
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -19,7 +22,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
   FakeFilterBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
@@ -31,8 +34,9 @@ class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
     if (invocation.memberName == #then) {
       if (error != null) throw error!;
       final onValue = invocation.positionalArguments.first as dynamic;
-      return Future.value(result)
-          .then((_) => onValue(result ?? const <Map<String, dynamic>>[]));
+      return Future.value(
+        result,
+      ).then((_) => onValue(result ?? const <Map<String, dynamic>>[]));
     }
     return this;
   }
@@ -40,14 +44,17 @@ class FakeFilterBuilder implements PostgrestFilterBuilder<PostgrestList> {
 
 class FakeQueryBuilder implements SupabaseQueryBuilder {
   FakeQueryBuilder({this.result, this.error, List<Invocation>? recorder})
-      : recorder = recorder ?? [];
+    : recorder = recorder ?? [];
 
   final Object? result;
   final Object? error;
   final List<Invocation> recorder;
 
-  late final FakeFilterBuilder filter =
-      FakeFilterBuilder(result: result, error: error, recorder: recorder);
+  late final FakeFilterBuilder filter = FakeFilterBuilder(
+    result: result,
+    error: error,
+    recorder: recorder,
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
@@ -95,100 +102,101 @@ class FakeSupabaseClient implements SupabaseClient {
 final _review = SubmitReview(
   motoposadaId: 1,
   requestId: 7,
-  toUserId: 42,
-  type: 'host',
+  toUserId: 'u-host-1',
+  type: 'guest_review',
   rating: 5,
   comment: 'Excelente host',
 );
 
 void main() {
-  group('MotoposadasBloc — update_trust_score RPC (fix catch silencioso)', () {
-    User fakeUser(String id) => User(
-          id: id,
-          appMetadata: const {},
-          userMetadata: const {},
-          aud: 'authenticated',
-          createdAt: DateTime.now().toIso8601String(),
+  group(
+    'MotoposadasBloc — submit_motoposada_review (031, trust server-side)',
+    () {
+      User fakeUser(String id) => User(
+        id: id,
+        appMetadata: const {},
+        userMetadata: const {},
+        aud: 'authenticated',
+        createdAt: DateTime.now().toIso8601String(),
+      );
+
+      test('review → UN solo rpc submit_motoposada_review con todos los '
+          'params y ReviewSubmitted', () async {
+        final client = FakeSupabaseClient(currentUser: fakeUser('u-guest'));
+        final bloc = MotoposadasBloc(client: client);
+
+        bloc.add(_review);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        final rpcCalls = client.calls
+            .where((i) => i.memberName == #rpc)
+            .toList();
+        expect(
+          rpcCalls,
+          hasLength(1),
+          reason:
+              'un solo RPC — el server inserta review Y actualiza '
+              'trust_score atómicamente',
         );
+        expect(
+          rpcCalls.single.positionalArguments.first,
+          'submit_motoposada_review',
+        );
+        final params =
+            rpcCalls.single.namedArguments[#params] as Map<String, dynamic>;
+        expect(params['p_request_id'], 7);
+        expect(params['p_to_user_id'], 'u-host-1');
+        expect(params['p_type'], 'guest_review');
+        expect(params['p_rating'], 5);
+        expect(params['p_comment'], 'Excelente host');
 
-    test('rating >= 4 → rpc con p_delta 2 y ReviewSubmitted', () async {
-      final client = FakeSupabaseClient(currentUser: fakeUser('u-reviewer'));
-      final bloc = MotoposadasBloc(client: client);
+        // El cliente NUNCA calcula deltas ni llama update_trust_score.
+        expect(
+          rpcCalls.map((i) => i.positionalArguments.first),
+          isNot(contains('update_trust_score')),
+        );
+        expect(bloc.state, isA<ReviewSubmitted>());
+        await bloc.close();
+      });
 
-      bloc.add(_review);
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      test('rating 3 (delta 0) → el RPC igual se llama (el server decide), '
+          'ReviewSubmitted', () async {
+        final client = FakeSupabaseClient(currentUser: fakeUser('u-guest'));
+        final bloc = MotoposadasBloc(client: client);
 
-      final rpcCalls = client.calls
-          .where((i) => i.memberName == #rpc)
-          .toList();
-      expect(rpcCalls, hasLength(1));
-      expect(rpcCalls.single.positionalArguments.first, 'update_trust_score');
-      final params =
-          rpcCalls.single.namedArguments[#params] as Map<String, dynamic>;
-      expect(params['p_user_id'], 42);
-      expect(params['p_delta'], 2);
+        bloc.add(
+          SubmitReview(
+            motoposadaId: 1,
+            requestId: 7,
+            toUserId: 'u-host-1',
+            type: 'host_review',
+            rating: 3,
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(bloc.state, isA<ReviewSubmitted>());
-      await bloc.close();
-    });
+        final rpcCalls = client.calls
+            .where((i) => i.memberName == #rpc)
+            .toList();
+        expect(rpcCalls, hasLength(1));
+        expect(bloc.state, isA<ReviewSubmitted>());
+        await bloc.close();
+      });
 
-    test('rating <= 2 → rpc con p_delta -2 y ReviewSubmitted', () async {
-      final client = FakeSupabaseClient(currentUser: fakeUser('u-reviewer'));
-      final bloc = MotoposadasBloc(client: client);
+      test('rpc FALLA (estancia no completada / no participante) → '
+          'MotoposadasError VISIBLE', () async {
+        final client = FakeSupabaseClient(
+          currentUser: fakeUser('u-guest'),
+          rpcError: Exception('stay_not_completed'),
+        );
+        final bloc = MotoposadasBloc(client: client);
 
-      bloc.add(SubmitReview(
-        motoposadaId: 1,
-        requestId: 7,
-        toUserId: 42,
-        type: 'guest',
-        rating: 1,
-      ));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc.add(_review);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      final rpcCalls =
-          client.calls.where((i) => i.memberName == #rpc).toList();
-      expect(rpcCalls, hasLength(1));
-      final params =
-          rpcCalls.single.namedArguments[#params] as Map<String, dynamic>;
-      expect(params['p_delta'], -2);
-      expect(bloc.state, isA<ReviewSubmitted>());
-      await bloc.close();
-    });
-
-    test('rating 3 (delta 0) → rpc NO llamado, ReviewSubmitted', () async {
-      final client = FakeSupabaseClient(currentUser: fakeUser('u-reviewer'));
-      final bloc = MotoposadasBloc(client: client);
-
-      bloc.add(SubmitReview(
-        motoposadaId: 1,
-        requestId: 7,
-        toUserId: 42,
-        type: 'host',
-        rating: 3,
-      ));
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-
-      expect(
-        client.calls.where((i) => i.memberName == #rpc).toList(),
-        isEmpty,
-      );
-      expect(bloc.state, isA<ReviewSubmitted>());
-      await bloc.close();
-    });
-
-    test('rpc FALLA → MotoposadasError VISIBLE (nunca catch vacío)',
-        () async {
-      final client = FakeSupabaseClient(
-        currentUser: fakeUser('u-reviewer'),
-        rpcError: Exception('RLS: update blocked'),
-      );
-      final bloc = MotoposadasBloc(client: client);
-
-      bloc.add(_review);
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-
-      expect(bloc.state, isA<MotoposadasError>());
-      await bloc.close();
-    });
-  });
+        expect(bloc.state, isA<MotoposadasError>());
+        await bloc.close();
+      });
+    },
+  );
 }

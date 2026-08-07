@@ -5,7 +5,8 @@ import 'package:equatable/equatable.dart';
 
 sealed class MotoposadasEvent extends Equatable {
   const MotoposadasEvent();
-  @override List<Object?> get props => [];
+  @override
+  List<Object?> get props => [];
 }
 
 final class LoadMotoposadas extends MotoposadasEvent {
@@ -26,6 +27,14 @@ final class LoadMyRequests extends MotoposadasEvent {
   const LoadMyRequests();
 }
 
+/// Host inbox (031): todas las solicitudes hacia MIS motoposadas — el
+/// server filtra por RLS `mr_select_host` (motoposada.user_id = auth.uid()).
+/// Separa "Recibidas" (host) de "Mis estancias" (guest, LoadMyRequests) —
+/// antes ambas estaban mezcladas en un solo buzón estilo Schrödinger.
+final class LoadReceivedRequests extends MotoposadasEvent {
+  const LoadReceivedRequests();
+}
+
 final class CreateMotoposada extends MotoposadasEvent {
   final String type;
   final String title;
@@ -38,9 +47,15 @@ final class CreateMotoposada extends MotoposadasEvent {
   final String visibility;
   final int? targetClanId;
   const CreateMotoposada({
-    required this.type, required this.title, required this.description,
-    required this.rules, required this.lat, required this.lng,
-    required this.address, required this.maxGuests, required this.visibility,
+    required this.type,
+    required this.title,
+    required this.description,
+    required this.rules,
+    required this.lat,
+    required this.lng,
+    required this.address,
+    required this.maxGuests,
+    required this.visibility,
     this.targetClanId,
   });
 }
@@ -55,9 +70,14 @@ final class UpdateMotoposada extends MotoposadasEvent {
   final int? targetClanId;
   final bool isActive;
   const UpdateMotoposada({
-    required this.id, required this.title, required this.description,
-    required this.rules, required this.maxGuests, required this.visibility,
-    this.targetClanId, required this.isActive,
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.rules,
+    required this.maxGuests,
+    required this.visibility,
+    this.targetClanId,
+    required this.isActive,
   });
 }
 
@@ -68,8 +88,11 @@ final class SendMotoposadaRequest extends MotoposadasEvent {
   final int guestCount;
   final String message;
   const SendMotoposadaRequest({
-    required this.motoposadaId, required this.checkIn, required this.checkOut,
-    this.guestCount = 1, this.message = '',
+    required this.motoposadaId,
+    required this.checkIn,
+    required this.checkOut,
+    this.guestCount = 1,
+    this.message = '',
   });
 }
 
@@ -79,17 +102,47 @@ final class RespondToRequest extends MotoposadasEvent {
   const RespondToRequest({required this.requestId, required this.status});
 }
 
+/// Host marks an approved stay as completed (031: `complete_motoposada_request`).
+final class CompleteMotoposadaRequest extends MotoposadasEvent {
+  final int requestId;
+  const CompleteMotoposadaRequest({required this.requestId});
+  @override
+  List<Object?> get props => [requestId];
+}
+
+/// Guest cancels before check-in (031: `cancel_motoposada_request`).
+final class CancelMotoposadaRequest extends MotoposadasEvent {
+  final int requestId;
+  const CancelMotoposadaRequest({required this.requestId});
+  @override
+  List<Object?> get props => [requestId];
+}
+
 final class SubmitReview extends MotoposadasEvent {
   final int motoposadaId;
   final int requestId;
-  final int toUserId;
+  final String
+  toUserId; // UUID del destinatario (host en guest_review, guest en host_review)
   final String type;
   final int rating;
   final String comment;
   const SubmitReview({
-    required this.motoposadaId, required this.requestId, required this.toUserId,
-    required this.type, required this.rating, this.comment = '',
+    required this.motoposadaId,
+    required this.requestId,
+    required this.toUserId,
+    required this.type,
+    required this.rating,
+    this.comment = '',
   });
+  @override
+  List<Object?> get props => [
+    motoposadaId,
+    requestId,
+    toUserId,
+    type,
+    rating,
+    comment,
+  ];
 }
 
 final class DeleteMotoposada extends MotoposadasEvent {
@@ -107,12 +160,27 @@ final class CreateTouristPoi extends MotoposadasEvent {
   final String address;
   final String city;
   const CreateTouristPoi({
-    required this.type, required this.title, required this.description,
-    required this.rules, required this.lat, required this.lng,
-    required this.address, required this.city,
+    required this.type,
+    required this.title,
+    required this.description,
+    required this.rules,
+    required this.lat,
+    required this.lng,
+    required this.address,
+    required this.city,
   });
   String get poiType => 'tourist';
-  @override List<Object?> get props => [type, title, description, rules, lat, lng, address, city];
+  @override
+  List<Object?> get props => [
+    type,
+    title,
+    description,
+    rules,
+    lat,
+    lng,
+    address,
+    city,
+  ];
 }
 
 // ── Casa de motero (F-M9 / F-M11) ──
@@ -145,8 +213,15 @@ final class CreateCasaMotero extends MotoposadasEvent {
   });
   @override
   List<Object?> get props => [
-    title, description, maxGuests, lat, lng,
-    latExact, lngExact, whatsappPhone, disclaimerAcceptedAt,
+    title,
+    description,
+    maxGuests,
+    lat,
+    lng,
+    latExact,
+    lngExact,
+    whatsappPhone,
+    disclaimerAcceptedAt,
   ];
 }
 
@@ -171,8 +246,15 @@ final class UpdateCasaMotero extends MotoposadasEvent {
     required this.isActive,
   });
   @override
-  List<Object?> get props =>
-      [id, title, description, maxGuests, lat, lng, isActive];
+  List<Object?> get props => [
+    id,
+    title,
+    description,
+    maxGuests,
+    lat,
+    lng,
+    isActive,
+  ];
 }
 
 /// Private fields update — `cmd_update_own` on `casa_motero_details`

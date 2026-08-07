@@ -24,10 +24,13 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<LoadMyMotoposadas>(_onLoadMy);
     on<LoadMotoposadaRequests>(_onLoadRequests);
     on<LoadMyRequests>(_onLoadMyRequests);
+    on<LoadReceivedRequests>(_onLoadReceivedRequests);
     on<CreateMotoposada>(_onCreate);
     on<UpdateMotoposada>(_onUpdate);
     on<SendMotoposadaRequest>(_onSendRequest);
     on<RespondToRequest>(_onRespond);
+    on<CompleteMotoposadaRequest>(_onCompleteRequest);
+    on<CancelMotoposadaRequest>(_onCancelRequest);
     on<SubmitReview>(_onSubmitReview);
     on<DeleteMotoposada>(_onDelete);
     on<CreateTouristPoi>(_onCreateTouristPoi);
@@ -168,6 +171,32 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
+  /// Host inbox (031): solicitudes hacia MIS motoposadas. Sin filtro
+  /// client-side — `mr_select_host` (009) ya limita a las motoposadas del
+  /// usuario autenticado. Distinto de [LoadMyRequests] (mis estancias como
+  /// guest): antes ambos casos vivían en el mismo handler/buzón.
+  Future<void> _onLoadReceivedRequests(
+    LoadReceivedRequests event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      final resp = await _db
+          .from('motoposada_requests')
+          .select(
+            '*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title)',
+          )
+          .order('created_at', ascending: false);
+
+      final list = (resp as List)
+          .map((m) => MotoposadaRequestModel.fromMap(m as Map<String, dynamic>))
+          .toList();
+      emit(RequestsLoaded(requests: list, isHost: true));
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
   Future<void> _onCreate(
     CreateMotoposada event,
     Emitter<MotoposadasState> emit,
@@ -224,79 +253,114 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
+  /// Crear solicitud vía `request_motoposada` (031, SECURITY DEFINER). El
+  /// server valida TODO de forma atómica: no-propia, fechas, capacidad,
+  /// visibilidad y solapamiento. Un POST directo a `motoposada_requests`
+  /// ya no existe — `mr_insert_guest` fue removida en 031.
   Future<void> _onSendRequest(
     SendMotoposadaRequest event,
     Emitter<MotoposadasState> emit,
   ) async {
     emit(MotoposadasLoading());
     try {
-      await _db.from('motoposada_requests').insert({
-        'motoposada_id': event.motoposadaId,
-        'guest_id': _uid,
-        'check_in': event.checkIn.toIso8601String().substring(0, 10),
-        'check_out': event.checkOut.toIso8601String().substring(0, 10),
-        'guest_count': event.guestCount,
-        'message': event.message,
-      });
+      await _db.rpc(
+        'request_motoposada',
+        params: {
+          'p_motoposada_id': event.motoposadaId,
+          'p_check_in': event.checkIn.toIso8601String().substring(0, 10),
+          'p_check_out': event.checkOut.toIso8601String().substring(0, 10),
+          'p_guest_count': event.guestCount,
+          'p_message': event.message,
+        },
+      );
       emit(const RequestSent());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
   }
 
+  /// Responder (aprobar/rechazar) vía `respond_motoposada_request` (031).
+  /// Solo el host; transición única pending → approved/rejected; en
+  /// aprobación valida fechas cruzadas (casa y guest). El server deriva el
+  /// estado — el cliente ya no escribe `status` directo.
   Future<void> _onRespond(
     RespondToRequest event,
     Emitter<MotoposadasState> emit,
   ) async {
     emit(MotoposadasLoading());
     try {
-      await _db
-          .from('motoposada_requests')
-          .update({
-            'status': event.status,
-            'host_response_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', event.requestId);
-
-      // If rejected, penalize guest trust_score if malicious pattern detected
+      await _db.rpc(
+        'respond_motoposada_request',
+        params: {
+          'p_request_id': event.requestId,
+          'p_approve': event.status == 'approved',
+        },
+      );
       emit(const RequestResponded());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
   }
 
+  /// Finalizar estancia vía `complete_motoposada_request` (031): solo host,
+  /// desde approved, estancia iniciada.
+  Future<void> _onCompleteRequest(
+    CompleteMotoposadaRequest event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      await _db.rpc(
+        'complete_motoposada_request',
+        params: {'p_request_id': event.requestId},
+      );
+      emit(const RequestCompleted());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Cancelar vía `cancel_motoposada_request` (031): solo guest, antes del
+  /// check-in.
+  Future<void> _onCancelRequest(
+    CancelMotoposadaRequest event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      await _db.rpc(
+        'cancel_motoposada_request',
+        params: {'p_request_id': event.requestId},
+      );
+      emit(const RequestCancelled());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  /// Reseña vía `submit_motoposada_review` (031, SECURITY DEFINER). El
+  /// server valida: estancia COMPLETADA, participante según tipo, rating
+  /// 1..5, una sola review — y actualiza trust_score con clamp 0..100
+  /// (delta derivado del rating en el servidor). El cliente ya no inserta
+  /// en `motoposada_reviews` ni calcula deltas (`mrev_insert_participant`
+  /// fue removida en 031; `update_trust_score`/030 queda como RPC
+  /// independiente para otros flujos).
   Future<void> _onSubmitReview(
     SubmitReview event,
     Emitter<MotoposadasState> emit,
   ) async {
     emit(MotoposadasLoading());
     try {
-      await _db.from('motoposada_reviews').insert({
-        'motoposada_id': event.motoposadaId,
-        'request_id': event.requestId,
-        'from_user_id': _uid,
-        'to_user_id': event.toUserId,
-        'type': event.type,
-        'rating': event.rating,
-        'comment': event.comment,
-        'behavior_flags': 0,
-      });
-
-      // Update trust_score — vía RPC SECURITY DEFINER (030). El UPDATE directo
-      // de user_xp cross-user FALLA SIEMPRE por RLS (007 solo define
-      // xp_select_all/xp_insert_own — sin policy de UPDATE); el catch vacío
-      // previo tragaba el fallo: la reputación del anfitrión nunca cambiaba
-      // tras una review. Ahora el error del RPC sube al catch externo →
-      // MotoposadasError VISIBLE (clase de bug _save: falla ruidosa, no
-      // silenciosa).
-      final trustDelta = event.rating >= 4 ? 2 : (event.rating <= 2 ? -2 : 0);
-      if (trustDelta != 0) {
-        await _db.rpc('update_trust_score', params: {
-          'p_user_id': event.toUserId,
-          'p_delta': trustDelta,
-        });
-      }
-
+      await _db.rpc(
+        'submit_motoposada_review',
+        params: {
+          'p_request_id': event.requestId,
+          'p_to_user_id': event.toUserId,
+          'p_type': event.type,
+          'p_rating': event.rating,
+          'p_comment': event.comment,
+        },
+      );
       emit(const ReviewSubmitted());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
@@ -435,14 +499,17 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
   ) async {
     emit(MotoposadasLoading());
     try {
-      await _db.from('motoposadas').update({
-        'title': event.title,
-        'description': event.description,
-        'max_guests': event.maxGuests,
-        'lat': event.lat,
-        'lng': event.lng,
-        'is_active': event.isActive,
-      }).eq('id', event.id);
+      await _db
+          .from('motoposadas')
+          .update({
+            'title': event.title,
+            'description': event.description,
+            'max_guests': event.maxGuests,
+            'lat': event.lat,
+            'lng': event.lng,
+            'is_active': event.isActive,
+          })
+          .eq('id', event.id);
       emit(const MotoposadaUpdated());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
@@ -457,11 +524,14 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
   ) async {
     emit(MotoposadasLoading());
     try {
-      await _db.from('casa_motero_details').update({
-        'whatsapp_phone': normalizePhoneDigits(event.whatsappPhone),
-        'lat_exact': event.latExact,
-        'lng_exact': event.lngExact,
-      }).eq('user_id', _uid!);
+      await _db
+          .from('casa_motero_details')
+          .update({
+            'whatsapp_phone': normalizePhoneDigits(event.whatsappPhone),
+            'lat_exact': event.latExact,
+            'lng_exact': event.lngExact,
+          })
+          .eq('user_id', _uid!);
       emit(const MotoposadaUpdated());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
@@ -499,17 +569,21 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
           .eq('motoposada_id', event.id)
           .maybeSingle();
       if (resp == null) {
-        emit(const MotoposadasError(
-          'No se encontraron los datos privados de tu casa de motero',
-        ));
+        emit(
+          const MotoposadasError(
+            'No se encontraron los datos privados de tu casa de motero',
+          ),
+        );
         return;
       }
-      emit(CasaMoteroDetailsLoaded(
-        motoposadaId: resp['motoposada_id'] as int,
-        whatsappPhone: resp['whatsapp_phone'] as String,
-        latExact: (resp['lat_exact'] as num).toDouble(),
-        lngExact: (resp['lng_exact'] as num).toDouble(),
-      ));
+      emit(
+        CasaMoteroDetailsLoaded(
+          motoposadaId: resp['motoposada_id'] as int,
+          whatsappPhone: resp['whatsapp_phone'] as String,
+          latExact: (resp['lat_exact'] as num).toDouble(),
+          lngExact: (resp['lng_exact'] as num).toDouble(),
+        ),
+      );
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
