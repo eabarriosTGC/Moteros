@@ -27,6 +27,11 @@ jobs:
           grep -q 'DROP POLICY IF EXISTS "mr_update_host"' supabase/migrations/031_secure_motoposada_flow.sql
           grep -q 'DROP POLICY IF EXISTS "mrev_insert_participant"' supabase/migrations/031_secure_motoposada_flow.sql
 
+      - name: Migration 031 direct table writes must return 403
+        run: |
+          grep -q 'REVOKE INSERT, UPDATE, DELETE ON public.motoposada_requests FROM anon, authenticated' supabase/migrations/031_secure_motoposada_flow.sql
+          grep -q 'REVOKE INSERT, UPDATE, DELETE ON public.motoposada_reviews FROM anon, authenticated' supabase/migrations/031_secure_motoposada_flow.sql
+
       - name: Migration 031 must ship all 5 authenticated RPCs
         run: |
           for rpc in request_motoposada respond_motoposada_request complete_motoposada_request cancel_motoposada_request submit_motoposada_review; do
