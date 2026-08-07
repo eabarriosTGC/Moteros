@@ -54,3 +54,10 @@ jobs:
           ! grep -q 'v.created_at' supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
           grep -q "period IN ('monthly', 'yearly', 'historical')" supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
           grep -q 'FROM anon, authenticated' supabase/migrations/032_fix_leaderboard_snapshot_refresh.sql
+
+      - name: Migration 033 must align club member roles
+        run: |
+          grep -q 'DROP CONSTRAINT IF EXISTS clan_members_role_check' supabase/migrations/033_align_club_member_roles.sql
+          grep -q "ALTER COLUMN role SET DEFAULT 'aspirante'" supabase/migrations/033_align_club_member_roles.sql
+          grep -q "CHECK (role IN ('presidente', 'oficial', 'honorable', 'aspirante'))" supabase/migrations/033_align_club_member_roles.sql
+          grep -q 'VALIDATE CONSTRAINT club_members_role_check' supabase/migrations/033_align_club_member_roles.sql
