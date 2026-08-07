@@ -166,6 +166,9 @@ $$;
 REVOKE ALL ON FUNCTION public.request_motoposada(
     BIGINT, DATE, DATE, INT, TEXT
 ) FROM public;
+REVOKE EXECUTE ON FUNCTION public.request_motoposada(
+    BIGINT, DATE, DATE, INT, TEXT
+) FROM anon;
 GRANT EXECUTE ON FUNCTION public.request_motoposada(
     BIGINT, DATE, DATE, INT, TEXT
 ) TO authenticated;
@@ -247,6 +250,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.respond_motoposada_request(BIGINT, BOOLEAN) FROM public;
+REVOKE EXECUTE ON FUNCTION public.respond_motoposada_request(BIGINT, BOOLEAN) FROM anon;
 GRANT EXECUTE ON FUNCTION public.respond_motoposada_request(BIGINT, BOOLEAN) TO authenticated;
 
 -- ============================================================
@@ -296,6 +300,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.complete_motoposada_request(BIGINT) FROM public;
+REVOKE EXECUTE ON FUNCTION public.complete_motoposada_request(BIGINT) FROM anon;
 GRANT EXECUTE ON FUNCTION public.complete_motoposada_request(BIGINT) TO authenticated;
 
 -- ============================================================
@@ -343,6 +348,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.cancel_motoposada_request(BIGINT) FROM public;
+REVOKE EXECUTE ON FUNCTION public.cancel_motoposada_request(BIGINT) FROM anon;
 GRANT EXECUTE ON FUNCTION public.cancel_motoposada_request(BIGINT) TO authenticated;
 
 -- ============================================================
@@ -433,6 +439,9 @@ $$;
 REVOKE ALL ON FUNCTION public.submit_motoposada_review(
     BIGINT, UUID, TEXT, INT, TEXT
 ) FROM public;
+REVOKE EXECUTE ON FUNCTION public.submit_motoposada_review(
+    BIGINT, UUID, TEXT, INT, TEXT
+) FROM anon;
 GRANT EXECUTE ON FUNCTION public.submit_motoposada_review(
     BIGINT, UUID, TEXT, INT, TEXT
 ) TO authenticated;
