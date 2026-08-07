@@ -236,6 +236,17 @@ final class RequestResponded extends MotoposadasState {
   const RequestResponded();
 }
 
+/// Host completed an approved stay (031: `complete_motoposada_request`).
+final class RequestCompleted extends MotoposadasState {
+  const RequestCompleted();
+}
+
+/// Guest cancelled a pending/approved stay before check-in
+/// (031: `cancel_motoposada_request`).
+final class RequestCancelled extends MotoposadasState {
+  const RequestCancelled();
+}
+
 final class ReviewSubmitted extends MotoposadasState {
   const ReviewSubmitted();
 }
@@ -302,6 +313,5 @@ final class CasaMoteroDetailsLoaded extends MotoposadasState {
     required this.lngExact,
   });
   @override
-  List<Object?> get props =>
-      [motoposadaId, whatsappPhone, latExact, lngExact];
+  List<Object?> get props => [motoposadaId, whatsappPhone, latExact, lngExact];
 }

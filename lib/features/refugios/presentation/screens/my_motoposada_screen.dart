@@ -27,10 +27,16 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
   bool? _eligibilityHas;
   List<MotoposadaModel>? _cachedListings;
 
+  // Request tabs (031): caches por rol. RequestsLoaded es un estado único
+  // compartido — cada tab renderiza SOLO su rol (isHost) y conserva su
+  // último listado cuando el otro tab recarga (patrón _cachedListings).
+  List<MotoposadaRequestModel>? _cachedReceived;
+  List<MotoposadaRequestModel>? _cachedMyStays;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
       context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
@@ -53,6 +59,31 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         if (state is MyMotoposadasLoaded) {
           _cachedListings = state.motoposadas;
         }
+        if (state is RequestsLoaded) {
+          if (state.isHost) {
+            _cachedReceived = state.requests;
+          } else {
+            _cachedMyStays = state.requests;
+          }
+        }
+        // Acciones de request (031): feedback + recarga del tab activo.
+        if (state is RequestResponded ||
+            state is RequestCompleted ||
+            state is RequestCancelled) {
+          final msg = switch (state) {
+            RequestResponded() => '✅ Solicitud actualizada',
+            RequestCompleted() => '✅ Estancia finalizada',
+            _ => '✅ Solicitud cancelada',
+          };
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: AppColors.success),
+          );
+          context.read<MotoposadasBloc>().add(
+            _tabController.index == 1
+                ? const LoadReceivedRequests()
+                : const LoadMyRequests(),
+          );
+        }
       },
       child: BlocBuilder<MotoposadasBloc, MotoposadasState>(
         builder: (context, state) {
@@ -71,19 +102,31 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                 labelColor: AppColors.primary,
                 unselectedLabelColor: AppColors.textMuted,
                 onTap: (i) {
+                  // 031: buzones separados — RECIBIDAS (host, hacia mis
+                  // motoposadas) y MIS ESTANCIAS (guest, mis solicitudes).
                   if (i == 1) {
+                    context.read<MotoposadasBloc>().add(
+                      const LoadReceivedRequests(),
+                    );
+                  }
+                  if (i == 2) {
                     context.read<MotoposadasBloc>().add(const LoadMyRequests());
                   }
                 },
                 tabs: const [
                   Tab(text: 'MIS PUBLICACIONES'),
-                  Tab(text: 'SOLICITUDES'),
+                  Tab(text: 'RECIBIDAS'),
+                  Tab(text: 'MIS ESTANCIAS'),
                 ],
               ),
             ),
             body: TabBarView(
               controller: _tabController,
-              children: [_buildMyListings(state), _buildRequests(state)],
+              children: [
+                _buildMyListings(state),
+                _buildReceived(state),
+                _buildMyStays(state),
+              ],
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => Navigator.push(
@@ -503,48 +546,95 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
     );
   }
 
-  Widget _buildRequests(MotoposadasState state) {
-    if (state is MotoposadasLoading) {
+  /// RECIBIDAS (031): solicitudes hacia MIS motoposadas — acciones de host.
+  /// Usa el estado RequestsLoaded SOLO cuando isHost; si el otro tab recargó,
+  /// muestra el caché de este rol (nunca datos del rol equivocado).
+  Widget _buildReceived(MotoposadasState state) {
+    final List<MotoposadaRequestModel>? requests =
+        state is RequestsLoaded && state.isHost
+        ? state.requests
+        : _cachedReceived;
+    if (requests == null) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
-    if (state is RequestsLoaded) {
-      if (state.requests.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.inbox_outlined,
-                size: 64,
-                color: AppColors.textMuted.withAlpha(60),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                'Sin solicitudes aún',
-                style: AppTypography.body.copyWith(color: AppColors.textMuted),
-              ),
-            ],
-          ),
-        );
-      }
-      return RefreshIndicator(
-        onRefresh: () async =>
-            context.read<MotoposadasBloc>().add(const LoadMyRequests()),
-        child: ListView.builder(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          itemCount: state.requests.length,
-          itemBuilder: (_, i) => _buildRequestCard(state.requests[i]),
+    if (requests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 64,
+              color: AppColors.textMuted.withAlpha(60),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Sin solicitudes recibidas aún',
+              style: AppTypography.body.copyWith(color: AppColors.textMuted),
+            ),
+          ],
         ),
       );
     }
-    return const Center(
-      child: Text('Cargando...', style: TextStyle(color: AppColors.textMuted)),
+    return RefreshIndicator(
+      onRefresh: () async =>
+          context.read<MotoposadasBloc>().add(const LoadReceivedRequests()),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        itemCount: requests.length,
+        itemBuilder: (_, i) => _buildHostRequestCard(requests[i]),
+      ),
     );
   }
 
-  Widget _buildRequestCard(MotoposadaRequestModel req) {
+  /// MIS ESTANCIAS (031): mis solicitudes como guest — sin acciones de host.
+  Widget _buildMyStays(MotoposadasState state) {
+    final List<MotoposadaRequestModel>? requests =
+        state is RequestsLoaded && !state.isHost
+        ? state.requests
+        : _cachedMyStays;
+    if (requests == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+    if (requests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.luggage_outlined,
+              size: 64,
+              color: AppColors.textMuted.withAlpha(60),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Todavía no pediste ninguna estancia',
+              style: AppTypography.body.copyWith(color: AppColors.textMuted),
+            ),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async =>
+          context.read<MotoposadasBloc>().add(const LoadMyRequests()),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        itemCount: requests.length,
+        itemBuilder: (_, i) => _buildGuestRequestCard(requests[i]),
+      ),
+    );
+  }
+
+  /// Tarjeta de solicitud RECIBIDA (host): perfil del guest + acciones
+  /// ACEPTAR/RECHAZAR (pending) y COMPLETAR (approved, finalización
+  /// controlada 031). Todas las mutaciones van por RPC — el server valida
+  /// propiedad, transiciones y fechas cruzadas.
+  Widget _buildHostRequestCard(MotoposadaRequestModel req) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -664,6 +754,121 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                   ),
                 ),
               ],
+            ),
+          ],
+          if (req.status == 'approved') ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              height: 36,
+              child: OutlinedButton.icon(
+                onPressed: () => context.read<MotoposadasBloc>().add(
+                  CompleteMotoposadaRequest(requestId: req.id),
+                ),
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text(
+                  'FINALIZAR ESTANCIA',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.info,
+                  side: const BorderSide(color: AppColors.info),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Tarjeta de MIS ESTANCIAS (guest): motoposada + estado + CANCELAR
+  /// (solo pending/approved antes del check-in — el server es la frontera
+  /// real con `cancel_motoposada_request`; el check client-side es UX).
+  Widget _buildGuestRequestCard(MotoposadaRequestModel req) {
+    final canCancel =
+        (req.status == 'pending' || req.status == 'approved') &&
+        req.checkIn.isAfter(DateTime.now());
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: _statusColor(req.status)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.input,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.home_outlined,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      req.motoposadaTitle ?? 'Motoposada #${req.motoposadaId}',
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${_formatDate(req.checkIn)} → ${_formatDate(req.checkOut)} · ${req.guestCount} huésped(es)',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _statusBadge(req.status),
+            ],
+          ),
+          if (req.message.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              req.message,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+          if (canCancel) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              height: 36,
+              child: OutlinedButton.icon(
+                onPressed: () => context.read<MotoposadasBloc>().add(
+                  CancelMotoposadaRequest(requestId: req.id),
+                ),
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text(
+                  'CANCELAR ESTANCIA',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
             ),
           ],
         ],
