@@ -159,7 +159,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'BIENVENIDO A ASFALTOCLUB',
+                        'BIENVENIDO A MOTEROS',
                         style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 16,
@@ -319,7 +319,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          'Acepto los términos y condiciones de AsfaltoClub',
+                          'Acepto los términos y condiciones de Moteros',
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13,

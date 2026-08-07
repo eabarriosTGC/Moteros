@@ -1,11 +1,10 @@
-/// Main navigation shell with custom bottom nav bar.
-/// Redesigned: 3 tabs (Rodar, Progreso, Explorar) for the minimalista redesign.
+/// Navegación principal de Moteros — barra flotante Velocity UI.
 library;
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
 
-/// Tab index mapping
 enum AppTab { rodar, progreso, explorar }
 
 class MainShell extends StatefulWidget {
@@ -22,11 +21,6 @@ class MainShell extends StatefulWidget {
   final Widget progresoScreen;
   final Widget explorarScreen;
   final AppTab initialTab;
-
-  /// Notificado en cada cambio de tab. El IndexedStack mantiene vivos los
-  /// tabs (keep-alive): las pantallas no re-ejecutan initState al volver —
-  /// el host usa este callback para refrescar datos stale (p. ej. los
-  /// contadores de Progreso al re-entrar).
   final ValueChanged<AppTab>? onTabSelected;
 
   @override
@@ -43,6 +37,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onTabSelected(AppTab tab) {
+    if (_currentTab == tab) return;
     setState(() => _currentTab = tab);
     widget.onTabSelected?.call(tab);
   }
@@ -53,108 +48,102 @@ class _MainShellState extends State<MainShell> {
       extendBody: true,
       body: IndexedStack(
         index: _currentTab.index,
-        children: [
-          widget.rodarScreen,    // 0: Rodar
-          widget.progresoScreen, // 1: Progreso
-          widget.explorarScreen, // 2: Explorar
-        ],
+        children: [widget.rodarScreen, widget.progresoScreen, widget.explorarScreen],
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _VelocityNavigation(
+        currentTab: _currentTab,
+        onSelected: _onTabSelected,
+      ),
     );
   }
+}
 
-  Widget _buildBottomNav() {
+class _VelocityNavigation extends StatelessWidget {
+  const _VelocityNavigation({required this.currentTab, required this.onSelected});
+
+  final AppTab currentTab;
+  final ValueChanged<AppTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
     final safeBottom = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      height: AppSpacing.bottomNavHeight + safeBottom + 8,
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.sm,
-        bottom: safeBottom + 4,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          top: BorderSide(color: AppColors.border, width: 0.5),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, 0, 14, safeBottom + 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: 70,
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppColors.elevated.withAlpha(242),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: AppColors.borderLight.withAlpha(180)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x66000000), blurRadius: 28, offset: Offset(0, 12)),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(child: _NavItem(tab: AppTab.rodar, icon: Icons.near_me_rounded, label: 'Rodar', selected: currentTab == AppTab.rodar, onTap: onSelected)),
+                Expanded(child: _NavItem(tab: AppTab.progreso, icon: Icons.query_stats_rounded, label: 'Progreso', selected: currentTab == AppTab.progreso, onTap: onSelected)),
+                Expanded(child: _NavItem(tab: AppTab.explorar, icon: Icons.travel_explore_rounded, label: 'Explorar', selected: currentTab == AppTab.explorar, onTap: onSelected)),
+              ],
+            ),
+          ),
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // Tab 0: Rodar
-          _NavItem(
-            icon: Icons.explore_rounded,
-            label: 'Rodar',
-            isSelected: _currentTab == AppTab.rodar,
-            onTap: () => _onTabSelected(AppTab.rodar),
-          ),
-          // Tab 1: Progreso
-          _NavItem(
-            icon: Icons.bar_chart_rounded,
-            label: 'Progreso',
-            isSelected: _currentTab == AppTab.progreso,
-            onTap: () => _onTabSelected(AppTab.progreso),
-          ),
-          // Tab 2: Explorar
-          _NavItem(
-            icon: Icons.compass_calibration_rounded,
-            label: 'Explorar',
-            isSelected: _currentTab == AppTab.explorar,
-            onTap: () => _onTabSelected(AppTab.explorar),
-          ),
-        ],
       ),
     );
   }
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _NavItem({required this.tab, required this.icon, required this.label, required this.selected, required this.onTap});
 
+  final AppTab tab;
   final IconData icon;
   final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final bool selected;
+  final ValueChanged<AppTab> onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.primary : AppColors.textMuted;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label.toUpperCase(),
-              style: AppTypography.caption.copyWith(
-                color: color,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                letterSpacing: 0.3,
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: () => onTap(tab),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary.withAlpha(28) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: selected ? AppColors.primary.withAlpha(80) : Colors.transparent),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedScale(
+                scale: selected ? 1.08 : 1,
+                duration: const Duration(milliseconds: 240),
+                child: Icon(icon, size: 23, color: selected ? AppColors.primaryLight : AppColors.textMuted),
               ),
-            ),
-            if (isSelected)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                width: 4,
-                height: 4,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                style: AppTypography.caption.copyWith(
+                  color: selected ? AppColors.textPrimary : AppColors.textMuted,
+                  fontSize: 10.5,
+                  letterSpacing: 0.05,
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

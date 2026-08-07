@@ -112,7 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       size: 64, color: AppColors.primary),
                   const SizedBox(height: 16),
                   const Text(
-                    'Únete a AsfaltoClub',
+                    'Únete a Moteros',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -8,24 +11,21 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeIn;
-  late Animation<double> _pulse;
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-    _fadeIn = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-    _pulse = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 0.8, curve: Curves.easeInOut)),
-    );
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _scale = Tween<double>(begin: .88, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) context.read<AuthBloc>().add(CheckAuthStatus());
+    });
   }
 
   @override
@@ -37,85 +37,39 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeIn,
-          child: ScaleTransition(
-            scale: _pulse,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Central glow + logo
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Amber glow background circle
-                    Container(
-                      width: 160,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: AppShadows.amberGlow,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppGradients.dashboard),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(top: -100, right: -100, child: Container(width: 280, height: 280, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withAlpha(18), boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(28), blurRadius: 110, spreadRadius: 35)]))),
+            Positioned(bottom: -110, left: -90, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.secondary.withAlpha(14), boxShadow: [BoxShadow(color: AppColors.secondary.withAlpha(18), blurRadius: 100, spreadRadius: 30)]))),
+            Center(
+              child: FadeTransition(
+                opacity: _fade,
+                child: ScaleTransition(
+                  scale: _scale,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(gradient: AppGradients.primaryButton, borderRadius: BorderRadius.circular(31), boxShadow: AppShadows.amberGlow),
+                        child: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 50),
                       ),
-                    ),
-                    // Logo icon
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.surface.withAlpha(180),
-                        border: Border.all(
-                          color: AppColors.primary.withAlpha(80),
-                          width: 2,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.motorcycle,
-                        size: 52,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                // ASFALTOCLUB — Space Grotesk, amber, glow
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  decoration: BoxDecoration(
-                    boxShadow: AppShadows.amberGlow,
-                  ),
-                  child: Text(
-                    'ASFALTOCLUB',
-                    style: AppTypography.displayMedium.copyWith(
-                      color: AppColors.primary,
-                      letterSpacing: 8,
-                    ),
+                      const SizedBox(height: 26),
+                      Text('MOTEROS', style: AppTypography.displayMedium.copyWith(color: AppColors.textPrimary, letterSpacing: 6)),
+                      const SizedBox(height: 8),
+                      Text('TU RUTA. TU COMUNIDAD.', style: AppTypography.label.copyWith(color: AppColors.secondaryLight, letterSpacing: 2.1)),
+                      const SizedBox(height: 38),
+                      const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.primaryLight)),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                // BATTLE RIDE — cyan subtitle
-                Text(
-                  'BATTLE RIDE',
-                  style: AppTypography.h2.copyWith(
-                    color: AppColors.secondary,
-                    letterSpacing: 6,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                // Loading indicator — amber
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

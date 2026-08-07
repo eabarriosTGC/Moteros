@@ -80,7 +80,7 @@ class MoterosApp extends StatelessWidget {
         create: (_) => ThemeCubit(),
         child: BlocBuilder<ThemeCubit, ThemeMode>(
           builder: (context, themeMode) => MaterialApp(
-            title: 'AsfaltoClub',
+            title: 'Moteros',
             debugShowCheckedModeBanner: false,
             themeMode: themeMode,
             darkTheme: AppTheme.dark,
