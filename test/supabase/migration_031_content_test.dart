@@ -7,7 +7,7 @@
 ///   - se CERRARON las policies de mutación directa (mr_insert_guest,
 ///     mr_update_host, mrev_insert_participant) y NO se re-crean
 ///   - existen las 5 RPC con SECURITY DEFINER + firma estrecha y GRANT a
-///     authenticated (REVOKE de public)
+///     authenticated (REVOKE de public y anon)
 ///   - trust_score se actualiza en el server con clamp 0..100
 ///   - helper dates_overlap presente (base de todos los chequeos)
 /// Si alguien "abre" el INSERT/UPDATE directo o saca una RPC, este test falla.
@@ -86,6 +86,11 @@ void main() {
           body,
           contains('SET search_path = public'),
           reason: '$rpc must pin search_path (026 convention)',
+        );
+        expect(
+          sql,
+          contains('REVOKE EXECUTE ON FUNCTION public.$rpc'),
+          reason: '$rpc must explicitly revoke Supabase default anon EXECUTE',
         );
         expect(
           sql,
