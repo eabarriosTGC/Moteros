@@ -108,6 +108,12 @@ void main() {
       expect(body, contains("'check_in_in_past'"));
       expect(body, contains("'invalid_guest_count'"));
       expect(body, contains("'motoposada_not_visible'"));
+      expect(
+        body,
+        contains('club_members'),
+        reason: 'visibility must use the production club schema, not legacy clan_members',
+      );
+      expect(body, isNot(contains('clan_members')));
       expect(body, contains("'overlapping_request'"));
       expect(
         body,
