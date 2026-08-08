@@ -108,10 +108,7 @@ serve(async (req) => {
     const { error: updateError } = await supabase
       .from('club_members')
       .update({
-        rank_id: targetRankId,
         role: targetRank.name,
-        promoted_at: new Date().toISOString(),
-        promoted_by: user.id,
       })
       .eq('club_id', clubId)
       .eq('user_id', memberId);

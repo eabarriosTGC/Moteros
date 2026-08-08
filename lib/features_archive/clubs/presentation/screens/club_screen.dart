@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../domain/entities/club_member_role.dart';
 import '../bloc/club_bloc.dart';
 import '../bloc/club_event.dart';
 import '../bloc/club_state.dart';
@@ -32,7 +33,6 @@ class _ClubScreenState extends State<ClubScreen> {
   String? _chatError;
   RealtimeChannel? _clubChatChannel;
   final Map<String, String> _userNameCache = {};
-  final bool _autoScroll = true;
 
   @override
   void initState() {
@@ -230,7 +230,7 @@ class _ClubScreenState extends State<ClubScreen> {
           style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
         ),
         actions: [
-          if (isMember && (state.myRole == 'founder' || state.myRole == 'captain'))
+          if (isMember && ClubMemberRole.fromValue(state.myRole).canManageMembers)
             IconButton(
               icon: const Icon(Icons.settings_outlined, color: AppColors.textMuted),
               onPressed: () => Navigator.pushNamed(context, '/club/members',
@@ -393,7 +393,8 @@ class _ClubScreenState extends State<ClubScreen> {
                   letterSpacing: 1.5,
                 ),
               ),
-              if (state.isMember && (state.myRole == 'founder' || state.myRole == 'captain'))
+              if (state.isMember &&
+                  ClubMemberRole.fromValue(state.myRole).canManageMembers)
                 TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/club/members',
                     arguments: widget.clubId,
@@ -415,9 +416,9 @@ class _ClubScreenState extends State<ClubScreen> {
   }
 
   Widget _buildMemberRow(Map<String, dynamic> member) {
-    final role = member['role'] as String? ?? 'rider';
+    final role = ClubMemberRole.fromValue(member['role'] as String?);
     final roleColors = _getRoleColor(role);
-    final roleLabels = _getRoleLabel(role);
+    final roleLabels = role.label;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -469,29 +470,16 @@ class _ClubScreenState extends State<ClubScreen> {
     );
   }
 
-  Color _getRoleColor(String role) {
+  Color _getRoleColor(ClubMemberRole role) {
     switch (role) {
-      case 'founder':
+      case ClubMemberRole.presidente:
         return AppColors.primary;
-      case 'captain':
+      case ClubMemberRole.oficial:
         return AppColors.secondary;
-      case 'rider':
+      case ClubMemberRole.honorable:
         return AppColors.success;
-      default:
+      case ClubMemberRole.aspirante:
         return AppColors.textMuted;
-    }
-  }
-
-  String _getRoleLabel(String role) {
-    switch (role) {
-      case 'founder':
-        return 'FUNDADOR';
-      case 'captain':
-        return 'CAPITÁN';
-      case 'rider':
-        return 'JINETE';
-      default:
-        return 'RECLUTA';
     }
   }
 

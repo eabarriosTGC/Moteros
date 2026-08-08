@@ -1,6 +1,7 @@
 /// Club Datasource — Supabase operations for clubs and members.
 library;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../domain/entities/club_member_role.dart';
 
 class ClubDatasource {
   final SupabaseClient _client;
@@ -56,11 +57,11 @@ class ClubDatasource {
 
     final club = response;
 
-    // Add founder as presidente
+    // Add the creator as the club president.
     await _client.from('club_members').insert({
       'club_id': club['id'],
       'user_id': userId,
-      'role': 'presidente',
+      'role': ClubMemberRole.presidente.value,
     });
 
     return club;
@@ -74,11 +75,15 @@ class ClubDatasource {
     await _client.from('clubs').delete().eq('id', clubId);
   }
 
-  Future<void> inviteMember(int clubId, String userId, {String role = 'aspirante'}) async {
+  Future<void> inviteMember(
+    int clubId,
+    String userId, {
+    ClubMemberRole role = ClubMemberRole.aspirante,
+  }) async {
     await _client.from('club_members').insert({
       'club_id': clubId,
       'user_id': userId,
-      'role': role,
+      'role': role.value,
     });
   }
 
@@ -90,7 +95,7 @@ class ClubDatasource {
     await _client.from('club_members').insert({
       'club_id': clubId,
       'user_id': userId,
-      'role': 'aspirante',
+      'role': ClubMemberRole.aspirante.value,
     });
   }
 

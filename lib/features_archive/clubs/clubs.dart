@@ -9,6 +9,7 @@ export 'data/models/club_challenge_model.dart';
 export 'domain/entities/club_entity.dart';
 export 'domain/entities/club_rank_entity.dart';
 export 'domain/entities/club_challenge_entity.dart';
+export 'domain/entities/club_member_role.dart';
 export 'domain/usecases/promote_member.dart';
 export 'domain/usecases/create_club_challenge.dart';
 export 'domain/usecases/check_rank_eligibility.dart';

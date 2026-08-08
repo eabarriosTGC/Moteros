@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../domain/entities/club_member_role.dart';
 import '../bloc/club_bloc.dart';
 import '../bloc/club_event.dart';
 import '../bloc/club_state.dart';
@@ -73,7 +74,8 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
   }
 
   Widget _buildScreen(ClubLoaded state) {
-    final canManage = state.myRole == 'founder' || state.myRole == 'captain';
+    final currentRole = ClubMemberRole.fromValue(state.myRole);
+    final canManage = currentRole.canManageMembers;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -86,7 +88,7 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
       ),
       body: Column(
         children: [
-          // Invite section (only for founder/captain)
+          // Invite section (only for presidente/oficial)
           if (canManage) _buildInviteSection(state),
 
           // Members list
@@ -95,7 +97,8 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
               padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: state.members.length,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (_, i) => _buildMemberCard(state, state.members[i], canManage),
+              itemBuilder: (_, i) =>
+                  _buildMemberCard(state, state.members[i], currentRole),
             ),
           ),
         ],
@@ -163,10 +166,14 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
     );
   }
 
-  Widget _buildMemberCard(ClubLoaded state, Map<String, dynamic> member, bool canManage) {
-    final role = member['role'] as String? ?? 'aspirante';
+  Widget _buildMemberCard(
+    ClubLoaded state,
+    Map<String, dynamic> member,
+    ClubMemberRole currentRole,
+  ) {
+    final role = ClubMemberRole.fromValue(member['role'] as String?);
     final roleColor = _getRoleColor(role);
-    final roleLabel = _getRoleLabel(role);
+    final roleLabel = role.label;
     final isSelf = member['user_id'] == Supabase.instance.client.auth.currentUser?.id;
     final memberId = member['user_id'] as String? ?? '';
 
@@ -243,84 +250,70 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
             ),
           ),
 
-          // Management options (founder/captain only, not for self, not for founder if we're captain)
-          if (canManage && !isSelf) ...[
+          // Role management follows the canonical club hierarchy.
+          if (!isSelf &&
+              (currentRole.canChangeRoleOf(role) ||
+                  currentRole.canRemove(role))) ...[
             const SizedBox(width: AppSpacing.sm),
-            _buildManageButton(state, member),
+            _buildManageButton(state, member, currentRole),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildManageButton(ClubLoaded state, Map<String, dynamic> member) {
-    final role = member['role'] as String? ?? 'aspirante';
+  Widget _buildManageButton(
+    ClubLoaded state,
+    Map<String, dynamic> member,
+    ClubMemberRole currentRole,
+  ) {
+    final role = ClubMemberRole.fromValue(member['role'] as String?);
     final memberId = member['user_id'] as String? ?? '';
+    final assignableRoles = currentRole.assignableRolesFor(role);
 
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: AppColors.textMuted, size: 20),
       color: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.mdCircular),
       onSelected: (value) {
-        switch (value) {
-          case 'promote_captain':
-            _changeRole(state, memberId, 'captain');
-          case 'promote_rider':
-            _changeRole(state, memberId, 'rider');
-            break;
-          case 'demote_recruit':
-            _changeRole(state, memberId, 'aspirante');
-            break;
-          case 'kick':
+        if (value == 'kick') {
             _confirmKick(state, memberId);
-            break;
+        } else {
+          _changeRole(state, memberId, value);
         }
       },
       itemBuilder: (_) => [
-        if (role != 'captain')
-          const PopupMenuItem(
-            value: 'promote_captain',
+        for (final assignableRole in assignableRoles)
+          PopupMenuItem(
+            value: assignableRole.value,
             child: ListTile(
-              leading: Icon(Icons.arrow_upward, color: AppColors.secondary),
-              title: Text('Ascender a Capitán',
-                style: TextStyle(color: AppColors.textPrimary),
+              leading: Icon(
+                assignableRole.index < role.index
+                    ? Icons.arrow_upward
+                    : Icons.arrow_downward,
+                color: _getRoleColor(assignableRole),
+              ),
+              title: Text(
+                'Cambiar a ${assignableRole.label}',
+                style: const TextStyle(color: AppColors.textPrimary),
               ),
               dense: true,
             ),
           ),
-        if (role != 'rider')
+        if (currentRole.canRemove(role)) ...[
+          const PopupMenuDivider(),
           const PopupMenuItem(
-            value: 'promote_rider',
+            value: 'kick',
             child: ListTile(
-              leading: Icon(Icons.arrow_upward, color: AppColors.success),
-              title: Text('Ascender a Jinete',
-                style: TextStyle(color: AppColors.textPrimary),
+              leading: Icon(Icons.person_remove, color: AppColors.error),
+              title: Text(
+                'Expulsar',
+                style: TextStyle(color: AppColors.error),
               ),
               dense: true,
             ),
           ),
-        if (role != 'aspirante')
-          const PopupMenuItem(
-            value: 'demote_recruit',
-            child: ListTile(
-              leading: Icon(Icons.arrow_downward, color: AppColors.textMuted),
-              title: Text('Degradar a Aspirante',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-              dense: true,
-            ),
-          ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: 'kick',
-          child: ListTile(
-            leading: Icon(Icons.person_remove, color: AppColors.error),
-            title: Text('Expulsar',
-              style: TextStyle(color: AppColors.error),
-            ),
-            dense: true,
-          ),
-        ),
+        ],
       ],
     );
   }
@@ -382,29 +375,16 @@ class _ClubMembersScreenState extends State<ClubMembersScreen> {
     _inviteController.clear();
   }
 
-  Color _getRoleColor(String role) {
+  Color _getRoleColor(ClubMemberRole role) {
     switch (role) {
-      case 'founder':
+      case ClubMemberRole.presidente:
         return AppColors.primary;
-      case 'captain':
+      case ClubMemberRole.oficial:
         return AppColors.secondary;
-      case 'rider':
+      case ClubMemberRole.honorable:
         return AppColors.success;
-      default:
+      case ClubMemberRole.aspirante:
         return AppColors.textMuted;
-    }
-  }
-
-  String _getRoleLabel(String role) {
-    switch (role) {
-      case 'founder':
-        return 'FUNDADOR';
-      case 'captain':
-        return 'CAPITÁN';
-      case 'rider':
-        return 'JINETE';
-      default:
-        return 'ASPIRANTE';
     }
   }
 }

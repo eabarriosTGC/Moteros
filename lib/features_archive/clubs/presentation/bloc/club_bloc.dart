@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../domain/entities/club_member_role.dart';
 import 'club_event.dart';
 import 'club_state.dart';
 
@@ -120,11 +121,11 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
 
       final club = response;
 
-      // Add founder with 'presidente' role
+      // Add the creator with the canonical president role.
       await Supabase.instance.client.from('club_members').insert({
         'club_id': club['id'],
         'user_id': userId,
-        'role': 'presidente',
+        'role': ClubMemberRole.presidente.value,
       });
 
       emit(ClubCreated(club: club));
@@ -138,7 +139,7 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
       await Supabase.instance.client.from('club_members').insert({
         'club_id': event.clubId,
         'user_id': event.userId,
-        'role': 'aspirante',
+        'role': ClubMemberRole.aspirante.value,
       });
       add(LoadClub(clubId: event.clubId));
     } catch (e) {
@@ -202,7 +203,7 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
       await Supabase.instance.client.from('club_members').insert({
         'club_id': event.clubId,
         'user_id': userId,
-        'role': 'aspirante',
+        'role': ClubMemberRole.aspirante.value,
       });
 
       add(LoadClub(clubId: event.clubId));
@@ -243,7 +244,7 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
     try {
       await Supabase.instance.client
           .from('club_members')
-          .update({'role': event.targetRole, 'rank_id': null})
+          .update({'role': event.targetRole})
           .eq('club_id', event.clubId)
           .eq('user_id', event.memberId);
       add(LoadClub(clubId: event.clubId));
@@ -367,7 +368,7 @@ class ClubBloc extends Bloc<ClubEvent, ClubState> {
       await Supabase.instance.client.from('club_members').insert({
         'club_id': club['id'],
         'user_id': userId,
-        'role': 'aspirante',
+        'role': ClubMemberRole.aspirante.value,
       });
 
       emit(ClubJoined());
