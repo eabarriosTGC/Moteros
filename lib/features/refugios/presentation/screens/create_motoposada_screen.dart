@@ -560,7 +560,7 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
                   ),
                   Switch(
                     value: _isTourist,
-                    activeColor: AppColors.warning,
+                    activeThumbColor: AppColors.warning,
                     onChanged: (v) => setState(() => _isTourist = v),
                   ),
                 ],
