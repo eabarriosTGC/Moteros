@@ -2,6 +2,8 @@ name: Build and publish Android alpha
 
 on:
   push:
+    branches:
+      - 'release/*'
     tags:
       - 'v*-alpha'
 
@@ -13,6 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve immutable release target
+        id: release
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "branch" ]]; then
+            echo "tag=${GITHUB_REF_NAME#release/}" >> "$GITHUB_OUTPUT"
+            echo "target=$(git rev-parse HEAD^)" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "target=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout reviewed source
+        run: git checkout "${{ steps.release.outputs.target }}"
 
       - uses: actions/setup-java@v4
         with:
@@ -55,10 +72,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "${{ steps.release.outputs.tag }}" \
+            --target "${{ steps.release.outputs.target }}" \
             AsfaltoClub-v0.11.0-alpha.apk \
             AsfaltoClub-v0.11.0-alpha.apk.sha256 \
             --title "AsfaltoClub v0.11.0 — Flujo seguro y clubes" \
             --prerelease \
             --generate-notes
-
