@@ -1,0 +1,64 @@
+name: Build and publish Android alpha
+
+on:
+  push:
+    tags:
+      - 'v*-alpha'
+
+permissions:
+  contents: write
+
+jobs:
+  android-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create production environment asset
+        env:
+          SUPABASE_URL: 'https://ykexdfixvhaeiaaxcbdf.supabase.co'
+          SUPABASE_ANON_KEY: 'sb_publishable_v5VE2Y8oMV6KP2ejysVYsQ_0bRbSXaE'
+        run: |
+          umask 077
+          printf 'SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\n' \
+            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > .env
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run release guards
+        run: |
+          flutter analyze lib/features/refugios lib/features_archive/clubs
+          flutter test test/features_archive/clubs/domain/entities/club_member_role_test.dart
+          flutter test test/supabase/migration_031_content_test.dart
+          flutter test test/supabase/migration_034_content_test.dart
+
+      - name: Build APK
+        run: flutter build apk --release --build-name 1.1.1 --build-number 6
+
+      - name: Prepare release artifact
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk AsfaltoClub-v0.11.0-alpha.apk
+          sha256sum AsfaltoClub-v0.11.0-alpha.apk > AsfaltoClub-v0.11.0-alpha.apk.sha256
+
+      - name: Publish GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            AsfaltoClub-v0.11.0-alpha.apk \
+            AsfaltoClub-v0.11.0-alpha.apk.sha256 \
+            --title "AsfaltoClub v0.11.0 — Flujo seguro y clubes" \
+            --prerelease \
+            --generate-notes
+
