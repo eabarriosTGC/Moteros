@@ -33,7 +33,6 @@ class _ClubScreenState extends State<ClubScreen> {
   String? _chatError;
   RealtimeChannel? _clubChatChannel;
   final Map<String, String> _userNameCache = {};
-  final bool _autoScroll = true;
 
   @override
   void initState() {

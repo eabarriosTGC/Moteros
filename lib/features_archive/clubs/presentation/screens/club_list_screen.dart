@@ -140,7 +140,10 @@ class _ClubListScreenState extends State<ClubListScreen> {
                       MaterialPageRoute(
                         builder: (_) => ClubScreen(clubId: club['id'] as int),
                       ),
-                    ).then((_) => context.read<ClubBloc>().add(LoadClubs()));
+                    ).then((_) {
+                      if (!context.mounted) return;
+                      context.read<ClubBloc>().add(const LoadClubs());
+                    });
                   },
                 );
               },
@@ -151,7 +154,10 @@ class _ClubListScreenState extends State<ClubListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateClubScreen()),
-          ).then((_) => context.read<ClubBloc>().add(LoadClubs()));
+          ).then((_) {
+            if (!context.mounted) return;
+            context.read<ClubBloc>().add(const LoadClubs());
+          });
         },
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnAmber,
