@@ -155,7 +155,7 @@ class _ClubListScreenState extends State<ClubListScreen> {
             context,
             MaterialPageRoute(builder: (_) => const CreateClubScreen()),
           ).then((_) {
-            if (!context.mounted) return;
+            if (!mounted) return;
             context.read<ClubBloc>().add(const LoadClubs());
           });
         },
