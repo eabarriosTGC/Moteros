@@ -80,6 +80,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Create the ignored test environment asset
+        run: touch .env
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
@@ -90,3 +93,4 @@ jobs:
         run: |
           flutter test test/features_archive/clubs/domain/entities/club_member_role_test.dart
           flutter test test/supabase/migration_034_content_test.dart
+
