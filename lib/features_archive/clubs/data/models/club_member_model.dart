@@ -1,3 +1,5 @@
+import '../../domain/entities/club_member_role.dart';
+
 /// Club Member Model — minimal parsed view of club_members table row.
 class ClubMemberModel {
   final int id;
@@ -25,7 +27,7 @@ class ClubMemberModel {
         clubId: json['club_id'] as int,
         userId: json['user_id'] as String,
         rankId: json['rank_id'] as int?,
-        role: json['role'] as String? ?? 'aspirante',
+        role: ClubMemberRole.fromValue(json['role'] as String?).value,
         joinedAt: DateTime.parse(json['joined_at'] as String),
         promotedAt: json['promoted_at'] != null ? DateTime.parse(json['promoted_at'] as String) : null,
         promotedBy: json['promoted_by'] as String?,

@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../domain/entities/club_member_role.dart';
 import '../bloc/club_bloc.dart';
 import '../bloc/club_event.dart';
 import '../bloc/club_state.dart';
@@ -30,7 +31,8 @@ class _ClubRankManagementScreenState extends State<ClubRankManagementScreen> {
     final minPuntosController = TextEditingController(text: '${existingRank?['requirements']?['min_puntos'] ?? 0}');
     final minChallengesController = TextEditingController(text: '${existingRank?['requirements']?['min_challenges'] ?? 0}');
     final maxSlotsController = TextEditingController(text: '${existingRank?['max_slots'] ?? ''}');
-    String selectedName = existingRank?['name'] as String? ?? 'aspirante';
+    String selectedName = existingRank?['name'] as String? ??
+        ClubMemberRole.aspirante.value;
 
     showDialog(
       context: context,
@@ -60,10 +62,14 @@ class _ClubRankManagementScreenState extends State<ClubRankManagementScreen> {
                       isExpanded: true,
                       dropdownColor: AppColors.surface,
                       style: const TextStyle(color: AppColors.textPrimary),
-                      items: const [
-                        DropdownMenuItem(value: 'aspirante', child: Text('Aspirante')),
-                        DropdownMenuItem(value: 'honorable', child: Text('Honorable')),
-                        DropdownMenuItem(value: 'oficial', child: Text('Oficial')),
+                      items: [
+                        for (final role in ClubMemberRole.values.where(
+                          (role) => role != ClubMemberRole.presidente,
+                        ))
+                          DropdownMenuItem(
+                            value: role.value,
+                            child: Text(role.label),
+                          ),
                       ],
                       onChanged: (v) {
                         Navigator.pop(ctx);
@@ -274,11 +280,11 @@ class _ClubRankManagementScreenState extends State<ClubRankManagementScreen> {
     final maxSlots = rank['max_slots'] as int?;
     final isLeader = rank['is_leader'] as bool? ?? false;
 
-    final rankColors = switch (name) {
-      'aspirante' => AppColors.textMuted,
-      'honorable' => AppColors.secondary,
-      'oficial' => AppColors.primary,
-      _ => AppColors.textMuted,
+    final rankColors = switch (ClubMemberRole.fromValue(name)) {
+      ClubMemberRole.presidente => AppColors.primary,
+      ClubMemberRole.oficial => AppColors.primary,
+      ClubMemberRole.honorable => AppColors.secondary,
+      ClubMemberRole.aspirante => AppColors.textMuted,
     };
 
     return Container(

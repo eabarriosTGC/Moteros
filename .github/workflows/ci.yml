@@ -61,3 +61,32 @@ jobs:
           grep -q "ALTER COLUMN role SET DEFAULT 'aspirante'" supabase/migrations/033_align_club_member_roles.sql
           grep -q "CHECK (role IN ('presidente', 'oficial', 'honorable', 'aspirante'))" supabase/migrations/033_align_club_member_roles.sql
           grep -q 'VALIDATE CONSTRAINT club_members_role_check' supabase/migrations/033_align_club_member_roles.sql
+
+      - name: Migration 034 must enforce the club hierarchy server-side
+        run: |
+          grep -q 'private.current_club_member_role' supabase/migrations/034_secure_club_member_hierarchy.sql
+          grep -q 'GRANT UPDATE (role)' supabase/migrations/034_secure_club_member_hierarchy.sql
+          grep -q 'private.sync_club_member_role_metadata' supabase/migrations/034_secure_club_member_hierarchy.sql
+          grep -q 'WITH CHECK (' supabase/migrations/034_secure_club_member_hierarchy.sql
+          grep -q "role IN ('oficial', 'honorable', 'aspirante')" supabase/migrations/034_secure_club_member_hierarchy.sql
+
+  club-role-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze the archived clubs module
+        run: flutter analyze lib/features_archive/clubs
+
+      - name: Test canonical roles and migration 034
+        run: |
+          flutter test test/features_archive/clubs/domain/entities/club_member_role_test.dart
+          flutter test test/supabase/migration_034_content_test.dart
