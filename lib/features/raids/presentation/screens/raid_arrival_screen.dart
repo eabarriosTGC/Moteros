@@ -46,7 +46,8 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
       final status = await Permission.camera.request();
       return status.isGranted;
     },
-    startCamera: () => _scanner.start(),
+    // Evita que un CameraX defectuoso deje la UI cargando para siempre.
+    startCamera: () => _scanner.start().timeout(const Duration(seconds: 12)),
     stopCamera: () => _scanner.stop(),
   );
 
@@ -59,6 +60,7 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _lifecycle.addListener(_onScannerPhaseChanged);
     // La cámara arranca después del primer frame y solo si mounted: la app
     // administra el ciclo de vida (autoStart: false).
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -69,8 +71,14 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _lifecycle.removeListener(_onScannerPhaseChanged);
+    _lifecycle.dispose();
     _scanner.dispose();
     super.dispose();
+  }
+
+  void _onScannerPhaseChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -276,28 +284,45 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
           onOpenSettings: _openAppSettings,
         );
       case ScannerPhase.initializing:
-        return const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        );
+        // MobileScanner debe existir en el árbol ANTES de controller.start().
+        // Con autoStart:false queda montado sin abrir la cámara hasta que el
+        // permiso haya sido concedido por ScannerLifecycle.
+        return _activeScannerArea(showLoading: true);
       case ScannerPhase.ready:
-        return MobileScanner(
-          controller: _scanner,
-          onDetect: (capture) =>
-              handleDetectedBarcode(capture.barcodes.firstOrNull?.rawValue),
-          errorBuilder: (context, error) => _ScannerMessageView(
-            icon: Icons.videocam_off_outlined,
-            title: 'No pudimos iniciar la cámara',
-            message:
-                'Verifica que ninguna otra app esté usando la cámara e inténtalo de nuevo.',
-            onRetry: _startScanner,
-            onOpenSettings: _openAppSettings,
-          ),
-          placeholderBuilder: (context) => const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          ),
-        );
+        return _activeScannerArea(showLoading: false);
     }
   }
+
+  Widget _activeScannerArea({required bool showLoading}) => Stack(
+        fit: StackFit.expand,
+        children: [
+          _mobileScanner(),
+          if (showLoading)
+            const ColoredBox(
+              color: AppColors.background,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+        ],
+      );
+
+  Widget _mobileScanner() => MobileScanner(
+        controller: _scanner,
+        onDetect: (capture) =>
+            handleDetectedBarcode(capture.barcodes.firstOrNull?.rawValue),
+        errorBuilder: (context, error) => _ScannerMessageView(
+          icon: Icons.videocam_off_outlined,
+          title: 'No pudimos iniciar la cámara',
+          message:
+              'Verifica que ninguna otra app esté usando la cámara e inténtalo de nuevo.',
+          onRetry: _startScanner,
+          onOpenSettings: _openAppSettings,
+        ),
+        placeholderBuilder: (context) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
 
   Widget _successBody() {
     final km = (_arrival!['verified_km'] as num).toDouble();

@@ -21,6 +21,18 @@ ScannerLifecycle _build({
 
 void main() {
   group('ScannerLifecycle — permiso y arranque', () {
+    test('notifica a la UI cuando cambia de fase', () async {
+      final lc = _build();
+      var notifications = 0;
+      lc.addListener(() => notifications++);
+
+      await lc.initialize();
+
+      expect(lc.phase, ScannerPhase.ready);
+      expect(notifications, 1);
+      lc.dispose();
+    });
+
     test('no inicia la cámara si el permiso fue denegado', () async {
       final lc = _build(permissionGranted: false);
       await lc.initialize();

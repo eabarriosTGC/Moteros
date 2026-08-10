@@ -13,7 +13,7 @@ enum ScannerPhase { initializing, ready, permissionDenied, unavailable, error }
 /// inactive/paused → start en resumed. Pura y unit-testable: los callbacks
 /// reales (permission_handler, MobileScannerController) se inyectan desde el
 /// State; en pruebas se sustituyen por contadores.
-class ScannerLifecycle {
+class ScannerLifecycle extends ChangeNotifier {
   ScannerLifecycle({
     required this._requestCameraPermission,
     required this._startCamera,
@@ -24,7 +24,14 @@ class ScannerLifecycle {
   final Future<void> Function() _startCamera;
   final Future<void> Function() _stopCamera;
 
-  ScannerPhase phase = ScannerPhase.initializing;
+  ScannerPhase _phase = ScannerPhase.initializing;
+  ScannerPhase get phase => _phase;
+
+  void _setPhase(ScannerPhase value) {
+    if (_phase == value) return;
+    _phase = value;
+    notifyListeners();
+  }
 
   /// Se concede el permiso una sola vez y se recuerda para el lifecycle.
   bool hasCameraPermission = false;
@@ -41,19 +48,19 @@ class ScannerLifecycle {
   Future<void> initialize() async {
     if (_startInFlight) return;
     _startInFlight = true;
-    phase = ScannerPhase.initializing;
+    _setPhase(ScannerPhase.initializing);
     try {
       final granted = await _requestCameraPermission();
       if (!granted) {
-        phase = ScannerPhase.permissionDenied;
+        _setPhase(ScannerPhase.permissionDenied);
         return;
       }
       hasCameraPermission = true;
       await _startCamera();
       startCalls++;
-      phase = ScannerPhase.ready;
+      _setPhase(ScannerPhase.ready);
     } catch (_) {
-      phase = ScannerPhase.error;
+      _setPhase(ScannerPhase.error);
     } finally {
       _startInFlight = false;
     }
@@ -95,7 +102,7 @@ class ScannerLifecycle {
     try {
       await _stopCamera();
       stopCalls++;
-      phase = ScannerPhase.initializing;
+      _setPhase(ScannerPhase.initializing);
     } finally {
       _stopInFlight = false;
     }
