@@ -1,15 +1,18 @@
-/// RaidJoinSheet widget tests — F-M8: ride details + Unirme → Ya unido.
+/// RaidJoinSheet widget tests — F-M8: ride details + Unirme → Verificar llegada.
+///
+/// v0.12.1: el flujo 'Grabar ruta' (INICIAR VIAJE → RouteTrackerScreen) fue
+/// eliminado deliberadamente. El botón para inscritos ahora es VERIFICAR
+/// LLEGADA → RaidArrivalScreen (QR + GPS). Estos tests verifican el
+/// comportamiento REAL de v0.12.1; la navegación a RaidArrivalScreen se inyecta
+/// vía [RaidJoinSheet.arrivalScreenBuilder] para no instanciar la cámara real.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moteros_app/core/services/location_tracking_service.dart';
 import 'package:moteros_app/features/raids/presentation/bloc/raid_bloc.dart';
 import 'package:moteros_app/features/raids/presentation/bloc/raid_event.dart';
 import 'package:moteros_app/features/raids/presentation/widgets/raid_join_sheet.dart';
-import 'package:moteros_app/features/tracker/presentation/screens/route_tracker_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Same fake chain as raid_bloc_test.dart (see that file for details).
@@ -50,9 +53,6 @@ class FakeSupabaseClient implements SupabaseClient {
       final t = invocation.positionalArguments.first as String;
       return tables.putIfAbsent(t, () => FakeQueryBuilder());
     }
-    // TrackerBloc (push de RouteTrackerScreen) lee auth.currentUser en
-    // LoadSavedRoutes — responder auth con usuario null evita el
-    // NoSuchMethodError en la cadena null.currentUser.
     if (invocation.memberName == #auth) return _FakeAuthClient();
     return null;
   }
@@ -66,39 +66,8 @@ class _FakeAuthClient implements GoTrueClient {
   User? get currentUser => null;
 }
 
-/// Fake GPS service para TrackerBloc (el push de RouteTrackerScreen lo
-/// construye; ningún test de este archivo llega a grabar).
-class _FakeGps implements TrackerGpsService {
-  bool startResult = true;
-  bool restoreResult = false;
-  DateTime? startedAtValue;
-  List<LatLng> points = [];
-  void Function(TrackingSnapshot)? _onUpdate;
-
-  @override
-  Future<bool> start() async => startResult;
-
-  @override
-  void stop() {}
-
-  @override
-  Future<bool> restoreFromCheckpoint() async => restoreResult;
-
-  @override
-  List<LatLng> get tracePoints => List.unmodifiable(points);
-
-  @override
-  DateTime? get startedAt => startedAtValue;
-
-  @override
-  void Function(TrackingSnapshot)? get onUpdate => _onUpdate;
-
-  @override
-  set onUpdate(void Function(TrackingSnapshot)? callback) {
-    _onUpdate = callback;
-  }
-}
-
+/// Sin origin_name/destination_name → el widget debe mostrar los fallbacks
+/// 'Punto de salida' / 'Destino'.
 final _raid = <String, dynamic>{
   'id': 42,
   'description': 'Ruta Gotica al Magdalena',
@@ -111,6 +80,19 @@ final _raid = <String, dynamic>{
   'raid_participants': <Map<String, dynamic>>[],
 };
 
+final _raidConNombres = <String, dynamic>{
+  ..._raid,
+  'origin_name': 'Portal Norte',
+  'destination_name': 'La Calera',
+};
+
+Map<String, dynamic> _raidInscrito() => <String, dynamic>{
+      ..._raid,
+      'raid_participants': [
+        {'user_id': 'u1', 'is_ready': false},
+      ],
+    };
+
 Widget _wrap(Widget child, {required FakeSupabaseClient client}) {
   return MaterialApp(
     home: BlocProvider<RaidBloc>(
@@ -120,28 +102,28 @@ Widget _wrap(Widget child, {required FakeSupabaseClient client}) {
   );
 }
 
-/// Wraps con RaidBloc + TrackerBloc y un home que abre el sheet vía
-/// `showRaidJoinSheet` (entry point real, M-RTR-1) — el push de
-/// RouteTrackerScreen necesita ambos blocs. currentUserId se pasa por el
-/// seam de testabilidad del entry point para la rama `joined`.
-Widget _wrapStartTrip(
+/// Los BlocProvider van FUERA del MaterialApp: showModalBottomSheet monta el
+/// sheet en el Overlay del Navigator, que desciende del contexto donde se
+/// construye MaterialApp. Si el provider estuviera dentro de `home`, el sheet
+/// lanzaría ProviderNotFoundException.
+Widget _wrapWithSheet(
   FakeSupabaseClient client, {
   required Map<String, dynamic> raid,
+  Widget Function(Map<String, dynamic> raid)? arrivalScreenBuilder,
 }) {
-  return MultiBlocProvider(
-    providers: [
-      BlocProvider<RaidBloc>(create: (_) => RaidBloc(client: client)),
-      BlocProvider<TrackerBloc>(
-        create: (_) => TrackerBloc(client: client, tracker: _FakeGps()),
-      ),
-    ],
+  return BlocProvider<RaidBloc>(
+    create: (_) => RaidBloc(client: client),
     child: MaterialApp(
       home: Builder(
         builder: (context) => Scaffold(
           body: Center(
             child: TextButton(
-              onPressed: () =>
-                  showRaidJoinSheet(context, raid, currentUserId: 'u1'),
+              onPressed: () => showRaidJoinSheet(
+                context,
+                raid,
+                currentUserId: 'u1',
+                arrivalScreenBuilder: arrivalScreenBuilder,
+              ),
               child: const Text('OPEN SHEET'),
             ),
           ),
@@ -152,12 +134,14 @@ Widget _wrapStartTrip(
 }
 
 void main() {
-  testWidgets('shows fecha, punto de encuentro and UNIRME button', (tester) async {
+  testWidgets(
+      'shows fecha, nombres de lugar, 0 confirmados y UNIRME A LA RODADA; '
+      'sin INICIAR VIAJE / YA UNIDO', (tester) async {
     final client = FakeSupabaseClient();
-    client.tables['raids'] = FakeQueryBuilder(result: [_raid]);
+    client.tables['raids'] = FakeQueryBuilder(result: [_raidConNombres]);
 
     await tester.pumpWidget(_wrap(
-      RaidJoinSheet(raid: _raid, currentUserId: 'u1'),
+      RaidJoinSheet(raid: _raidConNombres, currentUserId: 'u1'),
       client: client,
     ));
     await tester.pump();
@@ -167,16 +151,20 @@ void main() {
       find.textContaining('01/09/2026', findRichText: true),
       findsOneWidget,
     );
-    expect(
-      find.textContaining('4.59810, -74.07580', findRichText: true),
-      findsOneWidget,
-    );
-    expect(find.textContaining('0 participantes'), findsOneWidget);
-    expect(find.text('UNIRME'), findsOneWidget);
+    expect(find.text('Portal Norte'), findsOneWidget); // origin_name
+    expect(find.text('La Calera'), findsOneWidget); // destination_name
+    expect(find.textContaining('0 confirmados'), findsOneWidget);
+    expect(find.text('UNIRME A LA RODADA'), findsOneWidget);
+    expect(find.text('VERIFICAR LLEGADA'), findsNothing);
+    expect(find.text('INICIAR VIAJE'), findsNothing);
     expect(find.text('YA UNIDO'), findsNothing);
+    expect(find.text('Grabar ruta'), findsNothing);
   });
 
-  testWidgets('tap UNIRME flips to YA UNIDO without reload', (tester) async {
+  testWidgets(
+      'tap UNIRME A LA RODADA → diálogo de privacidad → SOLO CONTADOR → '
+      'JoinRaid → VERIFICAR LLEGADA + ABANDONAR RODADA + 1 confirmado',
+      (tester) async {
     final client = FakeSupabaseClient();
     client.tables['raids'] = FakeQueryBuilder(result: [_raid]);
     client.tables['raid_participants'] = FakeQueryBuilder();
@@ -195,87 +183,101 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 
-    await tester.tap(find.text('UNIRME'));
+    await tester.tap(find.text('UNIRME A LA RODADA'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100)); // dialog anim
+
+    // Diálogo de privacidad de la rodada.
+    expect(find.text('Privacidad de la rodada'), findsOneWidget);
+    expect(find.text('SOLO CONTADOR'), findsOneWidget);
+    expect(find.text('MOSTRARME'), findsOneWidget);
+
+    await tester.tap(find.text('SOLO CONTADOR'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('YA UNIDO'), findsOneWidget);
-    expect(find.text('ABANDONAR'), findsOneWidget);
-    expect(find.text('1 participante'), findsOneWidget);
-    expect(find.text('UNIRME'), findsNothing);
+    // JoinRaid despachado: el update local agrega el participante.
+    expect(find.text('VERIFICAR LLEGADA'), findsOneWidget);
+    expect(find.text('ABANDONAR RODADA'), findsOneWidget);
+    expect(find.textContaining('1 confirmado'), findsOneWidget);
+    expect(find.text('UNIRME A LA RODADA'), findsNothing);
   });
 
-  testWidgets('already joined shows YA UNIDO immediately', (tester) async {
-    final raidJoined = <String, dynamic>{
-      ..._raid,
-      'raid_participants': [
-        {'user_id': 'u1', 'is_ready': false},
-      ],
-    };
+  testWidgets('already joined shows VERIFICAR LLEGADA immediately',
+      (tester) async {
     final client = FakeSupabaseClient();
-    client.tables['raids'] = FakeQueryBuilder(result: [raidJoined]);
+    client.tables['raids'] = FakeQueryBuilder(result: [_raidInscrito()]);
 
     await tester.pumpWidget(_wrap(
-      RaidJoinSheet(raid: raidJoined, currentUserId: 'u1'),
+      RaidJoinSheet(raid: _raidInscrito(), currentUserId: 'u1'),
       client: client,
     ));
     await tester.pump();
 
-    expect(find.text('YA UNIDO'), findsOneWidget);
-    expect(find.text('UNIRME'), findsNothing);
+    expect(find.text('VERIFICAR LLEGADA'), findsOneWidget);
+    expect(find.text('ABANDONAR RODADA'), findsOneWidget);
+    expect(find.text('UNIRME A LA RODADA'), findsNothing);
+    expect(find.text('INICIAR VIAJE'), findsNothing);
   });
 
   // ══════════════════════════════════════════════════════════════════════
-  // M-RTR-1 — 'INICIAR VIAJE' (Fase 5, W3 UI)
-  // STRICT TDD: escritos ANTES del botón en RaidJoinSheet (RED).
+  // v0.12.1 — 'VERIFICAR LLEGADA' (reemplaza M-RTR-1: el flujo 'Grabar ruta'
+  // fue eliminado; la llegada se valida con QR + ubicación). La navegación se
+  // inyecta con arrivalScreenBuilder para no instanciar MobileScannerController.
   // ══════════════════════════════════════════════════════════════════════
 
-  testWidgets('joined → INICIAR VIAJE visible; tap → pop + push '
-      'RouteTrackerScreen(raidId)', (tester) async {
-    final raidJoined = <String, dynamic>{
-      ..._raid,
-      'id': 42, // BIGSERIAL → int Dart
-      'raid_participants': [
-        {'user_id': 'u1', 'is_ready': false},
-      ],
-    };
+  testWidgets('joined → VERIFICAR LLEGADA visible; tap → pop + push '
+      'arrivalScreenBuilder con el raid', (tester) async {
     final client = FakeSupabaseClient();
-    client.tables['raids'] = FakeQueryBuilder(result: [raidJoined]);
+    client.tables['raids'] = FakeQueryBuilder(result: [_raidInscrito()]);
     client.tables['raid_participants'] = FakeQueryBuilder();
 
-    await tester.pumpWidget(_wrapStartTrip(client, raid: raidJoined));
+    Map<String, dynamic>? pushedRaid;
+    await tester.pumpWidget(_wrapWithSheet(
+      client,
+      raid: _raidInscrito(),
+      arrivalScreenBuilder: (raid) {
+        pushedRaid = raid;
+        return const Scaffold(body: Text('ARRIVAL_SCREEN_TEST'));
+      },
+    ));
     await tester.pump();
     await tester.tap(find.text('OPEN SHEET'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400)); // sheet anim
 
-    expect(find.text('INICIAR VIAJE'), findsOneWidget);
+    expect(find.text('VERIFICAR LLEGADA'), findsOneWidget);
 
-    await tester.tap(find.text('INICIAR VIAJE'));
+    await tester.tap(find.text('VERIFICAR LLEGADA'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400)); // pop + push anim
 
-    // El sheet se cerró y el tracker se abrió con el raidId del raid.
+    // El sheet se cerró y el stub inyectado se abrió con el raid correcto.
     expect(find.byType(RaidJoinSheet), findsNothing);
-    expect(find.byType(RouteTrackerScreen), findsOneWidget);
-    final pushed =
-        tester.widget<RouteTrackerScreen>(find.byType(RouteTrackerScreen));
-    expect(pushed.raidId, 42);
+    expect(find.text('ARRIVAL_SCREEN_TEST'), findsOneWidget);
+    expect(pushedRaid?['id'], 42);
+    // El flujo viejo de grabación de ruta no existe en v0.12.1.
+    expect(find.text('INICIAR VIAJE'), findsNothing);
   });
 
-  testWidgets('no joined → INICIAR VIAJE ausente', (tester) async {
+  testWidgets('no joined → VERIFICAR LLEGADA ausente; fallbacks de lugar',
+      (tester) async {
     final client = FakeSupabaseClient();
     client.tables['raids'] = FakeQueryBuilder(result: [_raid]);
     client.tables['raid_participants'] = FakeQueryBuilder();
 
-    await tester.pumpWidget(_wrapStartTrip(client, raid: _raid));
+    await tester.pumpWidget(_wrapWithSheet(client, raid: _raid));
     await tester.pump();
     await tester.tap(find.text('OPEN SHEET'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400)); // sheet anim
 
+    expect(find.text('VERIFICAR LLEGADA'), findsNothing);
+    expect(find.text('UNIRME A LA RODADA'), findsOneWidget);
     expect(find.text('INICIAR VIAJE'), findsNothing);
-    expect(find.text('UNIRME'), findsOneWidget);
-    expect(find.byType(RouteTrackerScreen), findsNothing);
+    // Fallbacks: el raid no trae origin_name/destination_name.
+    expect(find.text('Punto de salida'), findsOneWidget);
+    // 'Destino' aparece dos veces: el label de la fila y el fallback del valor.
+    expect(find.text('Destino'), findsNWidgets(2));
   });
 }

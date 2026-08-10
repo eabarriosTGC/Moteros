@@ -13,6 +13,7 @@ import '../bloc/raid_state.dart';
 import '../widgets/raid_join_sheet.dart';
 import 'create_raid_screen.dart';
 import 'raid_stats_screen.dart';
+import 'raid_conquest_history_screen.dart';
 
 class RaidListScreen extends StatefulWidget {
   const RaidListScreen({super.key});
@@ -48,6 +49,14 @@ class _RaidListScreenState extends State<RaidListScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.emoji_events_outlined, color: AppColors.primary),
+            tooltip: 'Mis conquistas',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RaidConquestHistoryScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.textMuted),
             onPressed: () {
@@ -99,13 +108,22 @@ class _RaidListScreenState extends State<RaidListScreen> {
       return _buildEmptyState();
     }
 
-    final lobbyRaids = raids.where((r) => r['status'] == 'lobby').toList();
-    final activeRaids = raids.where((r) => r['status'] == 'active').toList();
+    final permanentRaids = raids
+        .where((r) => r['raid_type'] == 'permanent' && r['status'] != 'cancelled')
+        .toList();
+    final scheduledRaids = raids
+        .where((r) =>
+            (r['raid_type'] ?? 'scheduled') == 'scheduled' &&
+            ['planned', 'lobby', 'active'].contains(r['status']) &&
+            !_isExpired(r))
+        .toList();
     final completedRaids = raids
         .where((r) => r['status'] == 'completed')
         .toList();
     final otherRaids = raids
-        .where((r) => !['lobby', 'active', 'completed'].contains(r['status']))
+        .where((r) =>
+            r['raid_type'] == null &&
+            !['lobby', 'active', 'completed'].contains(r['status']))
         .toList();
 
     return RefreshIndicator(
@@ -121,16 +139,16 @@ class _RaidListScreenState extends State<RaidListScreen> {
           100,
         ),
         children: [
-          if (activeRaids.isNotEmpty) ...[
-            _sectionHeader('EN VIVO', AppColors.secondary),
+          if (scheduledRaids.isNotEmpty) ...[
+            _sectionHeader('RODADAS CON FECHA', AppColors.secondary),
             const SizedBox(height: AppSpacing.sm),
-            ...activeRaids.map((r) => _buildRaidCard(r, 'active')),
+            ...scheduledRaids.map((r) => _buildRaidCard(r, 'scheduled')),
             const SizedBox(height: AppSpacing.lg),
           ],
-          if (lobbyRaids.isNotEmpty) ...[
-            _sectionHeader('LOBBY', AppColors.primary),
+          if (permanentRaids.isNotEmpty) ...[
+            _sectionHeader('RAIDS PERMANENTES', AppColors.primary),
             const SizedBox(height: AppSpacing.sm),
-            ...lobbyRaids.map((r) => _buildRaidCard(r, 'lobby')),
+            ...permanentRaids.map((r) => _buildRaidCard(r, 'permanent')),
             const SizedBox(height: AppSpacing.lg),
           ],
           if (completedRaids.isNotEmpty) ...[
@@ -149,6 +167,12 @@ class _RaidListScreenState extends State<RaidListScreen> {
         ],
       ),
     );
+  }
+
+  bool _isExpired(Map<String, dynamic> raid) {
+    final raw = raid['ends_at'] ?? raid['scheduled_at'];
+    final end = DateTime.tryParse(raw?.toString() ?? '');
+    return end != null && end.isBefore(DateTime.now());
   }
 
   Widget _buildEmptyState() {
@@ -275,9 +299,12 @@ class _RaidListScreenState extends State<RaidListScreen> {
 
   Widget _buildRaidCard(Map<String, dynamic> raid, String category) {
     final title = raid['description'] ?? 'Raid sin nombre';
-    final gameMode = raid['mode'] ?? 'Free Ride';
-    final dateTime = raid['scheduled_at'];
-    final participantCount = (raid['raid_participants'] as List?)?.length ?? 0;
+    final gameMode = raid['raid_type'] == 'permanent' ? 'PERMANENTE' : 'CON FECHA';
+    final dateTime = raid['starts_at'] ?? raid['scheduled_at'];
+    final distanceKm = (raid['distance_km'] as num?)?.toDouble();
+    final participantCount = (raid['participant_count'] as num?)?.toInt() ??
+        (raid['raid_participants'] as List?)?.length ??
+        0;
     final isPublic = raid['is_public'] as bool? ?? true;
     final raidId = raid['id']?.toString() ?? '';
 
@@ -337,7 +364,12 @@ class _RaidListScreenState extends State<RaidListScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      _infoChip(gameMode.toUpperCase(), AppColors.primary),
+                      _infoChip(
+                        distanceKm == null
+                            ? gameMode
+                            : '$gameMode · ${distanceKm.toStringAsFixed(1)} KM',
+                        AppColors.primary,
+                      ),
                       const SizedBox(width: AppSpacing.sm),
                       _infoChip(_formatDate(dateTime), AppColors.textMuted),
                     ],
@@ -403,7 +435,10 @@ class _RaidListScreenState extends State<RaidListScreen> {
       case 'active':
         return AppColors.secondary;
       case 'lobby':
+      case 'permanent':
         return AppColors.primary;
+      case 'scheduled':
+        return AppColors.secondary;
       case 'completed':
         return AppColors.success;
       default:
