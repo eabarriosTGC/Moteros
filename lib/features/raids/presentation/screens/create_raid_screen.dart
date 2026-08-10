@@ -200,10 +200,8 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
     );
   }
 
-  String _clubName(Map<String, dynamic> row) {
-    final club = row['clubs'];
-    return club is Map ? (club['name']?.toString() ?? 'Club') : 'Club';
-  }
+  String _clubName(Map<String, dynamic> row) =>
+      row['club_name']?.toString() ?? 'Club';
 
   String _dateLabel(DateTime value) {
     String two(int value) => value.toString().padLeft(2, '0');

@@ -19,15 +19,14 @@ class RaidConquestRepository {
     return (response as List).cast<Map<String, dynamic>>();
   }
 
+  /// Clubs presididos por el usuario autenticado.
+  ///
+  /// La identidad la resuelve el servidor con auth.uid() (RPC 036): el
+  /// cliente nunca envía su user_id y el rol se valida en SQL. Devuelve
+  /// filas con `club_id` y `club_name`.
   Future<List<Map<String, dynamic>>> presidentClubs() async {
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) return const [];
-    final rows = await client
-        .from('club_members')
-        .select('club_id, clubs(id, name)')
-        .eq('user_id', userId)
-        .eq('role', 'presidente');
-    return (rows as List).cast<Map<String, dynamic>>();
+    final result = await client.rpc('list_my_president_clubs');
+    return (result as List).cast<Map<String, dynamic>>();
   }
 
   Future<Map<String, dynamic>> createRaid({
