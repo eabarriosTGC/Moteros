@@ -4,7 +4,17 @@ import 'package:flutter/widgets.dart';
 
 /// Fases explícitas del escáner QR. La pantalla nunca muestra el error
 /// nativo de CameraX: cada fase tiene su propia vista de recuperación.
-enum ScannerPhase { initializing, ready, permissionDenied, unavailable, error }
+enum ScannerPhase {
+  requestingPermission,
+  mountingCamera,
+  ready,
+  permissionDenied,
+  permissionPermanentlyDenied,
+  unavailable,
+  error,
+}
+
+enum CameraPermissionResult { granted, denied, permanentlyDenied }
 
 /// Máquina de estados del ciclo de vida del escáner.
 ///
@@ -16,15 +26,17 @@ enum ScannerPhase { initializing, ready, permissionDenied, unavailable, error }
 class ScannerLifecycle extends ChangeNotifier {
   ScannerLifecycle({
     required this._requestCameraPermission,
+    required this._waitUntilCameraIsMounted,
     required this._startCamera,
     required this._stopCamera,
   });
 
-  final Future<bool> Function() _requestCameraPermission;
+  final Future<CameraPermissionResult> Function() _requestCameraPermission;
+  final Future<void> Function() _waitUntilCameraIsMounted;
   final Future<void> Function() _startCamera;
   final Future<void> Function() _stopCamera;
 
-  ScannerPhase _phase = ScannerPhase.initializing;
+  ScannerPhase _phase = ScannerPhase.requestingPermission;
   ScannerPhase get phase => _phase;
 
   void _setPhase(ScannerPhase value) {
@@ -48,14 +60,26 @@ class ScannerLifecycle extends ChangeNotifier {
   Future<void> initialize() async {
     if (_startInFlight) return;
     _startInFlight = true;
-    _setPhase(ScannerPhase.initializing);
+    _setPhase(ScannerPhase.requestingPermission);
     try {
-      final granted = await _requestCameraPermission();
-      if (!granted) {
-        _setPhase(ScannerPhase.permissionDenied);
-        return;
+      if (!hasCameraPermission) {
+        final permission = await _requestCameraPermission();
+        switch (permission) {
+          case CameraPermissionResult.denied:
+            _setPhase(ScannerPhase.permissionDenied);
+            return;
+          case CameraPermissionResult.permanentlyDenied:
+            _setPhase(ScannerPhase.permissionPermanentlyDenied);
+            return;
+          case CameraPermissionResult.granted:
+            hasCameraPermission = true;
+        }
       }
-      hasCameraPermission = true;
+
+      // La vista nativa del scanner solo se monta después de obtener permiso.
+      // Esperar el siguiente frame evita llamar start() sobre una vista ausente.
+      _setPhase(ScannerPhase.mountingCamera);
+      await _waitUntilCameraIsMounted();
       await _startCamera();
       startCalls++;
       _setPhase(ScannerPhase.ready);
@@ -102,7 +126,7 @@ class ScannerLifecycle extends ChangeNotifier {
     try {
       await _stopCamera();
       stopCalls++;
-      _setPhase(ScannerPhase.initializing);
+      _setPhase(ScannerPhase.mountingCamera);
     } finally {
       _stopInFlight = false;
     }

@@ -44,8 +44,13 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
   late final ScannerLifecycle _lifecycle = ScannerLifecycle(
     requestCameraPermission: () async {
       final status = await Permission.camera.request();
-      return status.isGranted;
+      if (status.isGranted) return CameraPermissionResult.granted;
+      if (status.isPermanentlyDenied || status.isRestricted) {
+        return CameraPermissionResult.permanentlyDenied;
+      }
+      return CameraPermissionResult.denied;
     },
+    waitUntilCameraIsMounted: () => WidgetsBinding.instance.endOfFrame,
     // Evita que un CameraX defectuoso deje la UI cargando para siempre.
     startCamera: () => _scanner.start().timeout(const Duration(seconds: 12)),
     stopCamera: () => _scanner.stop(),
@@ -271,6 +276,14 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
           message:
               'Concede el permiso de cámara para escanear el código de llegada del destino.',
           onRetry: _startScanner,
+        );
+      case ScannerPhase.permissionPermanentlyDenied:
+        return _ScannerMessageView(
+          icon: Icons.no_photography_outlined,
+          title: 'Permiso de cámara bloqueado',
+          message:
+              'Activa el permiso de cámara desde los ajustes de Asfalto Club para escanear el QR.',
+          onRetry: _startScanner,
           onOpenSettings: _openAppSettings,
         );
       case ScannerPhase.unavailable:
@@ -283,10 +296,17 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
           onRetry: _startScanner,
           onOpenSettings: _openAppSettings,
         );
-      case ScannerPhase.initializing:
-        // MobileScanner debe existir en el árbol ANTES de controller.start().
-        // Con autoStart:false queda montado sin abrir la cámara hasta que el
-        // permiso haya sido concedido por ScannerLifecycle.
+      case ScannerPhase.requestingPermission:
+        // Todavía no se monta CameraX: primero se muestra el diálogo nativo.
+        return const ColoredBox(
+          color: AppColors.background,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
+      case ScannerPhase.mountingCamera:
+        // El permiso ya fue concedido. Se monta la vista y se espera un frame
+        // antes de llamar MobileScannerController.start().
         return _activeScannerArea(showLoading: true);
       case ScannerPhase.ready:
         return _activeScannerArea(showLoading: false);
@@ -379,14 +399,14 @@ class _ScannerMessageView extends StatelessWidget {
     required this.title,
     required this.message,
     required this.onRetry,
-    required this.onOpenSettings,
+    this.onOpenSettings,
   });
 
   final IconData icon;
   final String title;
   final String message;
   final VoidCallback onRetry;
-  final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -415,10 +435,11 @@ class _ScannerMessageView extends StatelessWidget {
               foregroundColor: AppColors.textOnAmber,
             ),
           ),
-          TextButton(
-            onPressed: onOpenSettings,
-            child: const Text('ABRIR AJUSTES'),
-          ),
+          if (onOpenSettings != null)
+            TextButton(
+              onPressed: onOpenSettings,
+              child: const Text('ABRIR AJUSTES'),
+            ),
         ],
       ),
     );

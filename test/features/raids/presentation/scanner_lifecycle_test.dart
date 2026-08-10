@@ -4,14 +4,18 @@ import 'package:moteros_app/features/raids/presentation/scanner_lifecycle.dart';
 
 ScannerLifecycle _build({
   bool permissionGranted = true,
+  bool permissionPermanentlyDenied = false,
   bool startThrows = false,
+  void Function()? onCameraMounted,
 }) {
-  var permissionCalls = 0;
   return ScannerLifecycle(
     requestCameraPermission: () async {
-      permissionCalls++;
-      return permissionGranted;
+      if (permissionGranted) return CameraPermissionResult.granted;
+      return permissionPermanentlyDenied
+          ? CameraPermissionResult.permanentlyDenied
+          : CameraPermissionResult.denied;
     },
+    waitUntilCameraIsMounted: () async => onCameraMounted?.call(),
     startCamera: () async {
       if (startThrows) throw Exception('CameraX init failed');
     },
@@ -29,7 +33,7 @@ void main() {
       await lc.initialize();
 
       expect(lc.phase, ScannerPhase.ready);
-      expect(notifications, 1);
+      expect(notifications, 2);
       lc.dispose();
     });
 
@@ -39,6 +43,38 @@ void main() {
       expect(lc.phase, ScannerPhase.permissionDenied);
       expect(lc.startCalls, 0);
       expect(lc.hasCameraPermission, isFalse);
+    });
+
+    test('diferencia permiso bloqueado para ofrecer ajustes', () async {
+      final lc = _build(
+        permissionGranted: false,
+        permissionPermanentlyDenied: true,
+      );
+      await lc.initialize();
+      expect(lc.phase, ScannerPhase.permissionPermanentlyDenied);
+      expect(lc.startCalls, 0);
+    });
+
+    test('monta la vista después del permiso y antes de start', () async {
+      var mounted = false;
+      final events = <String>[];
+      final lc = ScannerLifecycle(
+        requestCameraPermission: () async {
+          events.add('permission');
+          return CameraPermissionResult.granted;
+        },
+        waitUntilCameraIsMounted: () async {
+          mounted = true;
+          events.add('mounted');
+        },
+        startCamera: () async {
+          expect(mounted, isTrue);
+          events.add('start');
+        },
+        stopCamera: () async {},
+      );
+      await lc.initialize();
+      expect(events, ['permission', 'mounted', 'start']);
     });
 
     test('permiso concedido → arranca una vez y pasa a ready', () async {
