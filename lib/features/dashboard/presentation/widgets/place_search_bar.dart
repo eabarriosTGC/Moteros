@@ -6,7 +6,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../bloc/search_bloc.dart';
 import '../bloc/search_event.dart';
-import '../bloc/search_state.dart';
 
 class PlaceSearchBar extends StatefulWidget {
   const PlaceSearchBar({super.key});

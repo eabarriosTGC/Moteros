@@ -87,10 +87,11 @@ class _RaidListScreenState extends State<RaidListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           HapticFeedback.mediumImpact();
+          final bloc = context.read<RaidBloc>();
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateRaidScreen()),
-          ).then((_) => context.read<RaidBloc>().add(const LoadRaids()));
+          ).then((_) => bloc.add(const LoadRaids()));
         },
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnAmber,
@@ -452,10 +453,11 @@ class _RaidListScreenState extends State<RaidListScreen> {
 
     // Completed raids have stats; lobby/active open the join sheet (F-M8)
     if (category == 'completed') {
+      final bloc = context.read<RaidBloc>();
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => RaidStatsScreen(raidId: raidId)),
-      ).then((_) => context.read<RaidBloc>().add(const LoadRaids()));
+      ).then((_) => bloc.add(const LoadRaids()));
       return;
     }
     final state = context.read<RaidBloc>().state;

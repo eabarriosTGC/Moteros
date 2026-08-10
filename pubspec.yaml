@@ -43,6 +43,7 @@ dependencies:
   sensors_plus: ^6.1.1
   image_picker: ^1.2.3
   flutter_bloc: ^9.1.1
+  bloc: ^9.2.1
   equatable: ^2.0.8
   latlong2: ^0.9.1
   flutter_map_marker_cluster: ^8.2.2
