@@ -97,7 +97,7 @@ class _ProgresoScreenState extends State<ProgresoScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     const _EquippedPatchesSection(),
                     const SizedBox(height: AppSpacing.lg),
-                    _RouteHistorySection(entries: state.routeHistory),
+                    ConquestSection(conquests: state.conquests),
                     const SizedBox(height: AppSpacing.lg),
                     _PhotosSection(photos: state.photos),
                     const SizedBox(height: AppSpacing.xxl),
@@ -613,20 +613,25 @@ class _PhotosSection extends StatelessWidget {
   }
 }
 
-/// ── Route History Section ──
+/// ── Conquistas verificadas (raid_arrivals) ──
+///
+/// Sustituye al historial de rutas del módulo retirado "Grabar ruta"
+/// (route_history): aquí solo aparecen llegadas verificadas por el servidor.
+class ConquestSection extends StatelessWidget {
+  const ConquestSection({super.key, required this.conquests});
 
-class _RouteHistorySection extends StatelessWidget {
-  final List<Map<String, dynamic>> entries;
-  const _RouteHistorySection({required this.entries});
+  final List<Map<String, dynamic>> conquests;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('HISTORIAL DE RUTAS', style: AppTypography.label.copyWith(color: AppColors.textMuted, letterSpacing: 1.5)),
+        Text('CONQUISTAS VERIFICADAS',
+            style: AppTypography.label.copyWith(
+                color: AppColors.textMuted, letterSpacing: 1.5)),
         const SizedBox(height: AppSpacing.sm),
-        if (entries.isEmpty)
+        if (conquests.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -637,29 +642,40 @@ class _RouteHistorySection extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Icon(Icons.route_outlined, size: 40, color: AppColors.textMuted.withAlpha(60)),
+                Icon(Icons.verified_outlined,
+                    size: 40, color: AppColors.textMuted.withAlpha(60)),
                 const SizedBox(height: AppSpacing.sm),
-                Text('Sin rutas registradas', style: AppTypography.body.copyWith(color: AppColors.textSecondary)),
+                Text('Aún no tienes conquistas',
+                    style: AppTypography.body
+                        .copyWith(color: AppColors.textSecondary)),
                 const SizedBox(height: AppSpacing.xs),
-                Text('Tus viajes aparecerán aquí al registrar rutas', style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
+                Text(
+                  'Tus rutas conquistadas aparecerán aquí después de verificar '
+                  'tu llegada con QR.',
+                  style: AppTypography.caption
+                      .copyWith(color: AppColors.textMuted),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           )
         else
-          ...entries.map((entry) => _RouteHistoryTile(entry: entry)),
+          ...conquests.map((entry) => _ConquestTile(entry: entry)),
       ],
     );
   }
 }
 
-class _RouteHistoryTile extends StatelessWidget {
-  final Map<String, dynamic> entry;
-  const _RouteHistoryTile({required this.entry});
+class _ConquestTile extends StatelessWidget {
+  const _ConquestTile({required this.entry});
 
-  /// Human-readable date for unnamed routes: "5 ago 2026" instead of "Ruta".
+  final Map<String, dynamic> entry;
+
+  /// "2026-08-10T..." → "10 ago 2026".
   static String _friendlyDate(String isoDate) {
-    final parts = isoDate.split('-');
-    if (parts.length != 3) return isoDate;
+    final date = isoDate.length >= 10 ? isoDate.substring(0, 10) : isoDate;
+    final parts = date.split('-');
+    if (parts.length != 3) return date;
     const months = [
       'ene', 'feb', 'mar', 'abr', 'may', 'jun',
       'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
@@ -667,23 +683,26 @@ class _RouteHistoryTile extends StatelessWidget {
     final month = int.tryParse(parts[1]);
     final day = int.tryParse(parts[2]);
     if (month == null || day == null || month < 1 || month > 12) {
-      return isoDate;
+      return date;
     }
     return '$day ${months[month - 1]} ${parts[0]}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final km = (entry['distance_km'] as num?)?.toDouble() ?? 0;
-    final duration = entry['duration_minutes'] as int? ?? 0;
-    final completedAt = entry['completed_at'] as String? ?? entry['created_at'] as String? ?? '';
-    final routeName = entry['route_name'] as String? ?? entry['name'] as String?;
-    final date = completedAt.length >= 10 ? completedAt.substring(0, 10) : completedAt;
-    // P2-7: when no custom name exists, prefer a human date over the generic
-    // "Ruta" so history reads like memories, not a technical log.
-    final displayName = routeName != null && routeName.isNotEmpty
-        ? routeName
-        : _friendlyDate(date);
+    final raids = entry['raids'] is Map
+        ? Map<String, dynamic>.from(entry['raids'] as Map)
+        : const <String, dynamic>{};
+    final place = entry['conquest_places'] is Map
+        ? Map<String, dynamic>.from(entry['conquest_places'] as Map)
+        : const <String, dynamic>{};
+    final title = raids['description']?.toString() ?? 'Raid conquistado';
+    final origin = raids['origin_name']?.toString() ?? 'Origen';
+    final destination = raids['destination_name']?.toString() ?? 'Destino';
+    final placeName = place['name']?.toString();
+    final km = (entry['verified_km'] as num?)?.toDouble() ?? 0;
+    final verifiedAt = entry['verified_at'] as String? ?? '';
+    final photoUrl = entry['photo_url'] as String?;
 
     return Container(
       width: double.infinity,
@@ -696,34 +715,61 @@ class _RouteHistoryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withAlpha(15),
+          if (photoUrl != null && photoUrl.isNotEmpty)
+            ClipRRect(
               borderRadius: AppRadius.smCircular,
-            ),
-            child: const Icon(Icons.route_rounded, color: AppColors.primary, size: 20),
-          ),
+              child: Image.network(
+                photoUrl,
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _fallbackIcon(),
+              ),
+            )
+          else
+            _fallbackIcon(),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(displayName, style: AppTypography.body.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-                Text(date, style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
+                Text(title,
+                    style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                Text('$origin → $destination',
+                    style: AppTypography.caption
+                        .copyWith(color: AppColors.textMuted)),
+                if (placeName != null && placeName.isNotEmpty)
+                  Text(placeName,
+                      style: AppTypography.caption
+                          .copyWith(color: AppColors.textSecondary)),
+                Text(_friendlyDate(verifiedAt),
+                    style: AppTypography.caption
+                        .copyWith(color: AppColors.textMuted)),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('${km.toStringAsFixed(1)} km', style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
-              if (duration > 0)
-                Text('$duration min', style: AppTypography.caption.copyWith(color: AppColors.textMuted)),
-            ],
-          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text('${km.toStringAsFixed(1)} km',
+              style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.primary, fontWeight: FontWeight.w700)),
         ],
       ),
+    );
+  }
+
+  Widget _fallbackIcon() {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.success.withAlpha(15),
+        borderRadius: AppRadius.smCircular,
+      ),
+      child: const Icon(Icons.verified_rounded, color: AppColors.success, size: 22),
     );
   }
 }

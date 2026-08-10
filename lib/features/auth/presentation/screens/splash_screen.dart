@@ -52,11 +52,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(gradient: AppGradients.primaryButton, borderRadius: BorderRadius.circular(31), boxShadow: AppShadows.amberGlow),
-                        child: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 50),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(31),
+                        child: Image.asset(
+                          'icon.jpeg',
+                          width: 96,
+                          height: 96,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                       const SizedBox(height: 26),
                       Text('MOTEROS', style: AppTypography.displayMedium.copyWith(color: AppColors.textPrimary, letterSpacing: 6)),

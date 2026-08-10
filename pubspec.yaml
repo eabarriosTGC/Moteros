@@ -65,6 +65,7 @@ dependencies:
   collection: any
   dio: ^5.11.0
   stream_transform: ^2.1.1
+  permission_handler: ^12.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -97,6 +98,7 @@ flutter:
 
   assets:
     - .env
+    - icon.jpeg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

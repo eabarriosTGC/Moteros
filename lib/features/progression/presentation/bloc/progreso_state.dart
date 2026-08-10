@@ -20,7 +20,11 @@ final class ProgresoLoaded extends ProgresoState {
   final int badgesCount;
   final int photosCount;
   final List<Map<String, dynamic>> badges;
-  final List<Map<String, dynamic>> routeHistory;
+
+  /// Llegadas verificadas por servidor (raid_arrivals + raids +
+  /// conquest_places). Reemplaza a routeHistory (módulo "Grabar ruta"
+  /// retirado de esta pantalla).
+  final List<Map<String, dynamic>> conquests;
 
   /// The conquest_photos rows the bloc already selects (single query, B1) —
   /// serves both the FOTOS counter and the re-homed _PhotosSection album.
@@ -32,12 +36,12 @@ final class ProgresoLoaded extends ProgresoState {
     this.badgesCount = 0,
     this.photosCount = 0,
     this.badges = const [],
-    this.routeHistory = const [],
+    this.conquests = const [],
     this.photos = const [],
   });
 
   @override
-  List<Object?> get props => [totalKm, tripsCount, badgesCount, photosCount, badges, routeHistory, photos];
+  List<Object?> get props => [totalKm, tripsCount, badgesCount, photosCount, badges, conquests, photos];
 }
 
 final class ProgresoError extends ProgresoState {
