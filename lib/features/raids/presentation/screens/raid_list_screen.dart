@@ -11,7 +11,7 @@ import '../bloc/raid_bloc.dart';
 import '../bloc/raid_event.dart';
 import '../bloc/raid_state.dart';
 import '../widgets/raid_join_sheet.dart';
-import 'create_raid_screen.dart';
+import '../raid_creation_flow.dart';
 import 'raid_stats_screen.dart';
 import 'raid_conquest_history_screen.dart';
 
@@ -87,11 +87,7 @@ class _RaidListScreenState extends State<RaidListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           HapticFeedback.mediumImpact();
-          final bloc = context.read<RaidBloc>();
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateRaidScreen()),
-          ).then((_) => bloc.add(const LoadRaids()));
+          openCreateRaidFlow(context);
         },
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnAmber,
@@ -203,10 +199,7 @@ class _RaidListScreenState extends State<RaidListScreen> {
             ElevatedButton.icon(
               onPressed: () {
                 HapticFeedback.mediumImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CreateRaidScreen()),
-                );
+                openCreateRaidFlow(context);
               },
               icon: const Icon(Icons.add),
               label: const Text(

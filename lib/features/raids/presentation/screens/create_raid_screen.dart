@@ -9,7 +9,10 @@ import '../../../../core/widgets/map_picker_screen.dart';
 import '../../data/raid_conquest_repository.dart';
 
 class CreateRaidScreen extends StatefulWidget {
-  const CreateRaidScreen({super.key});
+  const CreateRaidScreen({super.key, this.repository});
+
+  /// Seam de testabilidad: permite inyectar un repository fake.
+  final RaidConquestRepository? repository;
 
   @override
   State<CreateRaidScreen> createState() => _CreateRaidScreenState();
@@ -19,7 +22,8 @@ class _CreateRaidScreenState extends State<CreateRaidScreen> {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _description = TextEditingController();
-  final _repository = RaidConquestRepository();
+  late final RaidConquestRepository _repository =
+      widget.repository ?? RaidConquestRepository();
 
   List<Map<String, dynamic>> _clubs = const [];
   int? _clubId;

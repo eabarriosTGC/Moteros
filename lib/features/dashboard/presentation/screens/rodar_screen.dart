@@ -23,7 +23,7 @@ import '../bloc/search_state.dart';
 import '../../../raids/presentation/bloc/raid_bloc.dart';
 import '../../../raids/presentation/bloc/raid_event.dart';
 import '../../../raids/presentation/bloc/raid_state.dart';
-import '../../../raids/presentation/screens/create_raid_screen.dart';
+import '../../../raids/presentation/raid_creation_flow.dart';
 import '../../../raids/presentation/screens/raid_list_screen.dart';
 import '../../../raids/presentation/screens/raid_conquest_history_screen.dart';
 import '../../../raids/presentation/widgets/raid_join_sheet.dart';
@@ -258,26 +258,11 @@ class _RodarScreenState extends State<RodarScreen>
                     if (state is! RaidsLoaded) {
                       return const SizedBox.shrink();
                     }
-                    final markers = state.raids
-                        .where(
-                          (r) =>
-                              (r['status'] == 'lobby' ||
-                                  r['status'] == 'planned' ||
-                                  r['status'] == 'active') &&
-                              r['origin_lat'] != null &&
-                              r['origin_lng'] != null &&
-                              (r['raid_type'] == 'permanent' || !isExpiredRaid(r)),
-                        )
+                    final markers = visibleRaidMarkers(state.raids)
                         .map((r) {
                           final isActive = r['status'] == 'active';
-                          final permanent = r['raid_type'] == 'permanent';
                           return Marker(
-                            point: LatLng(
-                              ((permanent ? r['dest_lat'] : r['origin_lat']) as num)
-                                  .toDouble(),
-                              ((permanent ? r['dest_lng'] : r['origin_lng']) as num)
-                                  .toDouble(),
-                            ),
+                            point: raidMarkerPoint(r)!,
                             width: 40,
                             height: 40,
                             child: GestureDetector(
@@ -431,10 +416,13 @@ class _RodarScreenState extends State<RodarScreen>
                       top: BorderSide(color: AppColors.border, width: 0.5),
                     ),
                   ),
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    children: [
+                  child: RefreshIndicator(
+                    onRefresh: _refreshRaids,
+                    child: ListView(
+                      controller: scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      children: [
                       // Drag handle
                       Center(
                         child: Container(
@@ -476,7 +464,8 @@ class _RodarScreenState extends State<RodarScreen>
                       _sectionHeader('VIAJES RECIENTES'),
                       const SizedBox(height: AppSpacing.sm),
                       _buildRecentRidesPlaceholder(),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
@@ -592,6 +581,14 @@ class _RodarScreenState extends State<RodarScreen>
 
   // ── Raid section ──
 
+  /// Pull-to-refresh del bottom sheet: recarga los raids para recoger
+  /// cambios hechos desde otras pantallas o dispositivos.
+  Future<void> _refreshRaids() async {
+    final bloc = context.read<RaidBloc>();
+    bloc.add(const LoadRaids());
+    await bloc.stream.firstWhere((state) => state is! RaidLoading);
+  }
+
   Widget _buildRaidSection() {
     return BlocBuilder<RaidBloc, RaidState>(
       builder: (context, state) {
@@ -603,6 +600,18 @@ class _RodarScreenState extends State<RodarScreen>
           return Column(
             children: [
               ...activeRaids.map((r) => _buildRaidCard(r)),
+              const SizedBox(height: AppSpacing.sm),
+              _buildRaidActions(),
+            ],
+          );
+        }
+        if (state is RaidError) {
+          return Column(
+            children: [
+              RaidErrorCard(
+                onRetry: () =>
+                    context.read<RaidBloc>().add(const LoadRaids()),
+              ),
               const SizedBox(height: AppSpacing.sm),
               _buildRaidActions(),
             ],
@@ -744,10 +753,7 @@ class _RodarScreenState extends State<RodarScreen>
           child: ElevatedButton.icon(
             onPressed: () {
               _tap();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateRaidScreen()),
-              );
+              openCreateRaidFlow(context);
             },
             icon: const Icon(Icons.add, size: 16),
             label: const Text(
@@ -1115,8 +1121,75 @@ bool isExpiredRaid(Map<String, dynamic> raid) {
   }
 }
 
+/// Punto de anclaje del pin de un raid en el mapa:
+/// - scheduled: origen (origin_lat/origin_lng).
+/// - permanent: destino (dest_lat/dest_lng).
+/// Devuelve null si faltan las coordenadas relevantes (no se crea Marker).
+LatLng? raidMarkerPoint(Map<String, dynamic> raid) {
+  final permanent = raid['raid_type'] == 'permanent';
+  final lat = permanent ? raid['dest_lat'] : raid['origin_lat'];
+  final lng = permanent ? raid['dest_lng'] : raid['origin_lng'];
+  if (lat == null || lng == null) return null;
+  return LatLng((lat as num).toDouble(), (lng as num).toDouble());
+}
+
+/// Raids que se marcan en el mapa del Radar: planned/lobby/active, con
+/// coordenadas válidas para el pin, y no vencidos salvo los permanentes.
+/// Pura y unit-testable (precedente del repo: la pantalla completa tiene
+/// FlutterMap → no se widget-testea).
+List<Map<String, dynamic>> visibleRaidMarkers(
+    List<Map<String, dynamic>> raids) {
+  return raids
+      .where(
+        (r) =>
+            (r['status'] == 'lobby' ||
+                r['status'] == 'planned' ||
+                r['status'] == 'active') &&
+            raidMarkerPoint(r) != null &&
+            (r['raid_type'] == 'permanent' || !isExpiredRaid(r)),
+      )
+      .toList();
+}
+
+/// Estado de error de raids en el Radar: visible y accionable (reintentar),
+/// no silencio. M-ERV-6.
+class RaidErrorCard extends StatelessWidget {
+  const RaidErrorCard({super.key, required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.error.withAlpha(12),
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.error.withAlpha(60)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Text(
+              'No se pudieron cargar los raids.',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('REINTENTAR'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// M-ERV-5 — raids visibles en la sección 'PRÓXIMOS RAIDS' de Rodar.
-/// Mismo criterio que los markers: status lobby/active + NO vencido
+/// Mismo criterio que los markers (planned/lobby/active) + NO vencido
 /// (isExpiredRaid). Límite 3. Pura y unit-testable (la pantalla completa
 /// tiene FlutterMap → no se widget-testea; precedente del repo).
 List<Map<String, dynamic>> visibleUpcomingRaids(
@@ -1124,7 +1197,9 @@ List<Map<String, dynamic>> visibleUpcomingRaids(
   return raids
       .where(
         (r) =>
-            (r['status'] == 'lobby' || r['status'] == 'active') &&
+            (r['status'] == 'planned' ||
+                r['status'] == 'lobby' ||
+                r['status'] == 'active') &&
             !isExpiredRaid(r),
       )
       .take(3)
