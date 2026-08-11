@@ -83,6 +83,17 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
             );
           }
         }
+        if (state is ReviewSubmitted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Evaluación publicada'), backgroundColor: AppColors.success),
+          );
+          context.read<MotoposadasBloc>().add(
+            _tabController.index == 1 ? const LoadReceivedRequests() : const LoadMyRequests(),
+          );
+        }
+        if (state is MotoposadaReputationLoaded) {
+          _showReputation(state.reputation);
+        }
         // Acciones de request (031): feedback + recarga del tab activo.
         if (state is RequestResponded ||
             state is RequestCompleted ||
@@ -796,6 +807,29 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
               ],
             ),
           ],
+          if (req.status == 'completed') ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => context.read<MotoposadasBloc>().add(
+                    LoadMotoposadaReputation(userId: req.guestId),
+                  ),
+                  icon: const Icon(Icons.shield_outlined, size: 16),
+                  label: const Text('REPUTACIÓN'),
+                ),
+                if (!req.hasReviewed)
+                  ElevatedButton.icon(
+                    onPressed: () => _showReviewDialog(req),
+                    icon: const Icon(Icons.star_outline, size: 16),
+                    label: const Text('EVALUAR HUÉSPED'),
+                  )
+                else
+                  const Chip(label: Text('YA EVALUADO')),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -898,7 +932,94 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
               label: const Text('CONTACTAR POR WHATSAPP'),
             ),
           ],
+          if (req.status == 'completed') ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: req.hostId == null ? null : () => context.read<MotoposadasBloc>().add(
+                    LoadMotoposadaReputation(userId: req.hostId!),
+                  ),
+                  icon: const Icon(Icons.shield_outlined, size: 16),
+                  label: const Text('REPUTACIÓN'),
+                ),
+                if (!req.hasReviewed)
+                  ElevatedButton.icon(
+                    onPressed: () => _showReviewDialog(req),
+                    icon: const Icon(Icons.star_outline, size: 16),
+                    label: const Text('EVALUAR ANFITRIÓN'),
+                  )
+                else
+                  const Chip(label: Text('YA EVALUADO')),
+              ],
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Future<void> _showReviewDialog(MotoposadaRequestModel req) async {
+    var rating = 5;
+    final controller = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Evaluar estancia'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Tu evaluación ayuda a que la comunidad viaje con más confianza.'),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) => IconButton(
+                  tooltip: '${index + 1} estrellas',
+                  onPressed: () => setDialogState(() => rating = index + 1),
+                  icon: Icon(index < rating ? Icons.star : Icons.star_border, color: AppColors.primary),
+                )),
+              ),
+              TextField(
+                controller: controller,
+                maxLength: 500,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Comentario opcional'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCELAR')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('PUBLICAR')),
+          ],
+        ),
+      ),
+    );
+    if (submitted == true && mounted) {
+      context.read<MotoposadasBloc>().add(
+        SubmitReview(requestId: req.id, rating: rating, comment: controller.text.trim()),
+      );
+    }
+    controller.dispose();
+  }
+
+  void _showReputation(MotoposadaReputation reputation) {
+    String score(double? average, int count) => count == 0 ? 'Sin evaluaciones' : '${average?.toStringAsFixed(1) ?? '—'} / 5 ($count)';
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reputación en Motoposadas'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Como anfitrión: ${score(reputation.hostAverage, reputation.hostReviews)}'),
+            const SizedBox(height: AppSpacing.sm),
+            Text('Como huésped: ${score(reputation.guestAverage, reputation.guestReviews)}'),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('CERRAR'))],
       ),
     );
   }

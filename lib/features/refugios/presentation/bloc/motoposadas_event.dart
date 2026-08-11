@@ -128,30 +128,23 @@ final class FetchMotoposadaRequestContact extends MotoposadasEvent {
 }
 
 final class SubmitReview extends MotoposadasEvent {
-  final int motoposadaId;
   final int requestId;
-  final String
-  toUserId; // UUID del destinatario (host en guest_review, guest en host_review)
-  final String type;
   final int rating;
   final String comment;
   const SubmitReview({
-    required this.motoposadaId,
     required this.requestId,
-    required this.toUserId,
-    required this.type,
     required this.rating,
     this.comment = '',
   });
   @override
-  List<Object?> get props => [
-    motoposadaId,
-    requestId,
-    toUserId,
-    type,
-    rating,
-    comment,
-  ];
+  List<Object?> get props => [requestId, rating, comment];
+}
+
+final class LoadMotoposadaReputation extends MotoposadasEvent {
+  final String userId;
+  const LoadMotoposadaReputation({required this.userId});
+  @override
+  List<Object?> get props => [userId];
 }
 
 final class DeleteMotoposada extends MotoposadasEvent {

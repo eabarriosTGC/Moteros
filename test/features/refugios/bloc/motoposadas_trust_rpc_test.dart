@@ -100,17 +100,14 @@ class FakeSupabaseClient implements SupabaseClient {
 // ── Fixtures ──
 
 final _review = SubmitReview(
-  motoposadaId: 1,
   requestId: 7,
-  toUserId: 'u-host-1',
-  type: 'guest_review',
   rating: 5,
   comment: 'Excelente host',
 );
 
 void main() {
   group(
-    'MotoposadasBloc — submit_motoposada_review (031, trust server-side)',
+    'MotoposadasBloc — submit_motoposada_review_v2 (040)',
     () {
       User fakeUser(String id) => User(
         id: id,
@@ -140,13 +137,13 @@ void main() {
         );
         expect(
           rpcCalls.single.positionalArguments.first,
-          'submit_motoposada_review',
+          'submit_motoposada_review_v2',
         );
         final params =
             rpcCalls.single.namedArguments[#params] as Map<String, dynamic>;
         expect(params['p_request_id'], 7);
-        expect(params['p_to_user_id'], 'u-host-1');
-        expect(params['p_type'], 'guest_review');
+        expect(params, isNot(contains('p_to_user_id')));
+        expect(params, isNot(contains('p_type')));
         expect(params['p_rating'], 5);
         expect(params['p_comment'], 'Excelente host');
 
@@ -166,10 +163,7 @@ void main() {
 
         bloc.add(
           SubmitReview(
-            motoposadaId: 1,
             requestId: 7,
-            toUserId: 'u-host-1',
-            type: 'host_review',
             rating: 3,
           ),
         );

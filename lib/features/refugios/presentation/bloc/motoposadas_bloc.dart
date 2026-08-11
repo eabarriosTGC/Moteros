@@ -33,6 +33,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<CancelMotoposadaRequest>(_onCancelRequest);
     on<FetchMotoposadaRequestContact>(_onFetchRequestContact);
     on<SubmitReview>(_onSubmitReview);
+    on<LoadMotoposadaReputation>(_onLoadReputation);
     on<DeleteMotoposada>(_onDelete);
     on<CreateTouristPoi>(_onCreateTouristPoi);
     on<CheckCasaMoteroEligibility>(_onCheckCasaMoteroEligibility);
@@ -134,9 +135,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select(
-            '*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title)',
-          )
+          .select('*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title,user_id), motoposada_reviews(id)')
           .eq('motoposada_id', event.motoposadaId)
           .order('created_at', ascending: false);
 
@@ -157,9 +156,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select(
-            '*, motoposadas!inner(title), guests!inner(username, user_xp!inner(level, trust_score))',
-          )
+          .select('*, motoposadas!inner(title,user_id), guests!inner(username, user_xp!inner(level, trust_score)), motoposada_reviews(id)')
           .eq('guest_id', _uid!)
           .order('created_at', ascending: false);
 
@@ -184,9 +181,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select(
-            '*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title)',
-          )
+          .select('*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title,user_id), motoposada_reviews(id)')
           .order('created_at', ascending: false);
 
       final list = (resp as List)
@@ -354,7 +349,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     }
   }
 
-  /// Reseña vía `submit_motoposada_review` (031, SECURITY DEFINER). El
+  /// Reseña vía v2: destinatario y rol se derivan de auth.uid() + estancia.
   /// server valida: estancia COMPLETADA, participante según tipo, rating
   /// 1..5, una sola review — y actualiza trust_score con clamp 0..100
   /// (delta derivado del rating en el servidor). El cliente ya no inserta
@@ -368,16 +363,31 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     emit(MotoposadasLoading());
     try {
       await _db.rpc(
-        'submit_motoposada_review',
+        'submit_motoposada_review_v2',
         params: {
           'p_request_id': event.requestId,
-          'p_to_user_id': event.toUserId,
-          'p_type': event.type,
           'p_rating': event.rating,
           'p_comment': event.comment,
         },
       );
       emit(const ReviewSubmitted());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadReputation(
+    LoadMotoposadaReputation event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    try {
+      final response = await _db.rpc(
+        'get_motoposada_reputation',
+        params: {'p_user_id': event.userId},
+      );
+      final rows = response as List;
+      final row = rows.isEmpty ? const <String, dynamic>{} : rows.first as Map<String, dynamic>;
+      emit(MotoposadaReputationLoaded(MotoposadaReputation.fromMap(row)));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }
