@@ -1,7 +1,9 @@
 library;
 
-import 'dart:typed_data';
+import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RaidConquestRepository {
@@ -171,8 +173,37 @@ class RaidConquestRepository {
     return url;
   }
 
+  /// Clasifica el error real en lugar de tratar todo como falta de conexión:
+  /// - red (SocketException/timeout/dio) → sin conexión;
+  /// - sesión (AuthException/401) → volver a iniciar sesión;
+  /// - PostgrestException → código del RPC o servicio no disponible (PGRST202);
+  /// - 5xx → servidor no disponible;
+  /// - desconocido → genérico con diagnóstico en debug.
   static String friendlyError(Object error) {
+    debugPrint('friendlyError [${error.runtimeType}]: $error');
     final raw = error.toString();
+
+    if (error is SocketException ||
+        error is TimeoutException ||
+        raw.contains('ClientException') ||
+        raw.contains('Connection refused') ||
+        raw.contains('Failed host lookup')) {
+      return 'Sin conexión. Verificá tu internet e intentá de nuevo.';
+    }
+    if (error is AuthException ||
+        raw.contains('401') && (raw.contains('JWT') || raw.contains('token'))) {
+      return 'Tu sesión expiró. Volvé a iniciar sesión.';
+    }
+    if (error is PostgrestException) {
+      if (error.code == 'PGRST202') {
+        return 'El servicio de verificación no está disponible. Intentá de nuevo en unos minutos.';
+      }
+    }
+    if (raw.contains('HTTP 500') || raw.contains('HTTP 502') ||
+        raw.contains('HTTP 503')) {
+      return 'El servidor no está disponible. Intentá de nuevo en unos minutos.';
+    }
+
     const messages = <String, String>{
       'PRESIDENT_REQUIRED': 'Solo el presidente del club puede realizar esta acción.',
       'GPS_ACCURACY_TOO_LOW': 'La señal GPS es imprecisa. Sal al exterior e inténtalo otra vez.',
@@ -191,7 +222,7 @@ class RaidConquestRepository {
       return 'Estás a ${distance.group(1)} m del destino. Acércate al punto del QR.';
     }
     // Avoid displaying the full PostgREST payload to an end user.
-    return 'No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.';
+    return 'No se pudo completar la operación. Revisá tu conexión e inténtalo de nuevo.';
   }
 
   static Map<String, dynamic> _firstRow(dynamic value) {
