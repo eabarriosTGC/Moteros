@@ -83,7 +83,8 @@ class ScannerLifecycle extends ChangeNotifier {
       await _startCamera();
       startCalls++;
       _setPhase(ScannerPhase.ready);
-    } catch (_) {
+    } catch (e, s) {
+      debugPrint('ScannerLifecycle: fallo al iniciar cámara → $e\n$s');
       _setPhase(ScannerPhase.error);
     } finally {
       _startInFlight = false;

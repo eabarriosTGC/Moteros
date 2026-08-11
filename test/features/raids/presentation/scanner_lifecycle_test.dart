@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moteros_app/features/raids/presentation/scanner_lifecycle.dart';
@@ -43,6 +45,29 @@ void main() {
       expect(lc.phase, ScannerPhase.permissionDenied);
       expect(lc.startCalls, 0);
       expect(lc.hasCameraPermission, isFalse);
+    });
+
+    test('no arranca hasta que la vista está montada (waitUntilCameraIsMounted)',
+        () async {
+      final mounted = Completer<void>();
+      final lc = ScannerLifecycle(
+        requestCameraPermission: () async =>
+            CameraPermissionResult.granted,
+        waitUntilCameraIsMounted: () => mounted.future,
+        startCamera: () async {},
+        stopCamera: () async {},
+      );
+
+      final initFuture = lc.initialize();
+      await Future<void>.delayed(Duration.zero);
+      // La vista aún no está montada: la cámara NO debe haber arrancado.
+      expect(lc.startCalls, 0);
+      expect(lc.phase, ScannerPhase.mountingCamera);
+
+      mounted.complete();
+      await initFuture;
+      expect(lc.startCalls, 1);
+      expect(lc.phase, ScannerPhase.ready);
     });
 
     test('diferencia permiso bloqueado para ofrecer ajustes', () async {

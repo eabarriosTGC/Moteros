@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -113,6 +115,37 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('RUTA CONQUISTADA'), findsNothing);
+  });
+
+  testWidgets('QR duplicado mientras se procesa se ignora (una sola verificación)',
+      (tester) async {
+    final repo = _FakeArrivalRepository(arrival: {
+      'arrival_id': 'a1',
+      'place_name': 'Mirador de la Calera',
+      'verified_km': 42.5,
+    });
+    final state = await _pump(tester, repo: repo);
+
+    final token = 'asfaltoclub:arrival:v1:dup123';
+    final first = (state as dynamic).handleDetectedBarcode(token);
+    // Segundo disparo mientras el primero sigue en vuelo: debe ignorarse.
+    await (state as dynamic).handleDetectedBarcode(token);
+    await first;
+    await tester.pump();
+
+    expect(repo.verifyCalls, 1);
+  });
+
+  test('el controlador del escáner usa la cámara trasera y la API 6.0.11',
+      () async {
+    final source = File(
+      'lib/features/raids/presentation/screens/raid_arrival_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('facing: CameraFacing.back'));
+    expect(source, isNot(contains('CameraFacing.front')));
+    expect(source, isNot(contains('lensType')));
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(pubspec, contains('mobile_scanner: 6.0.11'));
   });
 
   testWidgets('arrivalScreenBuilder sigue permitiendo tests sin cámara',

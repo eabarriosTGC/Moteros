@@ -39,6 +39,7 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
     autoStart: false,
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: const [BarcodeFormat.qrCode],
+    facing: CameraFacing.back,
   );
 
   late final ScannerLifecycle _lifecycle = ScannerLifecycle(
@@ -331,15 +332,20 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
         controller: _scanner,
         onDetect: (capture) =>
             handleDetectedBarcode(capture.barcodes.firstOrNull?.rawValue),
-        errorBuilder: (context, error) => _ScannerMessageView(
-          icon: Icons.videocam_off_outlined,
-          title: 'No pudimos iniciar la cámara',
-          message:
-              'Verifica que ninguna otra app esté usando la cámara e inténtalo de nuevo.',
-          onRetry: _startScanner,
-          onOpenSettings: _openAppSettings,
-        ),
-        placeholderBuilder: (context) => const Center(
+        errorBuilder: (context, error, child) {
+          debugPrint(
+              'MobileScanner: code=${error.errorCode}, '
+              'message=${error.errorDetails?.message}');
+          return _ScannerMessageView(
+            icon: Icons.videocam_off_outlined,
+            title: 'No pudimos iniciar la cámara',
+            message:
+                'Verifica que ninguna otra app esté usando la cámara e inténtalo de nuevo.',
+            onRetry: _startScanner,
+            onOpenSettings: _openAppSettings,
+          );
+        },
+        placeholderBuilder: (context, child) => const Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
