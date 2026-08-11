@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/whatsapp_launcher.dart';
 import '../bloc/motoposadas_bloc.dart';
 import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
@@ -64,6 +65,22 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
             _cachedReceived = state.requests;
           } else {
             _cachedMyStays = state.requests;
+          }
+        }
+        if (state is MotoposadaRequestContactLoaded) {
+          final phone = state.phone;
+          if (phone == null || phone.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('La contraparte no registró un teléfono'),
+              ),
+            );
+          } else {
+            launchWhatsAppContact(
+              context,
+              phone,
+              'Hola, te contacto por nuestra solicitud de Motoposada en Asfalto Club.',
+            );
           }
         }
         // Acciones de request (031): feedback + recarga del tab activo.
@@ -758,25 +775,25 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
           ],
           if (req.status == 'approved') ...[
             const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              height: 36,
-              child: OutlinedButton.icon(
-                onPressed: () => context.read<MotoposadasBloc>().add(
-                  CompleteMotoposadaRequest(requestId: req.id),
-                ),
-                icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: const Text(
-                  'FINALIZAR ESTANCIA',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.info,
-                  side: const BorderSide(color: AppColors.info),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => context.read<MotoposadasBloc>().add(
+                    FetchMotoposadaRequestContact(requestId: req.id),
                   ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('WHATSAPP'),
                 ),
-              ),
+                OutlinedButton.icon(
+                  onPressed: () => context.read<MotoposadasBloc>().add(
+                    CompleteMotoposadaRequest(requestId: req.id),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text('FINALIZAR ESTANCIA'),
+                ),
+              ],
             ),
           ],
         ],
@@ -869,6 +886,16 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                   ),
                 ),
               ),
+            ),
+          ],
+          if (req.status == 'approved' || req.status == 'completed') ...[
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: () => context.read<MotoposadasBloc>().add(
+                FetchMotoposadaRequestContact(requestId: req.id),
+              ),
+              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+              label: const Text('CONTACTAR POR WHATSAPP'),
             ),
           ],
         ],

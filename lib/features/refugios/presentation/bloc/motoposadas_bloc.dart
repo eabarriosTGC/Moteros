@@ -31,6 +31,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<RespondToRequest>(_onRespond);
     on<CompleteMotoposadaRequest>(_onCompleteRequest);
     on<CancelMotoposadaRequest>(_onCancelRequest);
+    on<FetchMotoposadaRequestContact>(_onFetchRequestContact);
     on<SubmitReview>(_onSubmitReview);
     on<DeleteMotoposada>(_onDelete);
     on<CreateTouristPoi>(_onCreateTouristPoi);
@@ -333,6 +334,21 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
         params: {'p_request_id': event.requestId},
       );
       emit(const RequestCancelled());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  Future<void> _onFetchRequestContact(
+    FetchMotoposadaRequestContact event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    try {
+      final phone = await _db.rpc(
+        'get_motoposada_request_contact',
+        params: {'p_request_id': event.requestId},
+      );
+      emit(MotoposadaRequestContactLoaded(phone: phone as String?));
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }

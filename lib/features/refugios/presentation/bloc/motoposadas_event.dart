@@ -118,6 +118,15 @@ final class CancelMotoposadaRequest extends MotoposadasEvent {
   List<Object?> get props => [requestId];
 }
 
+/// Obtiene el teléfono de la contraparte solo para una estancia aprobada o
+/// completada. La autorización se valida en PostgreSQL (migración 039).
+final class FetchMotoposadaRequestContact extends MotoposadasEvent {
+  final int requestId;
+  const FetchMotoposadaRequestContact({required this.requestId});
+  @override
+  List<Object?> get props => [requestId];
+}
+
 final class SubmitReview extends MotoposadasEvent {
   final int motoposadaId;
   final int requestId;

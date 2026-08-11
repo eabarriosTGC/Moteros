@@ -247,6 +247,13 @@ final class RequestCancelled extends MotoposadasState {
   const RequestCancelled();
 }
 
+final class MotoposadaRequestContactLoaded extends MotoposadasState {
+  final String? phone;
+  const MotoposadaRequestContactLoaded({this.phone});
+  @override
+  List<Object?> get props => [phone];
+}
+
 final class ReviewSubmitted extends MotoposadasState {
   const ReviewSubmitted();
 }
