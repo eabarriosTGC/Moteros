@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../data/raid_conquest_repository.dart';
+import '../arrival_credential.dart';
 
 class RaidQrManagementScreen extends StatefulWidget {
   final Map<String, dynamic> raid;
@@ -98,6 +99,38 @@ class _RaidQrManagementScreenState extends State<RaidQrManagementScreen> {
               backgroundColor: Colors.white,
               errorCorrectionLevel: QrErrorCorrectLevel.M,
             ),
+            if (generated['manual_code'] != null) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Código manual para compartir',
+                style: TextStyle(
+                    color: Colors.black87, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                formatManualCode(generated['manual_code'].toString()),
+                style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 22,
+                    letterSpacing: 4,
+                    fontWeight: FontWeight.bold),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(
+                      text: formatManualCode(
+                              generated['manual_code'].toString())
+                          .replaceAll('-', '')));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Código copiado')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('COPIAR'),
+              ),
+            ],
             const SizedBox(height: 12),
             const Text(
               'Guarda una captura para imprimir. Por seguridad, el código completo solo se muestra ahora.',

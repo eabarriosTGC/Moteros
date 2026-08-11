@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../data/raid_conquest_repository.dart';
+import '../arrival_credential.dart';
 import '../scanner_lifecycle.dart';
 
 class RaidArrivalScreen extends StatefulWidget {
@@ -59,8 +60,10 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
 
   bool _processing = false;
   bool _uploadingPhoto = false;
-  Map<String, dynamic>? _arrival;
+  bool _manualMode = false;
   String? _error;
+  Map<String, dynamic>? _arrival;
+  final _manualCodeController = TextEditingController();
 
   @override
   void initState() {
@@ -79,6 +82,7 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
     WidgetsBinding.instance.removeObserver(this);
     _lifecycle.removeListener(_onScannerPhaseChanged);
     _lifecycle.dispose();
+    _manualCodeController.dispose();
     _scanner.dispose();
     super.dispose();
   }
@@ -128,6 +132,20 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
     if (_processing || _arrival != null) return;
     // Tokens ajenos se ignoran: no se toca red ni kilometraje.
     if (!isValidArrivalToken(raw)) return;
+    await _verifyArrivalCode(raw!);
+  }
+
+  /// Punto de entrada del código manual (mismo flujo que el QR).
+  @visibleForTesting
+  Future<void> submitManualCode(String raw) => _verifyArrivalCode(raw);
+
+  /// Único flujo de verificación: lo usan tanto el QR como el código manual.
+  /// Normaliza → valida formato → GPS → verify_raid_arrival (autoridad del
+  /// servidor) → acreditación única → fotoconquista.
+  Future<void> _verifyArrivalCode(String credential) async {
+    if (_processing || _arrival != null) return;
+    final normalized = normalizeArrivalCredential(credential);
+    if (normalized == null) return; // formato inválido: no toca red ni km
     setState(() {
       _processing = true;
       _error = null;
@@ -142,7 +160,7 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
       }
       final arrival = await _repository.verifyArrival(
         raidId: (widget.raid['id'] as num).toInt(),
-        qrToken: raw!,
+        qrToken: normalized,
         latitude: position.latitude,
         longitude: position.longitude,
         accuracyMeters: position.accuracy,
@@ -161,6 +179,22 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
       });
       await _lifecycle.resume();
     }
+  }
+
+  void _openManualMode() {
+    setState(() {
+      _manualMode = true;
+      _error = null;
+    });
+    _lifecycle.pauseForVerification();
+  }
+
+  void _closeManualMode() {
+    setState(() {
+      _manualMode = false;
+      _error = null;
+    });
+    _lifecycle.resume();
   }
 
   Future<void> _startScanner() async {
@@ -209,7 +243,95 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
         title: const Text('VERIFICAR LLEGADA'),
         backgroundColor: Colors.transparent,
       ),
-      body: _arrival == null ? _scannerBody() : _successBody(),
+      body: _arrival == null
+          ? (_manualMode ? _buildManualEntry() : _scannerBody())
+          : _successBody(),
+    );
+  }
+
+  /// Ingreso manual de la credencial: NO monta ni inicia MobileScanner.
+  Widget _buildManualEntry() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: AppSpacing.screenPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: AppSpacing.lg),
+            const Icon(Icons.keyboard_alt_outlined,
+                size: 56, color: AppColors.textMuted),
+            const SizedBox(height: AppSpacing.md),
+            Text('Ingresar código de llegada',
+                style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'El código de 8 caracteres del lugar (ej. K7DM-4R9X). '
+              'Mismo QR, misma validación del servidor.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _manualCodeController,
+              textCapitalization: TextCapitalization.characters,
+              keyboardType: TextInputType.text,
+              autocorrect: false,
+              enableSuggestions: false,
+              inputFormatters: [
+                _ManualCodeFormatter(),
+                LengthLimitingTextInputFormatter(9),
+              ],
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 22,
+                  letterSpacing: 3),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'XXXX-XXXX',
+                hintStyle:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 22),
+                filled: true,
+                fillColor: AppColors.overlay,
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.mdCircular,
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onSubmitted: (_) => submitManualCode(_manualCodeController.text),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            if (_processing)
+              const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: () =>
+                    submitManualCode(_manualCodeController.text),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('VERIFICAR CÓDIGO'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnAmber,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(_error!,
+                  style: const TextStyle(color: AppColors.error),
+                  textAlign: TextAlign.center),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            TextButton.icon(
+              onPressed: _processing ? null : _closeManualMode,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('ESCANEAR QR'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -259,6 +381,14 @@ class _RaidArrivalScreenState extends State<RaidArrivalScreen>
                     const SizedBox(height: AppSpacing.sm),
                     Text(_error!, style: const TextStyle(color: AppColors.error), textAlign: TextAlign.center),
                   ],
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton.icon(
+                    onPressed: _processing ? null : _openManualMode,
+                    icon: const Icon(Icons.keyboard_alt_outlined,
+                        size: 18, color: AppColors.textMuted),
+                    label: const Text('¿La cámara no funciona? INGRESAR CÓDIGO',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  ),
                 ],
               ),
             ),
@@ -448,6 +578,21 @@ class _ScannerMessageView extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Formato automático del campo: XXXX-XXXX mientras se escribe.
+class _ManualCodeFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final formatted = formatManualCode(newValue.text);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

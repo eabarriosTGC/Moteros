@@ -178,7 +178,8 @@ class RaidConquestRepository {
       'GPS_ACCURACY_TOO_LOW': 'La señal GPS es imprecisa. Sal al exterior e inténtalo otra vez.',
       'OUTSIDE_EVENT_WINDOW': 'Este raid no está dentro de su horario de verificación.',
       'JOIN_REQUIRED': 'Debes unirte al raid temporal antes de verificar la llegada.',
-      'INVALID_QR': 'El código no corresponde a este destino o está desactivado.',
+      'INVALID_QR': 'Código inválido o no disponible.',
+      'TOO_MANY_ATTEMPTS': 'Demasiados intentos fallidos. Esperá unos minutos e intentá de nuevo.',
       'ALREADY_VERIFIED': 'Ya verificaste esta ruta anteriormente.',
       'RAID_NOT_AVAILABLE': 'Este raid ya no está disponible.',
     };

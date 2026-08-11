@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:moteros_app/features/raids/data/raid_conquest_repository.dart';
 import 'package:moteros_app/features/raids/presentation/screens/raid_arrival_screen.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Fakes mínimos (mismo patrón que raid_join_sheet_test.dart).
@@ -72,7 +73,6 @@ void main() {
       (tester) async {
     final repo = _FakeArrivalRepository();
     final state = await _pump(tester, repo: repo);
-
     await (state as dynamic).handleDetectedBarcode('https://nope.example/qr');
 
     expect(repo.verifyCalls, 0);
@@ -169,5 +169,129 @@ void main() {
     );
     expect(find.text('SEAM_OK'), findsOneWidget);
     expect(built, isFalse);
+  });
+
+  group('INGRESAR CÓDIGO (modo manual)', () {
+    testWidgets('el botón aparece debajo del escáner', (tester) async {
+      final repo = _FakeArrivalRepository();
+      await _pump(tester, repo: repo);
+
+      expect(find.textContaining('INGRESAR CÓDIGO'), findsOneWidget);
+    });
+
+    testWidgets('abrir modo manual no monta MobileScanner ni pide cámara',
+        (tester) async {
+      final repo = _FakeArrivalRepository();
+      await _pump(tester, repo: repo);
+
+      await tester.tap(find.textContaining('INGRESAR CÓDIGO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ingresar código de llegada'), findsOneWidget);
+      expect(find.text('VERIFICAR CÓDIGO'), findsOneWidget);
+      // El widget de cámara no debe existir en el árbol.
+      expect(find.byType(MobileScanner), findsNothing);
+    });
+
+    testWidgets('formato inválido no llama al servidor ni acredita',
+        (tester) async {
+      final repo = _FakeArrivalRepository();
+      final state = await _pump(tester, repo: repo);
+
+      await (state as dynamic).submitManualCode('K7DM!!!!');
+      await tester.pump();
+
+      expect(repo.verifyCalls, 0);
+      expect(find.text('RUTA CONQUISTADA'), findsNothing);
+    });
+
+    testWidgets('QR y código manual llaman al mismo flujo (verify_raid_arrival)',
+        (tester) async {
+      final repo = _FakeArrivalRepository(arrival: {
+        'arrival_id': 'a1',
+        'place_name': 'Mirador',
+        'verified_km': 12.0,
+      });
+      final state = await _pump(tester, repo: repo);
+
+      await (state as dynamic)
+          .handleDetectedBarcode('asfaltoclub:arrival:v1:tokX');
+      await tester.pump();
+      expect(repo.verifyCalls, 1);
+      expect(repo.lastQrToken, 'asfaltoclub:arrival:v1:tokX');
+    });
+
+    testWidgets('el código manual reutiliza el flujo con credencial normalizada',
+        (tester) async {
+      final repo = _FakeArrivalRepository(arrival: {
+        'arrival_id': 'a2',
+        'place_name': 'Mirador',
+        'verified_km': 12.0,
+      });
+      final state = await _pump(tester, repo: repo);
+
+      await (state as dynamic).submitManualCode('k7dm-4r9x');
+      await tester.pump();
+      expect(repo.verifyCalls, 1);
+      expect(repo.lastQrToken, 'K7DM4R9X');
+    });
+
+    testWidgets('doble pulsación de VERIFICAR no duplica la solicitud',
+        (tester) async {
+      final repo = _FakeArrivalRepository(arrival: {
+        'arrival_id': 'a1',
+        'place_name': 'Mirador',
+        'verified_km': 12.0,
+      });
+      final state = await _pump(tester, repo: repo);
+
+      final first = (state as dynamic).submitManualCode('K7DM4R9X');
+      await (state as dynamic).submitManualCode('K7DM4R9X');
+      await first;
+      await tester.pump();
+
+      expect(repo.verifyCalls, 1);
+    });
+  });
+
+  group('errores del servidor (verify_raid_arrival)', () {
+    Future<void> verifyWithError(
+        WidgetTester tester, Object error, String expectedMessage) async {
+      final repo = _FakeArrivalRepository(error: error);
+      final state = await _pump(tester, repo: repo);
+      await (state as dynamic).submitManualCode('K7DM4R9X');
+      await tester.pump();
+      expect(find.text(expectedMessage), findsOneWidget);
+    }
+
+    testWidgets('fecha futura (ventana temporal) rechaza sin acreditar',
+        (tester) async {
+      await verifyWithError(tester, Exception('OUTSIDE_EVENT_WINDOW'),
+          'Este raid no está dentro de su horario de verificación.');
+      expect(find.text('RUTA CONQUISTADA'), findsNothing);
+    });
+
+    testWidgets('GPS fuera del radio no acredita', (tester) async {
+      await verifyWithError(tester, Exception('TOO_FAR_FROM_DESTINATION:1234'),
+          'Estás a 1234 m del destino. Acércate al punto del QR.');
+    });
+
+    testWidgets('usuario no participante no acredita', (tester) async {
+      await verifyWithError(
+          tester, Exception('JOIN_REQUIRED'),
+          'Debes unirte al raid temporal antes de verificar la llegada.');
+    });
+
+    testWidgets('código inválido usa mensaje común (no revela origen)',
+        (tester) async {
+      await verifyWithError(tester, Exception('INVALID_QR'),
+          'Código inválido o no disponible.');
+    });
+
+    testWidgets('límite de intentos fallidos muestra recuperación',
+        (tester) async {
+      await verifyWithError(tester, Exception('TOO_MANY_ATTEMPTS'),
+          'Demasiados intentos fallidos. Esperá unos minutos e intentá de nuevo.');
+    });
   });
 }
