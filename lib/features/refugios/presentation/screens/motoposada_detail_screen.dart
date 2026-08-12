@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../trust/domain/models/trust_signals.dart';
@@ -14,7 +15,12 @@ import '../bloc/motoposadas_state.dart';
 
 class MotoposadaDetailScreen extends StatefulWidget {
   final int motoposadaId;
-  const MotoposadaDetailScreen({super.key, required this.motoposadaId});
+  final MotoposadaModel? initialMotoposada;
+  const MotoposadaDetailScreen({
+    super.key,
+    required this.motoposadaId,
+    this.initialMotoposada,
+  });
 
   @override
   State<MotoposadaDetailScreen> createState() => _MotoposadaDetailScreenState();
@@ -26,6 +32,18 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
   DateTime _checkOut = DateTime.now().add(const Duration(days: 2));
   int _guestCount = 1;
   bool _showRequestForm = false;
+
+  /// True si la publicación pertenece al usuario autenticado. La lectura del
+  /// uid es tolerante a Supabase no inicializado (widget tests): en producción
+  /// main.dart inicializa antes de runApp, así que nunca lanza.
+  bool _isOwnMotoposada(String? ownerId) {
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      return ownerId != null && uid != null && ownerId == uid;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   void initState() {
@@ -58,12 +76,12 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
   Widget build(BuildContext context) {
     // Try to find motoposada from parent state
     final state = context.read<MotoposadasBloc>().state;
-    MotoposadaModel? mp;
-    if (state is MotoposadasLoaded) {
+    MotoposadaModel? mp = widget.initialMotoposada;
+    if (mp == null && state is MotoposadasLoaded) {
       mp = state.motoposadas
           .where((m) => m.id == widget.motoposadaId)
           .firstOrNull;
-    } else if (state is MyMotoposadasLoaded) {
+    } else if (mp == null && state is MyMotoposadasLoaded) {
       mp = state.motoposadas
           .where((m) => m.id == widget.motoposadaId)
           .firstOrNull;
@@ -275,26 +293,28 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
                       ],
                       const SizedBox(height: AppSpacing.lg),
                       // Request form
-                      if (!_showRequestForm) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          height: AppSpacing.buttonHeight,
-                          child: ElevatedButton.icon(
-                            onPressed: () =>
-                                setState(() => _showRequestForm = true),
-                            icon: const Icon(Icons.send_outlined),
-                            label: const Text('SOLICITAR ESTADÍA'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: AppColors.textOnAmber,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadius.mdCircular,
+                      if (!_isOwnMotoposada(mp.userId)) ...[
+                        if (!_showRequestForm) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSpacing.buttonHeight,
+                            child: ElevatedButton.icon(
+                              onPressed: () =>
+                                  setState(() => _showRequestForm = true),
+                              icon: const Icon(Icons.send_outlined),
+                              label: const Text('SOLICITAR ESTADÍA'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: AppColors.textOnAmber,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadius.mdCircular,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ] else ...[
-                        _buildRequestForm(mp.id),
+                        ] else ...[
+                          _buildRequestForm(mp.id),
+                        ],
                       ],
                       const SizedBox(height: AppSpacing.xxl),
                     ],

@@ -7,9 +7,9 @@
 /// Covered:
 /// - renders alias, badge "Casa de motero", description, capacity, the
 ///   host `TrustSignalsRow` (4 values), "Ubicación aproximada" note, nav
-///   row (Waze/Google Maps at approx coords), Contactar (M-MAPA-3)
+///   row (Waze/Google Maps at approx coords), Ver y solicitar (M-MAPA-3)
 /// - NO phone and NO address in the tree (M-MAPA-3, M-WA-1)
-/// - Contactar tap → dispatches `FetchCasaMoteroWhatsapp` (M-WA-1)
+/// - Public CTA opens detail; contact remains gated by approved request.
 /// - phone loaded → wa.me URL built with the availability message (M-WA-1)
 /// - phone null → "El anfitrión no está disponible" (M-WA-1)
 /// - canLaunch=false → WhatsApp Web fallback sheet (M-WA-2)
@@ -104,7 +104,7 @@ Future<_SeededBloc> _pumpCard(
 void main() {
   group('CasaMoteroCard — content (M-MAPA-3)', () {
     testWidgets('renders alias, badge, description, capacity, signals, '
-        'approx-note, nav and Contactar', (tester) async {
+        'approx-note, nav and request entry', (tester) async {
       await _pumpCard(tester);
 
       // Alias + badge "Casa de motero" (poiTypeLabel).
@@ -124,10 +124,10 @@ void main() {
       expect(find.text('5 insignias'), findsOneWidget);
       // "Ubicación aproximada" note (M-MAPA-3 / M-WA-3: never the address).
       expect(find.text('Ubicación aproximada'), findsOneWidget);
-      // Nav row + Contactar.
+      // Nav row + request entry. Contact is available from approved stays.
       expect(find.text('Waze'), findsOneWidget);
       expect(find.text('Google Maps'), findsOneWidget);
-      expect(find.text('Contactar'), findsOneWidget);
+      expect(find.text('VER Y SOLICITAR'), findsOneWidget);
     });
 
     testWidgets('NO phone and NO address in the tree (M-MAPA-3, M-WA-1)', (
@@ -147,25 +147,22 @@ void main() {
     });
   });
 
-  group('CasaMoteroCard — Contactar (M-WA-1)', () {
-    testWidgets('tap dispatches FetchCasaMoteroWhatsapp with the listing id', (
+  group('CasaMoteroCard — request flow (M-WA-1)', () {
+    testWidgets('tap opens detail instead of requesting a public phone', (
       tester,
     ) async {
       final bloc = await _pumpCard(tester);
 
       await tester.scrollUntilVisible(
-        find.text('Contactar'),
+        find.text('VER Y SOLICITAR'),
         100,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Contactar'));
-      await tester.pump();
+      await tester.tap(find.text('VER Y SOLICITAR'));
+      await tester.pumpAndSettle();
 
-      final fetches = bloc.dispatched
-          .whereType<FetchCasaMoteroWhatsapp>()
-          .toList();
-      expect(fetches, hasLength(1));
-      expect(fetches.single.id, 7);
+      expect(find.text('SOLICITAR ESTADÍA'), findsOneWidget);
+      expect(bloc.dispatched.whereType<FetchCasaMoteroWhatsapp>(), isEmpty);
     });
 
     testWidgets('phone loaded → wa.me URL built with availability message', (
@@ -181,15 +178,7 @@ void main() {
         },
       );
 
-      await tester.scrollUntilVisible(
-        find.text('Contactar'),
-        100,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Contactar'));
-      await tester.pump();
-
-      // On-demand phone arrives → BlocListener launches.
+      // Approved-stay phone arrives → the listener launches.
       const phone = '573001234567';
       bloc.seed(const CasaMoteroWhatsappLoaded(phone: phone));
       await tester.pump();
@@ -233,14 +222,6 @@ void main() {
           launch: (_) async => true,
         ),
       );
-
-      await tester.scrollUntilVisible(
-        find.text('Contactar'),
-        100,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Contactar'));
-      await tester.pump();
 
       bloc.seed(const CasaMoteroWhatsappLoaded(phone: '573001234567'));
       await tester.pump();

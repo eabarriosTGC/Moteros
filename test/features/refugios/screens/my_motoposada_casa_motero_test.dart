@@ -107,15 +107,12 @@ Future<void> _seed(
 void main() {
   group('MyMotoposadaScreen — casa_motero entry (M-CRUD-1)', () {
     testWidgets(
-      'dispatches LoadMyMotoposadas + CheckCasaMoteroEligibility on init',
+      'dispatches one listings load on init (no competing state)',
       (tester) async {
         final bloc = await _pumpMyCasa(tester);
 
         expect(bloc.dispatched.whereType<LoadMyMotoposadas>(), hasLength(1));
-        expect(
-          bloc.dispatched.whereType<CheckCasaMoteroEligibility>(),
-          hasLength(1),
-        );
+        expect(bloc.dispatched.whereType<CheckCasaMoteroEligibility>(), isEmpty);
       },
     );
 

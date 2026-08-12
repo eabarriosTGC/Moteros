@@ -52,7 +52,9 @@ class FeaturedMotoposadaCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             // Title
             Text(
-              motoposada.title,
+              motoposada.title.trim().isEmpty
+                  ? 'Motoposada${motoposada.hostName == null ? '' : ' de ${motoposada.hostName}'}'
+                  : motoposada.title,
               style: AppTypography.titleMedium.copyWith(
                 color: AppColors.textPrimary,
               ),

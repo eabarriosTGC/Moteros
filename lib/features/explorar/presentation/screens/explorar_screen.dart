@@ -11,6 +11,7 @@ import '../bloc/explorar_state.dart';
 import '../widgets/featured_motoposada_card.dart';
 import '../widgets/raid_card.dart';
 import '../../../raids/presentation/widgets/raid_join_sheet.dart';
+import '../../../refugios/presentation/screens/motoposada_detail_screen.dart';
 
 class ExplorarScreen extends StatefulWidget {
   const ExplorarScreen({super.key});
@@ -80,9 +81,15 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                                 final mp = state.featuredMotoposadas[index];
                                 return FeaturedMotoposadaCard(
                                   motoposada: mp,
-                                  onTap: () {
-                                    // Navigate to detail — placeholder
-                                  },
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MotoposadaDetailScreen(
+                                        motoposadaId: mp.id,
+                                        initialMotoposada: mp,
+                                      ),
+                                    ),
+                                  ),
                                 );
                               },
                             ),

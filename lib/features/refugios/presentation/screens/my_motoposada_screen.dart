@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/services/whatsapp_launcher.dart';
@@ -11,6 +12,8 @@ import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
 import 'create_motoposada_screen.dart';
 import 'motoposada_detail_screen.dart';
+import 'motoposada_appeals_screen.dart';
+import 'motoposada_moderation_screen.dart';
 
 class MyMotoposadaScreen extends StatefulWidget {
   const MyMotoposadaScreen({super.key});
@@ -33,6 +36,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
   // último listado cuando el otro tab recarga (patrón _cachedListings).
   List<MotoposadaRequestModel>? _cachedReceived;
   List<MotoposadaRequestModel>? _cachedMyStays;
+  bool _canModerate = false;
 
   @override
   void initState() {
@@ -40,8 +44,20 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
-      context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
+      _loadModerationAccess();
     });
+  }
+
+  Future<void> _loadModerationAccess() async {
+    try {
+      await Supabase.instance.client.rpc(
+        'get_motoposada_moderation_queue',
+        params: {'p_status': 'open'},
+      );
+      if (mounted) setState(() => _canModerate = true);
+    } catch (_) {
+      // La RPC es la autoridad: un usuario normal recibe admin_required.
+    }
   }
 
   @override
@@ -59,6 +75,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         }
         if (state is MyMotoposadasLoaded) {
           _cachedListings = state.motoposadas;
+          _eligibilityHas = state.motoposadas.any((m) => m.isCasaMotero);
         }
         if (state is RequestsLoaded) {
           if (state.isHost) {
@@ -136,6 +153,41 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                 'MIS MOTOPOSADAS',
                 style: AppTypography.h2.copyWith(color: AppColors.primary),
               ),
+              actions: [
+                IconButton(
+                  tooltip: 'Mis sanciones y apelaciones',
+                  icon: const Icon(Icons.gavel_outlined),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MyMotoposadaAppealsScreen(),
+                    ),
+                  ),
+                ),
+                if (_canModerate)
+                  PopupMenuButton<String>(
+                    tooltip: 'Administración',
+                    icon: const Icon(Icons.admin_panel_settings_outlined),
+                    onSelected: (value) => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => value == 'appeals'
+                            ? const MotoposadaAppealReviewScreen()
+                            : const MotoposadaModerationScreen(),
+                      ),
+                    ),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'reports',
+                        child: Text('Reportes'),
+                      ),
+                      PopupMenuItem(
+                        value: 'appeals',
+                        child: Text('Apelaciones'),
+                      ),
+                    ],
+                  ),
+              ],
               bottom: TabBar(
                 controller: _tabController,
                 indicatorColor: AppColors.primary,

@@ -445,12 +445,22 @@ class _RodarScreenState extends State<RodarScreen>
                             padding: const EdgeInsets.only(
                               bottom: AppSpacing.sm,
                             ),
-                            child: Text(
-                              '${state.placesVisited} lugares · ${state.challengesCompleted} retos',
-                              style: AppTypography.body.copyWith(
-                                color: AppColors.textMuted,
-                              ),
-                              textAlign: TextAlign.center,
+                            child: BlocBuilder<MotoposadasBloc, MotoposadasState>(
+                              builder: (context, motoposadasState) {
+                                final activeMotoposadas =
+                                    motoposadasState is MotoposadasLoaded
+                                    ? motoposadasState.motoposadas
+                                          .where((m) => m.isActive)
+                                          .length
+                                    : 0;
+                                return Text(
+                                  '${state.placesVisited + activeMotoposadas} lugares · ${state.challengesCompleted} retos',
+                                  style: AppTypography.body.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                );
+                              },
                             ),
                           );
                         },
