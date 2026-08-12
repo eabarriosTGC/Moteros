@@ -71,6 +71,22 @@ void main() {
           .length,
       greaterThanOrEqualTo(2),
     );
+    expect(source, contains('guests:users!motoposada_requests_guest_id_fkey'));
+    expect(
+      source,
+      contains('motoposadas!motoposada_requests_motoposada_id_fkey'),
+    );
+    expect(source, isNot(contains('guests!inner')));
+  });
+
+  test('Rodar has a motoposada filter and opens the safe request flow', () {
+    final source = File(
+      'lib/features/dashboard/presentation/screens/rodar_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains("label: const Text('Motoposadas')"));
+    expect(source, contains('_showMotoposadas'));
+    expect(source, contains("label: const Text('VER Y SOLICITAR')"));
+    expect(source, contains('initialMotoposada: mp'));
   });
 
   test('Rodar place count includes active motoposadas', () {

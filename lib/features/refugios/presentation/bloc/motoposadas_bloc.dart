@@ -137,7 +137,7 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select('*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title,user_id), motoposada_reviews(id)')
+          .select('*, guests:users!motoposada_requests_guest_id_fkey(username, user_xp!inner(level, trust_score)), motoposadas!motoposada_requests_motoposada_id_fkey(title,user_id), motoposada_reviews(id)')
           .eq('motoposada_id', event.motoposadaId)
           .order('created_at', ascending: false);
 
@@ -158,7 +158,10 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select('*, motoposadas!inner(title,user_id), guests!inner(username, user_xp!inner(level, trust_score)), motoposada_reviews(id)')
+          .select(
+            '*, motoposadas!motoposada_requests_motoposada_id_fkey(title,user_id), '
+            'guests:users!motoposada_requests_guest_id_fkey(username), motoposada_reviews(id)',
+          )
           .eq('guest_id', _uid!)
           .order('created_at', ascending: false)
           .timeout(const Duration(seconds: 12));
@@ -184,7 +187,10 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     try {
       final resp = await _db
           .from('motoposada_requests')
-          .select('*, guests!inner(username, user_xp!inner(level, trust_score)), motoposadas!inner(title,user_id), motoposada_reviews(id)')
+          .select(
+            '*, motoposadas!motoposada_requests_motoposada_id_fkey(title,user_id), '
+            'guests:users!motoposada_requests_guest_id_fkey(username), motoposada_reviews(id)',
+          )
           .order('created_at', ascending: false)
           .timeout(const Duration(seconds: 12));
 
