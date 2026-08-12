@@ -1,6 +1,6 @@
 /// Rodar Screen — Map-first redesign for the core riding experience.
 /// Features: interactive map with motoposada POIs, animated KM counter,
-/// próximos raids, recent rides, and a prominent Rodar FAB.
+/// próximos raids y conquistas verificadas, sin grabación GPS continua.
 library;
 
 import 'dart:async';
@@ -13,7 +13,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/theme_cubit.dart';
-import '../../../tracker/presentation/screens/route_tracker_screen.dart';
 import '../../../../core/services/location_tracking_service.dart';
 import '../widgets/blue_dot_marker.dart';
 import '../widgets/recenter_button.dart';
@@ -24,8 +23,9 @@ import '../bloc/search_state.dart';
 import '../../../raids/presentation/bloc/raid_bloc.dart';
 import '../../../raids/presentation/bloc/raid_event.dart';
 import '../../../raids/presentation/bloc/raid_state.dart';
-import '../../../raids/presentation/screens/create_raid_screen.dart';
+import '../../../raids/presentation/raid_creation_flow.dart';
 import '../../../raids/presentation/screens/raid_list_screen.dart';
+import '../../../raids/presentation/screens/raid_conquest_history_screen.dart';
 import '../../../raids/presentation/widgets/raid_join_sheet.dart';
 import '../../../raids/presentation/widgets/raid_marker.dart';
 import '../../../refugios/presentation/bloc/motoposadas_bloc.dart';
@@ -86,7 +86,6 @@ class _RodarScreenState extends State<RodarScreen>
       context.read<DashboardBloc>().add(LoadDashboard(userId: 1));
       context.read<RaidBloc>().add(const LoadRaids());
       context.read<MotoposadasBloc>().add(const LoadMotoposadas());
-      _checkPendingTrip();
     });
 
     // Start passive position stream for blue dot (map only, no tracking).
@@ -161,69 +160,6 @@ class _RodarScreenState extends State<RodarScreen>
   Future<void> _openLocationSettings() => Geolocator.openLocationSettings();
 
   Future<void> _openAppSettings() => Geolocator.openAppSettings();
-
-  /// Check if there's a trip checkpoint from a prior session (process kill).
-  Future<void> _checkPendingTrip() async {
-    final hasPending = await LocationTrackingService.hasPendingTrip();
-    if (!hasPending || !mounted) return;
-
-    final action = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.route_rounded, color: AppColors.primary, size: 22),
-            const SizedBox(width: AppSpacing.sm),
-            const Text(
-              'Viaje pendiente',
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Tenías un viaje en curso que quedó sin guardar. '
-          '¿Quieres continuarlo o descartarlo?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'discard'),
-            child: const Text(
-              'DESCARTAR',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, 'continue'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnAmber,
-            ),
-            child: const Text(
-              'CONTINUAR',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted) return;
-    if (action == 'discard') {
-      await LocationTrackingService.instance.clearCheckpoint();
-    } else if (action == 'continue') {
-      context.read<TrackerBloc>().add(ResumeFromCheckpoint());
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const RouteTrackerScreen()),
-      );
-    }
-  }
 
   @override
   void dispose() {
@@ -322,28 +258,23 @@ class _RodarScreenState extends State<RodarScreen>
                     if (state is! RaidsLoaded) {
                       return const SizedBox.shrink();
                     }
-                    final markers = state.raids
-                        .where(
-                          (r) =>
-                              (r['status'] == 'lobby' ||
-                                  r['status'] == 'planned' ||
-                                  r['status'] == 'active') &&
-                              r['origin_lat'] != null &&
-                              r['origin_lng'] != null &&
-                              !isExpiredRaid(r),
-                        )
+                    final markers = visibleRaidMarkers(state.raids)
                         .map((r) {
                           final isActive = r['status'] == 'active';
                           return Marker(
-                            point: LatLng(
-                              (r['origin_lat'] as num).toDouble(),
-                              (r['origin_lng'] as num).toDouble(),
-                            ),
+                            point: raidMarkerPoint(r)!,
                             width: 40,
                             height: 40,
                             child: GestureDetector(
                               onTap: () => showRaidJoinSheet(context, r),
-                              child: RaidMarker(isActive: isActive),
+                              child: RaidMarker(
+                                raidType: r['raid_type']?.toString() ?? 'scheduled',
+                                isActive: isActive,
+                                participantCount:
+                                    (r['participant_count'] as num?)?.toInt() ??
+                                        (r['raid_participants'] as List?)?.length ??
+                                        0,
+                              ),
                             ),
                           );
                         })
@@ -469,31 +400,6 @@ class _RodarScreenState extends State<RodarScreen>
                 },
               ),
 
-            // ── Rodar FAB ──
-            Positioned(
-              bottom: 24,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: FloatingActionButton.large(
-                  onPressed: () {
-                    _tap();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RouteTrackerScreen(),
-                      ),
-                    );
-                  },
-                  backgroundColor: AppColors.error,
-                  foregroundColor: Colors.white,
-                  shape: const CircleBorder(),
-                  elevation: 8,
-                  child: const Icon(Icons.fiber_manual_record, size: 48),
-                ),
-              ),
-            ),
-
             // ── Bottom sheet: raids + recent rides ──
             DraggableScrollableSheet(
               initialChildSize: 0.30,
@@ -510,10 +416,13 @@ class _RodarScreenState extends State<RodarScreen>
                       top: BorderSide(color: AppColors.border, width: 0.5),
                     ),
                   ),
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    children: [
+                  child: RefreshIndicator(
+                    onRefresh: _refreshRaids,
+                    child: ListView(
+                      controller: scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      children: [
                       // Drag handle
                       Center(
                         child: Container(
@@ -555,7 +464,8 @@ class _RodarScreenState extends State<RodarScreen>
                       _sectionHeader('VIAJES RECIENTES'),
                       const SizedBox(height: AppSpacing.sm),
                       _buildRecentRidesPlaceholder(),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
@@ -671,6 +581,14 @@ class _RodarScreenState extends State<RodarScreen>
 
   // ── Raid section ──
 
+  /// Pull-to-refresh del bottom sheet: recarga los raids para recoger
+  /// cambios hechos desde otras pantallas o dispositivos.
+  Future<void> _refreshRaids() async {
+    final bloc = context.read<RaidBloc>();
+    bloc.add(const LoadRaids());
+    await bloc.stream.firstWhere((state) => state is! RaidLoading);
+  }
+
   Widget _buildRaidSection() {
     return BlocBuilder<RaidBloc, RaidState>(
       builder: (context, state) {
@@ -687,6 +605,18 @@ class _RodarScreenState extends State<RodarScreen>
             ],
           );
         }
+        if (state is RaidError) {
+          return Column(
+            children: [
+              RaidErrorCard(
+                onRetry: () =>
+                    context.read<RaidBloc>().add(const LoadRaids()),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _buildRaidActions(),
+            ],
+          );
+        }
         return _buildRaidActions();
       },
     );
@@ -694,10 +624,12 @@ class _RodarScreenState extends State<RodarScreen>
 
   Widget _buildRaidCard(Map<String, dynamic> raid) {
     final title = raid['description'] ?? 'Raid';
-    final gameMode = raid['mode'] ?? 'Free Ride';
+    final gameMode = raid['raid_type'] == 'permanent' ? 'Permanente' : 'Con fecha';
     final status = raid['status'] ?? 'lobby';
     final raidId = raid['id']?.toString() ?? '';
-    final participants = (raid['raid_participants'] as List?)?.length ?? 0;
+    final participants = (raid['participant_count'] as num?)?.toInt() ??
+        (raid['raid_participants'] as List?)?.length ??
+        0;
     final isActive = status == 'active';
 
     return GestureDetector(
@@ -821,10 +753,7 @@ class _RodarScreenState extends State<RodarScreen>
           child: ElevatedButton.icon(
             onPressed: () {
               _tap();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateRaidScreen()),
-              );
+              openCreateRaidFlow(context);
             },
             icon: const Icon(Icons.add, size: 16),
             label: const Text(
@@ -888,12 +817,21 @@ class _RodarScreenState extends State<RodarScreen>
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Tus viajes recientes aparecerán aquí',
+            'Consulta las rutas acreditadas con QR y ubicación',
             style: AppTypography.body.copyWith(
               color: AppColors.textMuted,
               fontSize: 13,
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RaidConquestHistoryScreen()),
+            ),
+            icon: const Icon(Icons.emoji_events_outlined),
+            label: const Text('VER MIS CONQUISTAS'),
           ),
         ],
       ),
@@ -1173,7 +1111,8 @@ class _RodarScreenState extends State<RodarScreen>
 /// `DateTime.parse` devuelve UTC). null/ausente/corrupto → false (las filas
 /// legacy nunca rompen el filtro).
 bool isExpiredRaid(Map<String, dynamic> raid) {
-  final raw = raid['scheduled_at'];
+  if (raid['raid_type'] == 'permanent') return false;
+  final raw = raid['ends_at'] ?? raid['scheduled_at'];
   if (raw == null) return false;
   try {
     return DateTime.parse(raw.toString()).isBefore(DateTime.now().toUtc());
@@ -1182,8 +1121,75 @@ bool isExpiredRaid(Map<String, dynamic> raid) {
   }
 }
 
+/// Punto de anclaje del pin de un raid en el mapa:
+/// - scheduled: origen (origin_lat/origin_lng).
+/// - permanent: destino (dest_lat/dest_lng).
+/// Devuelve null si faltan las coordenadas relevantes (no se crea Marker).
+LatLng? raidMarkerPoint(Map<String, dynamic> raid) {
+  final permanent = raid['raid_type'] == 'permanent';
+  final lat = permanent ? raid['dest_lat'] : raid['origin_lat'];
+  final lng = permanent ? raid['dest_lng'] : raid['origin_lng'];
+  if (lat == null || lng == null) return null;
+  return LatLng((lat as num).toDouble(), (lng as num).toDouble());
+}
+
+/// Raids que se marcan en el mapa del Radar: planned/lobby/active, con
+/// coordenadas válidas para el pin, y no vencidos salvo los permanentes.
+/// Pura y unit-testable (precedente del repo: la pantalla completa tiene
+/// FlutterMap → no se widget-testea).
+List<Map<String, dynamic>> visibleRaidMarkers(
+    List<Map<String, dynamic>> raids) {
+  return raids
+      .where(
+        (r) =>
+            (r['status'] == 'lobby' ||
+                r['status'] == 'planned' ||
+                r['status'] == 'active') &&
+            raidMarkerPoint(r) != null &&
+            (r['raid_type'] == 'permanent' || !isExpiredRaid(r)),
+      )
+      .toList();
+}
+
+/// Estado de error de raids en el Radar: visible y accionable (reintentar),
+/// no silencio. M-ERV-6.
+class RaidErrorCard extends StatelessWidget {
+  const RaidErrorCard({super.key, required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.error.withAlpha(12),
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.error.withAlpha(60)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Text(
+              'No se pudieron cargar los raids.',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('REINTENTAR'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// M-ERV-5 — raids visibles en la sección 'PRÓXIMOS RAIDS' de Rodar.
-/// Mismo criterio que los markers: status lobby/active + NO vencido
+/// Mismo criterio que los markers (planned/lobby/active) + NO vencido
 /// (isExpiredRaid). Límite 3. Pura y unit-testable (la pantalla completa
 /// tiene FlutterMap → no se widget-testea; precedente del repo).
 List<Map<String, dynamic>> visibleUpcomingRaids(
@@ -1191,7 +1197,9 @@ List<Map<String, dynamic>> visibleUpcomingRaids(
   return raids
       .where(
         (r) =>
-            (r['status'] == 'lobby' || r['status'] == 'active') &&
+            (r['status'] == 'planned' ||
+                r['status'] == 'lobby' ||
+                r['status'] == 'active') &&
             !isExpiredRaid(r),
       )
       .take(3)

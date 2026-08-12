@@ -28,6 +28,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Keep rules de ML Kit: R8 en release elimina BarcodeScanning
+            // cuando coexiste objectbox (flutter_map_tile_caching) → NPE del
+            // escáner solo en release. Ver mobile_scanner issue #1725.
+            proguardFiles("proguard-rules.pro")
         }
     }
 }

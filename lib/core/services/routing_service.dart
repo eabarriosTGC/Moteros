@@ -36,6 +36,10 @@ class RouteResult {
   /// Turn-by-turn instructions (if requested).
   final List<RouteInstruction>? instructions;
 
+  /// True when the routing backend was unavailable and distance is only the
+  /// straight-line Haversine estimate. It must not be credited as road km.
+  final bool isFallback;
+
   const RouteResult({
     required this.polyline,
     required this.distanceKm,
@@ -43,6 +47,7 @@ class RouteResult {
     this.ascend = 0,
     this.descend = 0,
     this.instructions,
+    this.isFallback = false,
   });
 }
 
@@ -162,6 +167,7 @@ class RoutingService {
       polyline: [LatLng(oLat, oLng), LatLng(dLat, dLng)],
       distanceKm: dist,
       durationMin: (dist / speedKmh * 60),
+      isFallback: true,
     );
   }
 

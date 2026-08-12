@@ -43,7 +43,7 @@ class SearchResultsList extends StatelessWidget {
             shrinkWrap: true,
             padding: EdgeInsets.zero,
             itemCount: displayResults.length,
-            separatorBuilder: (_, __) =>
+            separatorBuilder: (_, _) =>
                 const Divider(height: 1, color: AppColors.border),
             itemBuilder: (context, index) {
               final result = displayResults[index];

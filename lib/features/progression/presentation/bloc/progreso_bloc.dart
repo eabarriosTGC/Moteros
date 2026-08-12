@@ -1,16 +1,27 @@
-/// Progreso BLoC — loads stats, badges, and route history.
+/// Progreso BLoC — loads stats, badges, and verified conquests.
+///
+/// route_history (módulo retirado "Grabar ruta") ya NO se consulta: el
+/// historial de Progreso muestra únicamente llegadas verificadas por el
+/// servidor (raid_arrivals vía RaidConquestRepository.loadMyConquests).
 library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../raids/data/raid_conquest_repository.dart';
 import '../../../showcase/data/models/conquest_photo_model.dart';
 import 'progreso_event.dart';
 import 'progreso_state.dart';
 
 class ProgresoBloc extends Bloc<ProgresoEvent, ProgresoState> {
-  ProgresoBloc() : super(ProgresoInitial()) {
+  ProgresoBloc({SupabaseClient? client, RaidConquestRepository? conquests})
+      : _client = client ?? Supabase.instance.client,
+        _conquests = conquests ?? RaidConquestRepository(),
+        super(ProgresoInitial()) {
     on<LoadProgreso>(_onLoadProgreso);
   }
+
+  final SupabaseClient _client;
+  final RaidConquestRepository _conquests;
 
   Future<void> _onLoadProgreso(
     LoadProgreso event,
@@ -19,27 +30,27 @@ class ProgresoBloc extends Bloc<ProgresoEvent, ProgresoState> {
     emit(ProgresoLoading());
     try {
       final userId = event.userId;
-      final client = Supabase.instance.client;
 
       // Parallel loads — skip count queries that need special API
       final results = await Future.wait([
         // 0 — user_xp (km_traveled, raids_completed)
-        client.from('user_xp').select().eq('user_id', userId).maybeSingle(),
+        _client.from('user_xp').select().eq('user_id', userId).maybeSingle(),
         // 1 — conquest_photos (fetch all to count + album, B1/M-CPU-4)
-        client.from('conquest_photos').select().eq('user_id', userId).order('created_at', ascending: false),
+        _client.from('conquest_photos').select().eq('user_id', userId).order('created_at', ascending: false),
         // 2 — all achievements (for badge grid)
-        client.from('achievements').select().order('sort_order'),
+        _client.from('achievements').select().order('sort_order'),
         // 3 — user_achievements (for which are earned)
-        client.from('user_achievements').select('achievement_id, earned_at').eq('user_id', userId),
-        // 4 — route_history (last 50)
-        client.from('route_history').select().eq('user_id', userId).order('completed_at', ascending: false).limit(50),
+        _client.from('user_achievements').select('achievement_id, earned_at').eq('user_id', userId),
       ]);
 
       final xpData = results[0] as Map<String, dynamic>?;
       final photosList = (results[1] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final allAchievements = (results[2] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final userAchievements = (results[3] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final routeHistory = (results[4] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+      // Conquistas verificadas por servidor (raid_arrivals + raids +
+      // conquest_places). route_history fue retirado de esta pantalla.
+      final conquests = await _conquests.loadMyConquests();
 
       final totalKm = (xpData?['km_traveled'] as num?)?.toInt() ?? 0;
       final tripsCount = (xpData?['raids_completed'] as int?) ?? 0;
@@ -77,7 +88,7 @@ class ProgresoBloc extends Bloc<ProgresoEvent, ProgresoState> {
         badgesCount: badgesCount,
         photosCount: photosCount,
         badges: badges,
-        routeHistory: routeHistory,
+        conquests: conquests,
         photos: photos,
       ));
     } catch (e) {

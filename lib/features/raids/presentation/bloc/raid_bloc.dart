@@ -11,17 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'raid_event.dart';
 import 'raid_state.dart';
 
-/// Map UI display names to DB mode codes.
-const _modeToDb = <String, String>{
-  'Aventura': 'aventura',
-  'Velocidad': 'velocidad',
-  'Precisión': 'precision',
-  'Supervivencia': 'sobrevivencia',
-  'Exploración': 'exploracion',
-};
-
-String _mapGameMode(String display) => _modeToDb[display] ?? 'aventura';
-
 class RaidBloc extends Bloc<RaidEvent, RaidState> {
   final SupabaseClient _client;
 
@@ -29,7 +18,6 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
       : _client = client ?? Supabase.instance.client,
         super(RaidInitial()) {
     on<LoadRaids>(_onLoadRaids);
-    on<CreateRaid>(_onCreateRaid);
     on<JoinRaid>(_onJoinRaid);
     on<LeaveRaid>(_onLeaveRaid);
   }
@@ -41,8 +29,8 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
     try {
       final response = await _client
           .from('raids')
-          .select('*, raid_participants(*)')
-          .order('created_at', ascending: false);
+          .select('*, raid_participants(*), conquest_places(*)')
+          .order('published_at', ascending: false, nullsFirst: false);
       emit(RaidsLoaded(raids: (response as List).cast<Map<String, dynamic>>()));
     } catch (e) {
       final msg = e.toString();
@@ -52,40 +40,6 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
       } else {
         emit(RaidError(msg));
       }
-    }
-  }
-
-  // ── Create ──
-
-  Future<void> _onCreateRaid(CreateRaid event, Emitter<RaidState> emit) async {
-    emit(RaidLoading());
-    try {
-      final userId = _client.auth.currentUser?.id ?? '';
-      final response = await _client.from('raids').insert({
-        'origin_lat': event.originLat,
-        'origin_lng': event.originLng,
-        'dest_lat': event.destLat,
-        'dest_lng': event.destLng,
-        'mode': _mapGameMode(event.gameMode),
-        'scheduled_at': event.dateTime.toIso8601String(),
-        'is_public': event.isPublic,
-        'host_id': userId,
-        'status': 'lobby',
-        'description': event.title,
-      }).select().single();
-
-      final raid = response;
-
-      // Add host as first participant, ready by default
-      await _client.from('raid_participants').insert({
-        'raid_id': raid['id'],
-        'user_id': userId,
-        'is_ready': true,
-      });
-
-      emit(RaidCreated(raid: raid));
-    } catch (e) {
-      emit(RaidError(e.toString()));
     }
   }
 
@@ -100,6 +54,7 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
           'raid_id': event.raidId,
           'user_id': event.userId,
           'is_ready': false,
+          if (!event.showOnRoster) 'show_on_roster': false,
         });
         add(const LoadRaids());
       } catch (e) {
@@ -125,6 +80,7 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
         'raid_id': event.raidId,
         'user_id': event.userId,
         'is_ready': false,
+        if (!event.showOnRoster) 'show_on_roster': false,
       });
       emit(RaidsLoaded(
         raids: _replaceRaid(current.raids, _appendParticipant(raid, event.userId)),
@@ -202,6 +158,9 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
   Map<String, dynamic> _appendParticipant(Map<String, dynamic> raid, String userId) {
     return {
       ...raid,
+      'participant_count': ((raid['participant_count'] as num?)?.toInt() ??
+              _participantsOf(raid).length) +
+          1,
       'raid_participants': [
         ..._participantsOf(raid),
         {'user_id': userId, 'is_ready': false},
@@ -212,6 +171,10 @@ class RaidBloc extends Bloc<RaidEvent, RaidState> {
   Map<String, dynamic> _removeParticipant(Map<String, dynamic> raid, String userId) {
     return {
       ...raid,
+      'participant_count': (((raid['participant_count'] as num?)?.toInt() ??
+                  _participantsOf(raid).length) -
+              1)
+          .clamp(0, 1000000),
       'raid_participants': _participantsOf(raid)
           .where((p) => p['user_id'] != userId)
           .toList(),

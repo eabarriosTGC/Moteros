@@ -24,7 +24,6 @@ import 'features/places/presentation/bloc/places_bloc.dart';
 import 'features/raids/presentation/bloc/raid_bloc.dart';
 import 'features/refugios/presentation/bloc/motoposadas_bloc.dart';
 import 'features/patches/presentation/bloc/patches_bloc.dart';
-import 'features/tracker/presentation/screens/route_tracker_screen.dart';
 import 'features/routes/data/datasources/route_datasource.dart';
 import 'features/routes/presentation/bloc/route_bloc.dart';
 import 'features/mileage/presentation/bloc/mileage_bloc.dart';
@@ -67,7 +66,6 @@ class MoterosApp extends StatelessWidget {
         ),
         BlocProvider(create: (_) => RaidBloc()),
         BlocProvider(create: (_) => PatchesBloc()),
-        BlocProvider(create: (_) => TrackerBloc()),
         // New F-29 to F-35 BLoCs
         BlocProvider(create: (_) => RouteBloc(datasource: RouteDatasource())),
         BlocProvider(create: (_) => MileageBloc()),

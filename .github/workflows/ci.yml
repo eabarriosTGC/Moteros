@@ -70,6 +70,14 @@ jobs:
           grep -q 'WITH CHECK (' supabase/migrations/034_secure_club_member_hierarchy.sql
           grep -q "role IN ('oficial', 'honorable', 'aspirante')" supabase/migrations/034_secure_club_member_hierarchy.sql
 
+      - name: Migration 035 must keep conquest verification server-side
+        run: |
+          grep -q 'private.is_club_president' supabase/migrations/035_raid_conquests.sql
+          grep -q 'private.haversine_meters' supabase/migrations/035_raid_conquests.sql
+          grep -q 'GPS_ACCURACY_TOO_LOW' supabase/migrations/035_raid_conquests.sql
+          grep -q 'REVOKE INSERT, UPDATE, DELETE ON public.raids' supabase/migrations/035_raid_conquests.sql
+          grep -q "extensions.digest(p_qr_token, 'sha256')" supabase/migrations/035_raid_conquests.sql
+
   club-role-guard:
     runs-on: ubuntu-latest
     steps:
@@ -89,8 +97,17 @@ jobs:
       - name: Analyze the archived clubs module
         run: flutter analyze lib/features_archive/clubs
 
+      - name: Analyze raids, map integration and routing
+        run: >-
+          flutter analyze
+          lib/features/raids
+          lib/features/dashboard
+          lib/core/services/routing_service.dart
+
       - name: Test canonical roles and migration 034
         run: |
           flutter test test/features_archive/clubs/domain/entities/club_member_role_test.dart
           flutter test test/supabase/migration_034_content_test.dart
-
+          flutter test test/supabase/migration_035_content_test.dart
+          flutter test test/features/raids/bloc/raid_bloc_test.dart
+          flutter test test/features/dashboard/screens/rodar_upcoming_raids_test.dart

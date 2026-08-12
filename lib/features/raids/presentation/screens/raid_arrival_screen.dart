@@ -1,0 +1,598 @@
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../../../core/theme/design_tokens.dart';
+import '../../data/raid_conquest_repository.dart';
+import '../arrival_credential.dart';
+import '../scanner_lifecycle.dart';
+
+class RaidArrivalScreen extends StatefulWidget {
+  const RaidArrivalScreen({
+    super.key,
+    required this.raid,
+    this.repository,
+    this.positionResolver,
+  });
+
+  final Map<String, dynamic> raid;
+
+  /// Seam de testabilidad: repository fake.
+  final RaidConquestRepository? repository;
+
+  /// Seam de testabilidad: sustituye permiso GPS + getCurrentPosition.
+  final Future<Position?> Function()? positionResolver;
+
+  @override
+  State<RaidArrivalScreen> createState() => _RaidArrivalScreenState();
+}
+
+class _RaidArrivalScreenState extends State<RaidArrivalScreen>
+    with WidgetsBindingObserver {
+  late final RaidConquestRepository _repository =
+      widget.repository ?? RaidConquestRepository();
+
+  late final MobileScannerController _scanner = MobileScannerController(
+    autoStart: false,
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: const [BarcodeFormat.qrCode],
+    facing: CameraFacing.back,
+  );
+
+  late final ScannerLifecycle _lifecycle = ScannerLifecycle(
+    requestCameraPermission: () async {
+      final status = await Permission.camera.request();
+      if (status.isGranted) return CameraPermissionResult.granted;
+      if (status.isPermanentlyDenied || status.isRestricted) {
+        return CameraPermissionResult.permanentlyDenied;
+      }
+      return CameraPermissionResult.denied;
+    },
+    waitUntilCameraIsMounted: () => WidgetsBinding.instance.endOfFrame,
+    // Evita que un CameraX defectuoso deje la UI cargando para siempre.
+    startCamera: () => _scanner.start().timeout(const Duration(seconds: 12)),
+    stopCamera: () => _scanner.stop(),
+  );
+
+  bool _processing = false;
+  bool _uploadingPhoto = false;
+  bool _manualMode = false;
+  String? _error;
+  Map<String, dynamic>? _arrival;
+  final _manualCodeController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _lifecycle.addListener(_onScannerPhaseChanged);
+    // La cámara arranca después del primer frame y solo si mounted: la app
+    // administra el ciclo de vida (autoStart: false).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _lifecycle.initialize();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _lifecycle.removeListener(_onScannerPhaseChanged);
+    _lifecycle.dispose();
+    _manualCodeController.dispose();
+    _scanner.dispose();
+    super.dispose();
+  }
+
+  void _onScannerPhaseChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle.onLifecycleChanged(state);
+  }
+
+  Future<Position?> _resolvePosition() async {
+    final resolver = widget.positionResolver;
+    if (resolver != null) return resolver();
+    if (!await _ensureLocationPermission()) return null;
+    return Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 20),
+      ),
+    );
+  }
+
+  Future<bool> _ensureLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      setState(() => _error = 'Activa el GPS para verificar tu llegada.');
+      return false;
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      setState(() => _error = 'La ubicación es necesaria para comprobar que llegaste al destino.');
+      return false;
+    }
+    return true;
+  }
+
+  /// Punto de entrada del escáner. Separado de [MobileScanner.onDetect] para
+  /// poder testear el flujo sin cámara real.
+  @visibleForTesting
+  Future<void> handleDetectedBarcode(String? raw) async {
+    if (_processing || _arrival != null) return;
+    // Tokens ajenos se ignoran: no se toca red ni kilometraje.
+    if (!isValidArrivalToken(raw)) return;
+    await _verifyArrivalCode(raw!);
+  }
+
+  /// Punto de entrada del código manual (mismo flujo que el QR).
+  @visibleForTesting
+  Future<void> submitManualCode(String raw) => _verifyArrivalCode(raw);
+
+  /// Único flujo de verificación: lo usan tanto el QR como el código manual.
+  /// Normaliza → valida formato → GPS → verify_raid_arrival (autoridad del
+  /// servidor) → acreditación única → fotoconquista.
+  Future<void> _verifyArrivalCode(String credential) async {
+    if (_processing || _arrival != null) return;
+    final normalized = normalizeArrivalCredential(credential);
+    if (normalized == null) return; // formato inválido: no toca red ni km
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+    await _lifecycle.pauseForVerification();
+
+    try {
+      final position = await _resolvePosition();
+      if (position == null) {
+        await _lifecycle.resume();
+        return;
+      }
+      final arrival = await _repository.verifyArrival(
+        raidId: (widget.raid['id'] as num).toInt(),
+        qrToken: normalized,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracy,
+      );
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _arrival = arrival;
+        _processing = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = RaidConquestRepository.friendlyError(error);
+        _processing = false;
+      });
+      await _lifecycle.resume();
+    }
+  }
+
+  void _openManualMode() {
+    setState(() {
+      _manualMode = true;
+      _error = null;
+    });
+    _lifecycle.pauseForVerification();
+  }
+
+  void _closeManualMode() {
+    setState(() {
+      _manualMode = false;
+      _error = null;
+    });
+    _lifecycle.resume();
+  }
+
+  Future<void> _startScanner() async {
+    setState(() => _error = null);
+    await _lifecycle.retry();
+  }
+
+  Future<void> _openAppSettings() async {
+    await openAppSettings();
+  }
+
+  Future<void> _takeConquestPhoto() async {
+    if (_arrival == null || _uploadingPhoto) return;
+    final photo = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      imageQuality: 82,
+      maxWidth: 1920,
+    );
+    if (photo == null || !mounted) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      await _repository.attachPhoto(
+        arrivalId: _arrival!['arrival_id'].toString(),
+        bytes: await photo.readAsBytes(),
+        caption: 'Fotoconquista · ${_arrival!['place_name']}',
+      );
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fotoconquista guardada'), backgroundColor: AppColors.success),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(RaidConquestRepository.friendlyError(error))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('VERIFICAR LLEGADA'),
+        backgroundColor: Colors.transparent,
+      ),
+      body: _arrival == null
+          ? (_manualMode ? _buildManualEntry() : _scannerBody())
+          : _successBody(),
+    );
+  }
+
+  /// Ingreso manual de la credencial: NO monta ni inicia MobileScanner.
+  Widget _buildManualEntry() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: AppSpacing.screenPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: AppSpacing.lg),
+            const Icon(Icons.keyboard_alt_outlined,
+                size: 56, color: AppColors.textMuted),
+            const SizedBox(height: AppSpacing.md),
+            Text('Ingresar código de llegada',
+                style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'El código de 8 caracteres del lugar (ej. K7DM-4R9X). '
+              'Mismo QR, misma validación del servidor.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _manualCodeController,
+              textCapitalization: TextCapitalization.characters,
+              keyboardType: TextInputType.text,
+              autocorrect: false,
+              enableSuggestions: false,
+              inputFormatters: [
+                _ManualCodeFormatter(),
+                LengthLimitingTextInputFormatter(9),
+              ],
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 22,
+                  letterSpacing: 3),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'XXXX-XXXX',
+                hintStyle:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 22),
+                filled: true,
+                fillColor: AppColors.overlay,
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.mdCircular,
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onSubmitted: (_) => submitManualCode(_manualCodeController.text),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            if (_processing)
+              const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: () =>
+                    submitManualCode(_manualCodeController.text),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('VERIFICAR CÓDIGO'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnAmber,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(_error!,
+                  style: const TextStyle(color: AppColors.error),
+                  textAlign: TextAlign.center),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            TextButton.icon(
+              onPressed: _processing ? null : _closeManualMode,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('ESCANEAR QR'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _scannerBody() => Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildScannerArea(),
+          if (_lifecycle.phase == ScannerPhase.ready) ...[
+            Container(color: Colors.black.withAlpha(45)),
+            Center(
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.primary, width: 3),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+            ),
+          ],
+          Positioned(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: 48,
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.overlay,
+                borderRadius: AppRadius.mdCircular,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_processing) ...[
+                    const CircularProgressIndicator(color: AppColors.primary),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Text('Comprobando QR, GPS y horario…'),
+                  ] else ...[
+                    const Icon(Icons.qr_code_scanner, color: AppColors.primary, size: 32),
+                    const SizedBox(height: AppSpacing.xs),
+                    const Text(
+                      'Escanea uno de los códigos instalados en el destino',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(_error!, style: const TextStyle(color: AppColors.error), textAlign: TextAlign.center),
+                  ],
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton.icon(
+                    onPressed: _processing ? null : _openManualMode,
+                    icon: const Icon(Icons.keyboard_alt_outlined,
+                        size: 18, color: AppColors.textMuted),
+                    label: const Text('¿La cámara no funciona? INGRESAR CÓDIGO',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+
+  /// Área de cámara según la fase del ciclo de vida. Nunca se muestra el
+  /// error nativo de CameraX: cada fase tiene su vista de recuperación.
+  Widget _buildScannerArea() {
+    switch (_lifecycle.phase) {
+      case ScannerPhase.permissionDenied:
+        return _ScannerMessageView(
+          icon: Icons.no_photography_outlined,
+          title: 'Necesitamos la cámara',
+          message:
+              'Concede el permiso de cámara para escanear el código de llegada del destino.',
+          onRetry: _startScanner,
+        );
+      case ScannerPhase.permissionPermanentlyDenied:
+        return _ScannerMessageView(
+          icon: Icons.no_photography_outlined,
+          title: 'Permiso de cámara bloqueado',
+          message:
+              'Activa el permiso de cámara desde los ajustes de Asfalto Club para escanear el QR.',
+          onRetry: _startScanner,
+          onOpenSettings: _openAppSettings,
+        );
+      case ScannerPhase.unavailable:
+      case ScannerPhase.error:
+        return _ScannerMessageView(
+          icon: Icons.videocam_off_outlined,
+          title: 'No pudimos iniciar la cámara',
+          message:
+              'Verifica que ninguna otra app esté usando la cámara e inténtalo de nuevo.',
+          onRetry: _startScanner,
+          onOpenSettings: _openAppSettings,
+        );
+      case ScannerPhase.requestingPermission:
+        // Todavía no se monta CameraX: primero se muestra el diálogo nativo.
+        return const ColoredBox(
+          color: AppColors.background,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
+      case ScannerPhase.mountingCamera:
+        // El permiso ya fue concedido. Se monta la vista y se espera un frame
+        // antes de llamar MobileScannerController.start().
+        return _activeScannerArea(showLoading: true);
+      case ScannerPhase.ready:
+        return _activeScannerArea(showLoading: false);
+    }
+  }
+
+  Widget _activeScannerArea({required bool showLoading}) => Stack(
+        fit: StackFit.expand,
+        children: [
+          _mobileScanner(),
+          if (showLoading)
+            const ColoredBox(
+              color: AppColors.background,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+        ],
+      );
+
+  Widget _mobileScanner() => MobileScanner(
+        controller: _scanner,
+        onDetect: (capture) =>
+            handleDetectedBarcode(capture.barcodes.firstOrNull?.rawValue),
+        errorBuilder: (context, error, child) {
+          debugPrint(
+              'MobileScanner: code=${error.errorCode}, '
+              'message=${error.errorDetails?.message}');
+          return _ScannerMessageView(
+            icon: Icons.videocam_off_outlined,
+            title: 'No pudimos iniciar la cámara',
+            message:
+                'Verifica que ninguna otra app esté usando la cámara e inténtalo de nuevo.',
+            onRetry: _startScanner,
+            onOpenSettings: _openAppSettings,
+          );
+        },
+        placeholderBuilder: (context, child) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+
+  Widget _successBody() {
+    final km = (_arrival!['verified_km'] as num).toDouble();
+    return Center(
+      child: SingleChildScrollView(
+        padding: AppSpacing.screenPadding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.verified, size: 96, color: AppColors.success),
+            const SizedBox(height: AppSpacing.lg),
+            Text('RUTA CONQUISTADA', style: AppTypography.h2.copyWith(color: AppColors.primary)),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _arrival!['place_name'].toString(),
+              style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Text('${km.toStringAsFixed(1)} KM', style: AppTypography.monoLarge.copyWith(color: AppColors.primary)),
+            const Text('kilómetros de ruta verificados', style: TextStyle(color: AppColors.textMuted)),
+            const SizedBox(height: AppSpacing.xl),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _uploadingPhoto ? null : _takeConquestPhoto,
+                icon: _uploadingPhoto
+                    ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.camera_alt),
+                label: const Text('TOMAR FOTOCONQUISTA'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textOnAmber,
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('AHORA NO'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Vista de recuperación del escáner: mensaje claro + REINTENTAR +
+/// ABRIR AJUSTES (para denegación permanente).
+class _ScannerMessageView extends StatelessWidget {
+  const _ScannerMessageView({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.onRetry,
+    this.onOpenSettings,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final VoidCallback onRetry;
+  final VoidCallback? onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.background,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 56, color: AppColors.textMuted),
+          const SizedBox(height: AppSpacing.md),
+          Text(title,
+              style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+              textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.sm),
+          Text(message,
+              style: AppTypography.body.copyWith(color: AppColors.textMuted),
+              textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.lg),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('REINTENTAR'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnAmber,
+            ),
+          ),
+          if (onOpenSettings != null)
+            TextButton(
+              onPressed: onOpenSettings,
+              child: const Text('ABRIR AJUSTES'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Formato automático del campo: XXXX-XXXX mientras se escribe.
+class _ManualCodeFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final formatted = formatManualCode(newValue.text);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}

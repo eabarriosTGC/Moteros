@@ -205,7 +205,6 @@ class _RaidStatsScreenState extends State<RaidStatsScreen>
   Widget _buildStatsGrid() {
     final totalKm = (_myResult?['total_km'] as num?)?.toDouble() ?? 42.0;
     final totalTime = (_myResult?['total_time'] as int?) ?? 3600;
-    final avgSpeed = (_myResult?['avg_speed'] as num?)?.toDouble() ?? 42.0;
     final checkpoints = (_myResult?['checkpoints'] as int?) ?? 5;
 
     final hours = totalTime ~/ 3600;

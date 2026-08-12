@@ -43,9 +43,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   // ── Timer for auto-clearing PlaceSelected state ──
   Timer? _clearTimer;
 
-  SearchBloc({required NominatimDatasource datasource})
-      : _datasource = datasource,
-        super(const SearchInitial()) {
+  SearchBloc({required this._datasource}) : super(const SearchInitial()) {
     on<SearchPlace>(_onSearchPlace);
     on<SelectPlace>(_onSelectPlace);
     on<ClearSearch>((event, emit) {
