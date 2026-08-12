@@ -118,31 +118,49 @@ final class CancelMotoposadaRequest extends MotoposadasEvent {
   List<Object?> get props => [requestId];
 }
 
-final class SubmitReview extends MotoposadasEvent {
-  final int motoposadaId;
+/// Obtiene el teléfono de la contraparte solo para una estancia aprobada o
+/// completada. La autorización se valida en PostgreSQL (migración 039).
+final class FetchMotoposadaRequestContact extends MotoposadasEvent {
   final int requestId;
-  final String
-  toUserId; // UUID del destinatario (host en guest_review, guest en host_review)
-  final String type;
+  const FetchMotoposadaRequestContact({required this.requestId});
+  @override
+  List<Object?> get props => [requestId];
+}
+
+final class SubmitReview extends MotoposadasEvent {
+  final int requestId;
   final int rating;
   final String comment;
   const SubmitReview({
-    required this.motoposadaId,
     required this.requestId,
-    required this.toUserId,
-    required this.type,
     required this.rating,
     this.comment = '',
   });
   @override
-  List<Object?> get props => [
-    motoposadaId,
-    requestId,
-    toUserId,
-    type,
-    rating,
-    comment,
-  ];
+  List<Object?> get props => [requestId, rating, comment];
+}
+
+final class LoadMotoposadaReputation extends MotoposadasEvent {
+  final String userId;
+  const LoadMotoposadaReputation({required this.userId});
+  @override
+  List<Object?> get props => [userId];
+}
+
+final class ReportMotoposadaIncident extends MotoposadasEvent {
+  final int requestId;
+  final String category;
+  final String description;
+  const ReportMotoposadaIncident({required this.requestId, required this.category, required this.description});
+  @override
+  List<Object?> get props => [requestId, category, description];
+}
+
+final class BlockMotoposadaParticipant extends MotoposadasEvent {
+  final int requestId;
+  const BlockMotoposadaParticipant({required this.requestId});
+  @override
+  List<Object?> get props => [requestId];
 }
 
 final class DeleteMotoposada extends MotoposadasEvent {

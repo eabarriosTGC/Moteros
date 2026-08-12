@@ -144,6 +144,8 @@ final class MotoposadaRequestModel {
   final int? guestLevel;
   final int? guestTrustScore;
   final String? motoposadaTitle;
+  final String? hostId;
+  final bool hasReviewed;
 
   const MotoposadaRequestModel({
     required this.id,
@@ -159,6 +161,8 @@ final class MotoposadaRequestModel {
     this.guestLevel,
     this.guestTrustScore,
     this.motoposadaTitle,
+    this.hostId,
+    this.hasReviewed = false,
   });
 
   factory MotoposadaRequestModel.fromMap(Map<String, dynamic> m) {
@@ -179,8 +183,26 @@ final class MotoposadaRequestModel {
       guestLevel: guestXp?['level'] as int?,
       guestTrustScore: guestXp?['trust_score'] as int?,
       motoposadaTitle: mp?['title'] as String?,
+      hostId: mp?['user_id'] as String?,
+      hasReviewed: ((m['motoposada_reviews'] as List?) ?? const []).isNotEmpty,
     );
   }
+}
+
+final class MotoposadaReputation extends Equatable {
+  final double? hostAverage;
+  final int hostReviews;
+  final double? guestAverage;
+  final int guestReviews;
+  const MotoposadaReputation({this.hostAverage, required this.hostReviews, this.guestAverage, required this.guestReviews});
+  factory MotoposadaReputation.fromMap(Map<String, dynamic> map) => MotoposadaReputation(
+    hostAverage: (map['host_average'] as num?)?.toDouble(),
+    hostReviews: (map['host_reviews'] as num?)?.toInt() ?? 0,
+    guestAverage: (map['guest_average'] as num?)?.toDouble(),
+    guestReviews: (map['guest_reviews'] as num?)?.toInt() ?? 0,
+  );
+  @override
+  List<Object?> get props => [hostAverage, hostReviews, guestAverage, guestReviews];
 }
 
 sealed class MotoposadasState extends Equatable {
@@ -247,8 +269,30 @@ final class RequestCancelled extends MotoposadasState {
   const RequestCancelled();
 }
 
+final class MotoposadaRequestContactLoaded extends MotoposadasState {
+  final String? phone;
+  const MotoposadaRequestContactLoaded({this.phone});
+  @override
+  List<Object?> get props => [phone];
+}
+
 final class ReviewSubmitted extends MotoposadasState {
   const ReviewSubmitted();
+}
+
+final class MotoposadaReputationLoaded extends MotoposadasState {
+  final MotoposadaReputation reputation;
+  const MotoposadaReputationLoaded(this.reputation);
+  @override
+  List<Object?> get props => [reputation];
+}
+
+final class MotoposadaIncidentReported extends MotoposadasState {
+  const MotoposadaIncidentReported();
+}
+
+final class MotoposadaParticipantBlocked extends MotoposadasState {
+  const MotoposadaParticipantBlocked();
 }
 
 final class MotoposadasError extends MotoposadasState {

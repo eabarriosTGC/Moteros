@@ -102,6 +102,7 @@ jobs:
           flutter analyze
           lib/features/raids
           lib/features/dashboard
+          lib/features/refugios
           lib/core/services/routing_service.dart
 
       - name: Test canonical roles and migration 034
@@ -111,3 +112,8 @@ jobs:
           flutter test test/supabase/migration_035_content_test.dart
           flutter test test/features/raids/bloc/raid_bloc_test.dart
           flutter test test/features/dashboard/screens/rodar_upcoming_raids_test.dart
+      - name: Test motoposadas migrations and refugios module
+        run: |
+          flutter test test/supabase/migration_039_content_test.dart
+          flutter test test/supabase/migration_040_content_test.dart
+          flutter test test/features/refugios

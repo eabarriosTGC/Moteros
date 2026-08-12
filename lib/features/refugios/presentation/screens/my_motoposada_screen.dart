@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/whatsapp_launcher.dart';
 import '../bloc/motoposadas_bloc.dart';
 import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
@@ -65,6 +66,45 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
           } else {
             _cachedMyStays = state.requests;
           }
+        }
+        if (state is MotoposadaRequestContactLoaded) {
+          final phone = state.phone;
+          if (phone == null || phone.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('La contraparte no registró un teléfono'),
+              ),
+            );
+          } else {
+            launchWhatsAppContact(
+              context,
+              phone,
+              'Hola, te contacto por nuestra solicitud de Motoposada en Asfalto Club.',
+            );
+          }
+        }
+        if (state is ReviewSubmitted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Evaluación publicada'), backgroundColor: AppColors.success),
+          );
+          context.read<MotoposadasBloc>().add(
+            _tabController.index == 1 ? const LoadReceivedRequests() : const LoadMyRequests(),
+          );
+        }
+        if (state is MotoposadaReputationLoaded) {
+          _showReputation(state.reputation);
+        }
+        if (state is MotoposadaIncidentReported) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Reporte enviado para revisión'),
+            backgroundColor: AppColors.success,
+          ));
+        }
+        if (state is MotoposadaParticipantBlocked) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Usuario bloqueado. No podrán crear nuevas estancias entre ustedes.'),
+            backgroundColor: AppColors.success,
+          ));
         }
         // Acciones de request (031): feedback + recarga del tab activo.
         if (state is RequestResponded ||
@@ -758,26 +798,50 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
           ],
           if (req.status == 'approved') ...[
             const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              height: 36,
-              child: OutlinedButton.icon(
-                onPressed: () => context.read<MotoposadasBloc>().add(
-                  CompleteMotoposadaRequest(requestId: req.id),
-                ),
-                icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: const Text(
-                  'FINALIZAR ESTANCIA',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.info,
-                  side: const BorderSide(color: AppColors.info),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => context.read<MotoposadasBloc>().add(
+                    FetchMotoposadaRequestContact(requestId: req.id),
                   ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('WHATSAPP'),
                 ),
-              ),
+                OutlinedButton.icon(
+                  onPressed: () => context.read<MotoposadasBloc>().add(
+                    CompleteMotoposadaRequest(requestId: req.id),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text('FINALIZAR ESTANCIA'),
+                ),
+              ],
             ),
+          ],
+          if (req.status == 'completed') ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => context.read<MotoposadasBloc>().add(
+                    LoadMotoposadaReputation(userId: req.guestId),
+                  ),
+                  icon: const Icon(Icons.shield_outlined, size: 16),
+                  label: const Text('REPUTACIÓN'),
+                ),
+                if (!req.hasReviewed)
+                  ElevatedButton.icon(
+                    onPressed: () => _showReviewDialog(req),
+                    icon: const Icon(Icons.star_outline, size: 16),
+                    label: const Text('EVALUAR HUÉSPED'),
+                  )
+                else
+                  const Chip(label: Text('YA EVALUADO')),
+              ],
+            ),
+            _safetyActions(req),
           ],
         ],
       ),
@@ -871,7 +935,173 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
               ),
             ),
           ],
+          if (req.status == 'approved' || req.status == 'completed') ...[
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: () => context.read<MotoposadasBloc>().add(
+                FetchMotoposadaRequestContact(requestId: req.id),
+              ),
+              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+              label: const Text('CONTACTAR POR WHATSAPP'),
+            ),
+          ],
+          if (req.status == 'completed') ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: req.hostId == null ? null : () => context.read<MotoposadasBloc>().add(
+                    LoadMotoposadaReputation(userId: req.hostId!),
+                  ),
+                  icon: const Icon(Icons.shield_outlined, size: 16),
+                  label: const Text('REPUTACIÓN'),
+                ),
+                if (!req.hasReviewed)
+                  ElevatedButton.icon(
+                    onPressed: () => _showReviewDialog(req),
+                    icon: const Icon(Icons.star_outline, size: 16),
+                    label: const Text('EVALUAR ANFITRIÓN'),
+                  )
+                else
+                  const Chip(label: Text('YA EVALUADO')),
+              ],
+            ),
+            _safetyActions(req),
+          ],
         ],
+      ),
+    );
+  }
+
+  Future<void> _showReviewDialog(MotoposadaRequestModel req) async {
+    var rating = 5;
+    final controller = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Evaluar estancia'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Tu evaluación ayuda a que la comunidad viaje con más confianza.'),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) => IconButton(
+                  tooltip: '${index + 1} estrellas',
+                  onPressed: () => setDialogState(() => rating = index + 1),
+                  icon: Icon(index < rating ? Icons.star : Icons.star_border, color: AppColors.primary),
+                )),
+              ),
+              TextField(
+                controller: controller,
+                maxLength: 500,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Comentario opcional'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCELAR')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('PUBLICAR')),
+          ],
+        ),
+      ),
+    );
+    if (submitted == true && mounted) {
+      context.read<MotoposadasBloc>().add(
+        SubmitReview(requestId: req.id, rating: rating, comment: controller.text.trim()),
+      );
+    }
+    controller.dispose();
+  }
+
+  Widget _safetyActions(MotoposadaRequestModel req) => Padding(
+    padding: const EdgeInsets.only(top: AppSpacing.sm),
+    child: Wrap(spacing: AppSpacing.sm, children: [
+      TextButton.icon(
+        onPressed: () => _showIncidentDialog(req),
+        icon: const Icon(Icons.flag_outlined, size: 16),
+        label: const Text('REPORTAR INCIDENTE'),
+      ),
+      TextButton.icon(
+        onPressed: () => _confirmBlock(req),
+        icon: const Icon(Icons.block, size: 16),
+        label: const Text('BLOQUEAR USUARIO'),
+      ),
+    ]),
+  );
+
+  Future<void> _showIncidentDialog(MotoposadaRequestModel req) async {
+    var category = 'behavior';
+    final controller = TextEditingController();
+    final submit = await showDialog<bool>(context: context, builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: const Text('Reportar incidente'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          DropdownButtonFormField<String>(
+            initialValue: category,
+            items: const [
+              DropdownMenuItem(value: 'behavior', child: Text('Comportamiento inapropiado')),
+              DropdownMenuItem(value: 'harassment', child: Text('Acoso o amenaza')),
+              DropdownMenuItem(value: 'property_damage', child: Text('Daño a la propiedad')),
+              DropdownMenuItem(value: 'fraud', child: Text('Fraude o suplantación')),
+              DropdownMenuItem(value: 'other', child: Text('Otro')),
+            ],
+            onChanged: (value) => setDialogState(() => category = value ?? 'other'),
+          ),
+          TextField(controller: controller, maxLength: 1000, maxLines: 5,
+            decoration: const InputDecoration(labelText: 'Describe lo ocurrido')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCELAR')),
+          ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ENVIAR')),
+        ],
+      ),
+    ));
+    final description = controller.text.trim();
+    controller.dispose();
+    if (submit == true && description.length >= 10 && mounted) {
+      context.read<MotoposadasBloc>().add(ReportMotoposadaIncident(
+        requestId: req.id, category: category, description: description));
+    } else if (submit == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Describe el incidente con al menos 10 caracteres')));
+    }
+  }
+
+  Future<void> _confirmBlock(MotoposadaRequestModel req) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Bloquear usuario'),
+      content: const Text('No podrán enviarse nuevas solicitudes de Motoposada. Las estancias y reportes anteriores se conservarán.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCELAR')),
+        ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('BLOQUEAR')),
+      ],
+    ));
+    if (confirmed == true && mounted) {
+      context.read<MotoposadasBloc>().add(BlockMotoposadaParticipant(requestId: req.id));
+    }
+  }
+
+  void _showReputation(MotoposadaReputation reputation) {
+    String score(double? average, int count) => count == 0 ? 'Sin evaluaciones' : '${average?.toStringAsFixed(1) ?? '—'} / 5 ($count)';
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reputación en Motoposadas'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Como anfitrión: ${score(reputation.hostAverage, reputation.hostReviews)}'),
+            const SizedBox(height: AppSpacing.sm),
+            Text('Como huésped: ${score(reputation.guestAverage, reputation.guestReviews)}'),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('CERRAR'))],
       ),
     );
   }
