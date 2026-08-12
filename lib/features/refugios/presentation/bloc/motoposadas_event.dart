@@ -65,6 +65,9 @@ final class UpdateMotoposada extends MotoposadasEvent {
   final String title;
   final String description;
   final String rules;
+  final double lat;
+  final double lng;
+  final String address;
   final int maxGuests;
   final String visibility;
   final int? targetClanId;
@@ -74,6 +77,9 @@ final class UpdateMotoposada extends MotoposadasEvent {
     required this.title,
     required this.description,
     required this.rules,
+    required this.lat,
+    required this.lng,
+    required this.address,
     required this.maxGuests,
     required this.visibility,
     this.targetClanId,

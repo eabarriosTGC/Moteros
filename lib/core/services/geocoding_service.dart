@@ -42,6 +42,35 @@ class GeocodingService {
     return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
   }
 
+  /// Reverse geocode seguro para superficies públicas de Motoposadas.
+  /// Devuelve únicamente municipio/localidad y departamento; nunca calle,
+  /// barrio, dirección exacta ni coordenadas como fallback.
+  static Future<String?> reverseGeocodeLocality(double lat, double lng) async {
+    try {
+      final places = await _geocoding.placemarkFromCoordinates(lat, lng);
+      if (places.isEmpty) return null;
+      final p = places.first;
+      final locality = <String?>[
+        p.locality,
+        p.subAdministrativeArea,
+        p.administrativeArea,
+      ].whereType<String>().map((v) => v.trim()).firstWhere(
+        (v) => v.isNotEmpty,
+        orElse: () => '',
+      );
+      if (locality.isEmpty) return null;
+      final department = p.administrativeArea?.trim();
+      if (department == null ||
+          department.isEmpty ||
+          department.toLowerCase() == locality.toLowerCase()) {
+        return locality;
+      }
+      return '$locality, $department';
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Forward geocode: address → [lat, lng].
   /// Uses platform geocoder.
   static Future<List<double>?> forwardGeocode(String address) async {

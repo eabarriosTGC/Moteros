@@ -107,15 +107,12 @@ Future<void> _seed(
 void main() {
   group('MyMotoposadaScreen — casa_motero entry (M-CRUD-1)', () {
     testWidgets(
-      'dispatches LoadMyMotoposadas + CheckCasaMoteroEligibility on init',
+      'dispatches one listings load on init (no competing state)',
       (tester) async {
         final bloc = await _pumpMyCasa(tester);
 
         expect(bloc.dispatched.whereType<LoadMyMotoposadas>(), hasLength(1));
-        expect(
-          bloc.dispatched.whereType<CheckCasaMoteroEligibility>(),
-          hasLength(1),
-        );
+        expect(bloc.dispatched.whereType<CheckCasaMoteroEligibility>(), isEmpty);
       },
     );
 
@@ -167,7 +164,7 @@ void main() {
       expect(find.byType(Switch), findsOneWidget);
     });
 
-    testWidgets('non-casa_motero listing has NO owner action surface', (
+    testWidgets('non-casa_motero listing shows owner action surface (rev3)', (
       tester,
     ) async {
       final bloc = await _pumpMyCasa(tester);
@@ -179,9 +176,11 @@ void main() {
       );
 
       expect(find.text('Parqueadero El Faro'), findsOneWidget);
-      expect(find.text('EDITAR'), findsNothing);
-      expect(find.text('ELIMINAR'), findsNothing);
-      expect(find.byType(Switch), findsNothing);
+      // Rev3: EDITAR, ELIMINAR y DISPONIBLE aplican a todas las
+      // publicaciones propias, no solo a las casas de motero.
+      expect(find.text('EDITAR'), findsOneWidget);
+      expect(find.text('ELIMINAR'), findsOneWidget);
+      expect(find.byType(Switch), findsOneWidget);
     });
 
     testWidgets('DISPONIBLE toggle dispatches UpdateCasaMotero with flipped '
@@ -212,7 +211,7 @@ void main() {
 
         // Confirmation dialog first — nothing deleted yet.
         expect(
-          find.textContaining('Eliminar tu casa de motero'),
+          find.textContaining('Eliminar publicación'),
           findsOneWidget,
         );
         expect(bloc.dispatched.whereType<DeleteMotoposada>(), isEmpty);

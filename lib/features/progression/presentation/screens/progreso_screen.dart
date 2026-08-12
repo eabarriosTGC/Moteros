@@ -162,7 +162,6 @@ class _MiMotoposadaSectionState extends State<_MiMotoposadaSection> {
   void initState() {
     super.initState();
     context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
-    context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
   }
 
   @override
@@ -174,6 +173,17 @@ class _MiMotoposadaSectionState extends State<_MiMotoposadaSection> {
             icon: Icons.home_work_outlined,
             title: 'Mi motoposada',
             subtitle: 'Cargando…',
+          );
+        }
+        if (state is MotoposadasError) {
+          return _MiMotoposadaCard(
+            icon: Icons.home_work_outlined,
+            title: 'Motoposadas',
+            subtitle: 'No pudimos cargar tus publicaciones',
+            actionLabel: 'REINTENTAR',
+            onAction: () => context
+                .read<MotoposadasBloc>()
+                .add(const LoadMyMotoposadas()),
           );
         }
         final hasCasa = state is MyMotoposadasLoaded &&

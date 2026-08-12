@@ -23,8 +23,8 @@ import '../../../../core/theme/design_tokens.dart';
 import '../../../trust/domain/models/trust_signals.dart';
 import '../../../trust/presentation/widgets/trust_signals_row.dart';
 import '../bloc/motoposadas_bloc.dart';
-import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
+import '../screens/motoposada_detail_screen.dart';
 
 /// Test seam for the WhatsApp launch (the real launcher is a top-level
 /// function and cannot be mocktail-mocked).
@@ -239,15 +239,22 @@ class CasaMoteroCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            // ── Contactar — on-demand phone (M-WA-1) ──
+            // El contacto privado solo existe tras aprobación (039). Desde
+            // la ficha pública se abre el detalle para solicitar estancia.
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => context.read<MotoposadasBloc>().add(
-                  FetchCasaMoteroWhatsapp(id: mp.id),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MotoposadaDetailScreen(
+                      motoposadaId: mp.id,
+                      initialMotoposada: mp,
+                    ),
+                  ),
                 ),
-                icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                label: const Text('Contactar', style: AppTypography.button),
+                icon: const Icon(Icons.event_available_outlined, size: 18),
+                label: const Text('VER Y SOLICITAR', style: AppTypography.button),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.black,

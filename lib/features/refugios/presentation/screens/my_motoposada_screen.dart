@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/services/whatsapp_launcher.dart';
@@ -11,6 +12,8 @@ import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
 import 'create_motoposada_screen.dart';
 import 'motoposada_detail_screen.dart';
+import 'motoposada_appeals_screen.dart';
+import 'motoposada_moderation_screen.dart';
 
 class MyMotoposadaScreen extends StatefulWidget {
   const MyMotoposadaScreen({super.key});
@@ -33,6 +36,11 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
   // último listado cuando el otro tab recarga (patrón _cachedListings).
   List<MotoposadaRequestModel>? _cachedReceived;
   List<MotoposadaRequestModel>? _cachedMyStays;
+  bool _loadingReceived = false;
+  bool _loadingMyStays = false;
+  String? _receivedError;
+  String? _myStaysError;
+  bool _canModerate = false;
 
   @override
   void initState() {
@@ -40,8 +48,20 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
-      context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
+      _loadModerationAccess();
     });
+  }
+
+  Future<void> _loadModerationAccess() async {
+    try {
+      await Supabase.instance.client.rpc(
+        'get_motoposada_moderation_queue',
+        params: {'p_status': 'open'},
+      );
+      if (mounted) setState(() => _canModerate = true);
+    } catch (_) {
+      // La RPC es la autoridad: un usuario normal recibe admin_required.
+    }
   }
 
   @override
@@ -59,12 +79,26 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         }
         if (state is MyMotoposadasLoaded) {
           _cachedListings = state.motoposadas;
+          _eligibilityHas = state.motoposadas.any((m) => m.isCasaMotero);
         }
         if (state is RequestsLoaded) {
           if (state.isHost) {
             _cachedReceived = state.requests;
+            _loadingReceived = false;
+            _receivedError = null;
           } else {
             _cachedMyStays = state.requests;
+            _loadingMyStays = false;
+            _myStaysError = null;
+          }
+        }
+        if (state is MotoposadasError) {
+          if (_tabController.index == 1) {
+            _loadingReceived = false;
+            _receivedError = state.message;
+          } else if (_tabController.index == 2) {
+            _loadingMyStays = false;
+            _myStaysError = state.message;
           }
         }
         if (state is MotoposadaRequestContactLoaded) {
@@ -106,6 +140,9 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
             backgroundColor: AppColors.success,
           ));
         }
+        if (state is MotoposadaDeleted || state is MotoposadaUpdated) {
+          context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
+        }
         // Acciones de request (031): feedback + recarga del tab activo.
         if (state is RequestResponded ||
             state is RequestCompleted ||
@@ -136,6 +173,41 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                 'MIS MOTOPOSADAS',
                 style: AppTypography.h2.copyWith(color: AppColors.primary),
               ),
+              actions: [
+                IconButton(
+                  tooltip: 'Mis sanciones y apelaciones',
+                  icon: const Icon(Icons.gavel_outlined),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MyMotoposadaAppealsScreen(),
+                    ),
+                  ),
+                ),
+                if (_canModerate)
+                  PopupMenuButton<String>(
+                    tooltip: 'Administración',
+                    icon: const Icon(Icons.admin_panel_settings_outlined),
+                    onSelected: (value) => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => value == 'appeals'
+                            ? const MotoposadaAppealReviewScreen()
+                            : const MotoposadaModerationScreen(),
+                      ),
+                    ),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'reports',
+                        child: Text('Reportes'),
+                      ),
+                      PopupMenuItem(
+                        value: 'appeals',
+                        child: Text('Apelaciones'),
+                      ),
+                    ],
+                  ),
+              ],
               bottom: TabBar(
                 controller: _tabController,
                 indicatorColor: AppColors.primary,
@@ -145,11 +217,19 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                   // 031: buzones separados — RECIBIDAS (host, hacia mis
                   // motoposadas) y MIS ESTANCIAS (guest, mis solicitudes).
                   if (i == 1) {
+                    setState(() {
+                      _loadingReceived = true;
+                      _receivedError = null;
+                    });
                     context.read<MotoposadasBloc>().add(
                       const LoadReceivedRequests(),
                     );
                   }
                   if (i == 2) {
+                    setState(() {
+                      _loadingMyStays = true;
+                      _myStaysError = null;
+                    });
                     context.read<MotoposadasBloc>().add(const LoadMyRequests());
                   }
                 },
@@ -345,7 +425,10 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => MotoposadaDetailScreen(motoposadaId: mp.id),
+          builder: (_) => MotoposadaDetailScreen(
+            motoposadaId: mp.id,
+            initialMotoposada: mp,
+          ),
         ),
       ),
       child: Container(
@@ -392,7 +475,9 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        mp.title,
+                        mp.title.trim().isEmpty
+                            ? 'Motoposada'
+                            : mp.title,
                         style: AppTypography.body.copyWith(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
@@ -431,9 +516,9 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                 ),
               ],
             ),
-            // Casa de motero owner actions (M-CRUD-2/5): edit, disponible
-            // toggle and delete — only rendered for the owner's casa_motero.
-            if (mp.isCasaMotero) ...[
+            // Acciones explícitas del propietario. La edición estándar usa
+            // UpdateMotoposada; casa_motero conserva sus RPC privadas.
+            ...[
               const SizedBox(height: AppSpacing.sm),
               const Divider(color: AppColors.border, height: 1),
               const SizedBox(height: AppSpacing.sm),
@@ -441,7 +526,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => _openCasaMoteroEdit(mp),
+                      onPressed: () => _openListingEdit(mp),
                       icon: const Icon(Icons.edit_outlined, size: 16),
                       label: const Text(
                         'EDITAR',
@@ -520,18 +605,22 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
     );
   }
 
-  /// Edit flow (M-CRUD-5): reuses the create form in casa_motero edit mode;
-  /// the form prefetches owner-only details via LoadCasaMoteroDetails.
-  void _openCasaMoteroEdit(MotoposadaModel mp) {
-    Navigator.push(
+  void _openListingEdit(MotoposadaModel mp) {
+    Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => CreateMotoposadaScreen(
-          mode: CreateMotoposadaMode.casaMotero,
+          mode: mp.isCasaMotero
+              ? CreateMotoposadaMode.casaMotero
+              : CreateMotoposadaMode.standard,
           existing: mp,
         ),
       ),
-    );
+    ).then((changed) {
+      if (changed == true && mounted) {
+        context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
+      }
+    });
   }
 
   /// Delete flow (M-CRUD-2): confirm dialog, then `mp_delete_own` — the
@@ -549,7 +638,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
             const Icon(Icons.delete_outline, color: AppColors.error, size: 22),
             const SizedBox(width: AppSpacing.sm),
             const Text(
-              'Eliminar tu casa de motero',
+              'Eliminar publicación',
               style: TextStyle(color: AppColors.textPrimary),
             ),
           ],
@@ -594,11 +683,21 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         state is RequestsLoaded && state.isHost
         ? state.requests
         : _cachedReceived;
-    if (requests == null) {
+    if (_receivedError != null && requests == null) {
+      return _requestLoadError(
+        'No pudimos cargar las solicitudes recibidas',
+        () {
+          setState(() { _loadingReceived = true; _receivedError = null; });
+          context.read<MotoposadasBloc>().add(const LoadReceivedRequests());
+        },
+      );
+    }
+    if (_loadingReceived && requests == null) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
+    if (requests == null) return const SizedBox.shrink();
     if (requests.isEmpty) {
       return Center(
         child: Column(
@@ -635,11 +734,21 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         state is RequestsLoaded && !state.isHost
         ? state.requests
         : _cachedMyStays;
-    if (requests == null) {
+    if (_myStaysError != null && requests == null) {
+      return _requestLoadError(
+        'No pudimos cargar tus estancias',
+        () {
+          setState(() { _loadingMyStays = true; _myStaysError = null; });
+          context.read<MotoposadasBloc>().add(const LoadMyRequests());
+        },
+      );
+    }
+    if (_loadingMyStays && requests == null) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
+    if (requests == null) return const SizedBox.shrink();
     if (requests.isEmpty) {
       return Center(
         child: Column(
@@ -666,6 +775,24 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         padding: const EdgeInsets.all(AppSpacing.md),
         itemCount: requests.length,
         itemBuilder: (_, i) => _buildGuestRequestCard(requests[i]),
+      ),
+    );
+  }
+
+  Widget _requestLoadError(String message, VoidCallback retry) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, color: AppColors.error, size: 44),
+            const SizedBox(height: AppSpacing.sm),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton(onPressed: retry, child: const Text('REINTENTAR')),
+          ],
+        ),
       ),
     );
   }

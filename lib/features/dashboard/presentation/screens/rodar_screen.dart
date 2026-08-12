@@ -34,6 +34,7 @@ import '../../../refugios/presentation/bloc/motoposadas_state.dart';
 import '../../../refugios/presentation/widgets/tourist_poi_marker.dart';
 import '../../../refugios/presentation/widgets/casa_motero_marker.dart';
 import '../../../refugios/presentation/widgets/casa_motero_card.dart';
+import '../../../refugios/presentation/screens/motoposada_detail_screen.dart';
 import '../../../../core/services/navigation_handler.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
@@ -67,6 +68,7 @@ class _RodarScreenState extends State<RodarScreen>
 
   // ── Search state ──
   LatLng? _searchResultMarker;
+  bool _showMotoposadas = true;
 
   static const LatLng _defaultCenter = LatLng(4.5709, -74.2973); // Bogotá
 
@@ -219,6 +221,9 @@ class _RodarScreenState extends State<RodarScreen>
                 // Motoposada POI markers
                 BlocBuilder<MotoposadasBloc, MotoposadasState>(
                   builder: (context, state) {
+                    if (!_showMotoposadas) {
+                      return const SizedBox.shrink();
+                    }
                     if (state is! MotoposadasLoaded) {
                       return const SizedBox.shrink();
                     }
@@ -311,6 +316,24 @@ class _RodarScreenState extends State<RodarScreen>
                     ],
                   ),
               ],
+            ),
+
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 126,
+              left: AppSpacing.md,
+              child: FilterChip(
+                selected: _showMotoposadas,
+                avatar: const Icon(Icons.home_work_outlined, size: 18),
+                label: const Text('Motoposadas'),
+                onSelected: (selected) {
+                  setState(() => _showMotoposadas = selected);
+                  if (selected) {
+                    context.read<MotoposadasBloc>().add(
+                      const LoadMotoposadas(),
+                    );
+                  }
+                },
+              ),
             ),
 
             // ── Top overlay: KM counter card ──
@@ -445,12 +468,22 @@ class _RodarScreenState extends State<RodarScreen>
                             padding: const EdgeInsets.only(
                               bottom: AppSpacing.sm,
                             ),
-                            child: Text(
-                              '${state.placesVisited} lugares · ${state.challengesCompleted} retos',
-                              style: AppTypography.body.copyWith(
-                                color: AppColors.textMuted,
-                              ),
-                              textAlign: TextAlign.center,
+                            child: BlocBuilder<MotoposadasBloc, MotoposadasState>(
+                              builder: (context, motoposadasState) {
+                                final activeMotoposadas =
+                                    motoposadasState is MotoposadasLoaded
+                                    ? motoposadasState.motoposadas
+                                          .where((m) => m.isActive)
+                                          .length
+                                    : 0;
+                                return Text(
+                                  '${state.placesVisited + activeMotoposadas} lugares · ${state.challengesCompleted} retos',
+                                  style: AppTypography.body.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                );
+                              },
                             ),
                           );
                         },
@@ -955,6 +988,26 @@ class _RodarScreenState extends State<RodarScreen>
                 const SizedBox(height: AppSpacing.sm),
                 // ── Nav buttons ──
                 _buildNavRow(ctx, mp, wazeOk, mapsOk),
+                const SizedBox(height: AppSpacing.sm),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MotoposadaDetailScreen(
+                            motoposadaId: mp.id,
+                            initialMotoposada: mp,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.event_available_outlined),
+                    label: const Text('VER Y SOLICITAR'),
+                  ),
+                ),
               ],
             ),
           ),
