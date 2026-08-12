@@ -112,7 +112,6 @@ jobs:
           flutter test test/supabase/migration_035_content_test.dart
           flutter test test/features/raids/bloc/raid_bloc_test.dart
           flutter test test/features/dashboard/screens/rodar_upcoming_raids_test.dart
-
       - name: Test motoposadas migrations and refugios module
         run: |
           flutter test test/supabase/migration_039_content_test.dart
