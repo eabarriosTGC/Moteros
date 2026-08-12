@@ -7,11 +7,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/services/geocoding_service.dart';
 import '../../../trust/domain/models/trust_signals.dart';
 import '../../../trust/presentation/widgets/trust_signals_row.dart';
 import '../bloc/motoposadas_bloc.dart';
 import '../bloc/motoposadas_event.dart';
 import '../bloc/motoposadas_state.dart';
+import 'my_motoposada_screen.dart';
 
 class MotoposadaDetailScreen extends StatefulWidget {
   final int motoposadaId;
@@ -32,6 +34,8 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
   DateTime _checkOut = DateTime.now().add(const Duration(days: 2));
   int _guestCount = 1;
   bool _showRequestForm = false;
+  String? _resolvedLocality;
+  bool _resolvingLocality = false;
 
   /// True si la publicación pertenece al usuario autenticado. La lectura del
   /// uid es tolerante a Supabase no inicializado (widget tests): en producción
@@ -72,6 +76,21 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
     );
   }
 
+  Future<void> _resolveLocality(MotoposadaModel mp) async {
+    if (_resolvingLocality || _resolvedLocality != null) return;
+    _resolvingLocality = true;
+    final locality = await GeocodingService.reverseGeocodeLocality(
+      mp.lat,
+      mp.lng,
+    );
+    if (mounted) {
+      setState(() {
+        _resolvedLocality = locality ?? 'Ubicación aproximada';
+        _resolvingLocality = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Try to find motoposada from parent state
@@ -86,6 +105,20 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
           .where((m) => m.id == widget.motoposadaId)
           .firstOrNull;
     }
+    if (mp != null && _resolvedLocality == null && !_resolvingLocality) {
+      final city = mp.city?.trim();
+      if (city != null && city.isNotEmpty) {
+        _resolvedLocality = city;
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _resolveLocality(mp!));
+      }
+    }
+    final isOwner = _isOwnMotoposada(mp?.userId);
+    final displayTitle = mp == null
+        ? 'Motoposada'
+        : mp.title.trim().isEmpty
+        ? 'Motoposada${mp.hostName == null ? '' : ' de ${mp.hostName}'}'
+        : mp.title;
 
     return BlocListener<MotoposadasBloc, MotoposadasState>(
       listener: (context, state) {
@@ -115,7 +148,7 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: Text(
-            mp?.title ?? 'Motoposada',
+            displayTitle,
             style: AppTypography.h2.copyWith(color: AppColors.primary),
           ),
         ),
@@ -277,23 +310,36 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        '${mp.lat.toStringAsFixed(4)}, ${mp.lng.toStringAsFixed(4)}',
+                        _resolvedLocality ?? 'Buscando municipio…',
                         style: AppTypography.body.copyWith(
                           color: AppColors.primary,
                         ),
                       ),
-                      if (mp.address.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.lg),
+                      if (isOwner) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MyMotoposadaScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.settings_outlined),
+                            label: const Text('ADMINISTRAR MOTOPOSADA'),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
-                          mp.address,
+                          'Desde administración puedes editar la publicación, revisar solicitudes recibidas y gestionar estancias.',
                           style: AppTypography.bodySmall.copyWith(
                             color: AppColors.textMuted,
                           ),
                         ),
                       ],
-                      const SizedBox(height: AppSpacing.lg),
                       // Request form
-                      if (!_isOwnMotoposada(mp.userId)) ...[
+                      if (!isOwner) ...[
                         if (!_showRequestForm) ...[
                           SizedBox(
                             width: double.infinity,

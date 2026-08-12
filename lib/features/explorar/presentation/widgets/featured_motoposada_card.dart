@@ -88,12 +88,10 @@ class FeaturedMotoposadaCard extends StatelessWidget {
                   child: Text(
                     motoposada.isCasaMotero
                         ? 'Ubicación aproximada'
-                        : motoposada.address.isNotEmpty
-                        ? motoposada.address
                         : motoposada.city != null &&
                                 motoposada.city!.isNotEmpty
                         ? motoposada.city!
-                        : 'Ubicación en el mapa',
+                        : 'Ubicación aproximada',
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textMuted,
                       fontSize: 9,

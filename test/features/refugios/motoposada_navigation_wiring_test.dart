@@ -55,4 +55,25 @@ void main() {
     expect(source, contains('activeMotoposadas'));
     expect(source, contains('state.placesVisited + activeMotoposadas'));
   });
+
+  test('detail never renders public coordinates or exact address', () {
+    final source = File(
+      'lib/features/refugios/presentation/screens/motoposada_detail_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('reverseGeocodeLocality'));
+    expect(source, contains('ADMINISTRAR MOTOPOSADA'));
+    expect(source, isNot(contains('mp.lat.toStringAsFixed')));
+    expect(source, isNot(contains('mp.lng.toStringAsFixed')));
+    expect(source, isNot(contains("Text(\n                          mp.address")));
+  });
+
+  test('public locality resolver has no coordinate fallback', () {
+    final source = File(
+      'lib/core/services/geocoding_service.dart',
+    ).readAsStringSync();
+    final method = source.split('reverseGeocodeLocality').last;
+    expect(method, contains('return null'));
+    expect(method, isNot(contains('toStringAsFixed')));
+    expect(method, isNot(contains('p.street')));
+  });
 }
