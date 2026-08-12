@@ -46,6 +46,31 @@ void main() {
     expect(source, contains('MyMotoposadaAppealsScreen'));
     expect(source, contains('get_motoposada_moderation_queue'));
     expect(source, contains('if (_canModerate)'));
+    expect(source, contains('_openListingEdit'));
+    expect(source, contains('initialMotoposada: mp'));
+    expect(source, contains('_receivedError'));
+    expect(source, contains('_myStaysError'));
+  });
+
+  test('standard listing edit updates instead of creating a duplicate', () {
+    final source = File(
+      'lib/features/refugios/presentation/screens/create_motoposada_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('UpdateMotoposada('));
+    expect(source, contains("'EDITAR \${_type.toUpperCase()}'"));
+    expect(source, contains('this.existing'));
+  });
+
+  test('request inbox queries have a finite timeout', () {
+    final source = File(
+      'lib/features/refugios/presentation/bloc/motoposadas_bloc.dart',
+    ).readAsStringSync();
+    expect(
+      RegExp(r'timeout\(const Duration\(seconds: 12\)\)')
+          .allMatches(source)
+          .length,
+      greaterThanOrEqualTo(2),
+    );
   });
 
   test('Rodar place count includes active motoposadas', () {

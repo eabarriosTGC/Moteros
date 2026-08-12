@@ -84,6 +84,20 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
         // Create mode: max-1 UX pre-check (M-CRUD-1).
         context.read<MotoposadasBloc>().add(const CheckCasaMoteroEligibility());
       }
+    } else if (_isEditing) {
+      final existing = widget.existing!;
+      _titleController.text = existing.title;
+      _descController.text = existing.description;
+      _rulesController.text = existing.rules;
+      _addressController.text = existing.address;
+      _type = existing.type;
+      _visibility = existing.visibility;
+      _maxGuests = existing.maxGuests;
+      _lat = existing.lat;
+      _lng = existing.lng;
+      _locationLabel = existing.city?.trim().isNotEmpty == true
+          ? existing.city!.trim()
+          : 'Cambiar ubicación en el mapa';
     }
   }
 
@@ -102,7 +116,23 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
     if (!_formKey.currentState!.validate()) return;
     HapticFeedback.mediumImpact();
 
-    if (_isTourist) {
+    if (_isEditing) {
+      final existing = widget.existing!;
+      context.read<MotoposadasBloc>().add(
+        UpdateMotoposada(
+          id: existing.id,
+          title: _titleController.text.trim(),
+          description: _descController.text.trim(),
+          rules: _rulesController.text.trim(),
+          lat: _lat,
+          lng: _lng,
+          address: _addressController.text.trim(),
+          maxGuests: _maxGuests,
+          visibility: _visibility,
+          isActive: existing.isActive,
+        ),
+      );
+    } else if (_isTourist) {
       context.read<MotoposadasBloc>().add(
         CreateTouristPoi(
           type: _type,
@@ -296,6 +326,15 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
           );
           Navigator.pop(context, true);
         }
+        if (state is MotoposadaUpdated && !_isCasaMotero && _isEditing) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Publicación actualizada'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context, true);
+        }
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -307,7 +346,9 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
                 ? (_isEditing
                       ? 'EDITAR CASA DE MOTERO'
                       : 'OFRECER CASA DE MOTERO')
-                : 'OFRECER ${_type.toUpperCase()}',
+                : (_isEditing
+                      ? 'EDITAR ${_type.toUpperCase()}'
+                      : 'OFRECER ${_type.toUpperCase()}'),
             style: AppTypography.h2.copyWith(color: AppColors.primary),
           ),
         ),
