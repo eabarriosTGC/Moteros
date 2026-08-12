@@ -287,6 +287,14 @@ final class MotoposadaReputationLoaded extends MotoposadasState {
   List<Object?> get props => [reputation];
 }
 
+final class MotoposadaIncidentReported extends MotoposadasState {
+  const MotoposadaIncidentReported();
+}
+
+final class MotoposadaParticipantBlocked extends MotoposadasState {
+  const MotoposadaParticipantBlocked();
+}
+
 final class MotoposadasError extends MotoposadasState {
   final String message;
   const MotoposadasError(this.message);

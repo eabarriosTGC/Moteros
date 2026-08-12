@@ -34,6 +34,8 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
     on<FetchMotoposadaRequestContact>(_onFetchRequestContact);
     on<SubmitReview>(_onSubmitReview);
     on<LoadMotoposadaReputation>(_onLoadReputation);
+    on<ReportMotoposadaIncident>(_onReportIncident);
+    on<BlockMotoposadaParticipant>(_onBlockParticipant);
     on<DeleteMotoposada>(_onDelete);
     on<CreateTouristPoi>(_onCreateTouristPoi);
     on<CheckCasaMoteroEligibility>(_onCheckCasaMoteroEligibility);
@@ -388,6 +390,38 @@ class MotoposadasBloc extends Bloc<MotoposadasEvent, MotoposadasState> {
       final rows = response as List;
       final row = rows.isEmpty ? const <String, dynamic>{} : rows.first as Map<String, dynamic>;
       emit(MotoposadaReputationLoaded(MotoposadaReputation.fromMap(row)));
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  Future<void> _onReportIncident(
+    ReportMotoposadaIncident event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      await _db.rpc('report_motoposada_incident', params: {
+        'p_request_id': event.requestId,
+        'p_category': event.category,
+        'p_description': event.description,
+      });
+      emit(const MotoposadaIncidentReported());
+    } catch (e) {
+      emit(MotoposadasError(e.toString()));
+    }
+  }
+
+  Future<void> _onBlockParticipant(
+    BlockMotoposadaParticipant event,
+    Emitter<MotoposadasState> emit,
+  ) async {
+    emit(MotoposadasLoading());
+    try {
+      await _db.rpc('block_motoposada_participant', params: {
+        'p_request_id': event.requestId,
+      });
+      emit(const MotoposadaParticipantBlocked());
     } catch (e) {
       emit(MotoposadasError(e.toString()));
     }

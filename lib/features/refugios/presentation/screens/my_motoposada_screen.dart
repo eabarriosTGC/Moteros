@@ -94,6 +94,18 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
         if (state is MotoposadaReputationLoaded) {
           _showReputation(state.reputation);
         }
+        if (state is MotoposadaIncidentReported) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Reporte enviado para revisión'),
+            backgroundColor: AppColors.success,
+          ));
+        }
+        if (state is MotoposadaParticipantBlocked) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Usuario bloqueado. No podrán crear nuevas estancias entre ustedes.'),
+            backgroundColor: AppColors.success,
+          ));
+        }
         // Acciones de request (031): feedback + recarga del tab activo.
         if (state is RequestResponded ||
             state is RequestCompleted ||
@@ -829,6 +841,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                   const Chip(label: Text('YA EVALUADO')),
               ],
             ),
+            _safetyActions(req),
           ],
         ],
       ),
@@ -954,6 +967,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
                   const Chip(label: Text('YA EVALUADO')),
               ],
             ),
+            _safetyActions(req),
           ],
         ],
       ),
@@ -1002,6 +1016,74 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
       );
     }
     controller.dispose();
+  }
+
+  Widget _safetyActions(MotoposadaRequestModel req) => Padding(
+    padding: const EdgeInsets.only(top: AppSpacing.sm),
+    child: Wrap(spacing: AppSpacing.sm, children: [
+      TextButton.icon(
+        onPressed: () => _showIncidentDialog(req),
+        icon: const Icon(Icons.flag_outlined, size: 16),
+        label: const Text('REPORTAR INCIDENTE'),
+      ),
+      TextButton.icon(
+        onPressed: () => _confirmBlock(req),
+        icon: const Icon(Icons.block, size: 16),
+        label: const Text('BLOQUEAR USUARIO'),
+      ),
+    ]),
+  );
+
+  Future<void> _showIncidentDialog(MotoposadaRequestModel req) async {
+    var category = 'behavior';
+    final controller = TextEditingController();
+    final submit = await showDialog<bool>(context: context, builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: const Text('Reportar incidente'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          DropdownButtonFormField<String>(
+            initialValue: category,
+            items: const [
+              DropdownMenuItem(value: 'behavior', child: Text('Comportamiento inapropiado')),
+              DropdownMenuItem(value: 'harassment', child: Text('Acoso o amenaza')),
+              DropdownMenuItem(value: 'property_damage', child: Text('Daño a la propiedad')),
+              DropdownMenuItem(value: 'fraud', child: Text('Fraude o suplantación')),
+              DropdownMenuItem(value: 'other', child: Text('Otro')),
+            ],
+            onChanged: (value) => setDialogState(() => category = value ?? 'other'),
+          ),
+          TextField(controller: controller, maxLength: 1000, maxLines: 5,
+            decoration: const InputDecoration(labelText: 'Describe lo ocurrido')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCELAR')),
+          ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ENVIAR')),
+        ],
+      ),
+    ));
+    final description = controller.text.trim();
+    controller.dispose();
+    if (submit == true && description.length >= 10 && mounted) {
+      context.read<MotoposadasBloc>().add(ReportMotoposadaIncident(
+        requestId: req.id, category: category, description: description));
+    } else if (submit == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Describe el incidente con al menos 10 caracteres')));
+    }
+  }
+
+  Future<void> _confirmBlock(MotoposadaRequestModel req) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Bloquear usuario'),
+      content: const Text('No podrán enviarse nuevas solicitudes de Motoposada. Las estancias y reportes anteriores se conservarán.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCELAR')),
+        ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('BLOQUEAR')),
+      ],
+    ));
+    if (confirmed == true && mounted) {
+      context.read<MotoposadasBloc>().add(BlockMotoposadaParticipant(requestId: req.id));
+    }
   }
 
   void _showReputation(MotoposadaReputation reputation) {

@@ -147,6 +147,22 @@ final class LoadMotoposadaReputation extends MotoposadasEvent {
   List<Object?> get props => [userId];
 }
 
+final class ReportMotoposadaIncident extends MotoposadasEvent {
+  final int requestId;
+  final String category;
+  final String description;
+  const ReportMotoposadaIncident({required this.requestId, required this.category, required this.description});
+  @override
+  List<Object?> get props => [requestId, category, description];
+}
+
+final class BlockMotoposadaParticipant extends MotoposadasEvent {
+  final int requestId;
+  const BlockMotoposadaParticipant({required this.requestId});
+  @override
+  List<Object?> get props => [requestId];
+}
+
 final class DeleteMotoposada extends MotoposadasEvent {
   final int id;
   const DeleteMotoposada({required this.id});
