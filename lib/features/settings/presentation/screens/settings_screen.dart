@@ -12,6 +12,7 @@ import '../../../../core/theme/app_icons.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../profile/presentation/screens/profile_edit_screen.dart';
+import '../../../clubs/presentation/screens/clubs_screen.dart';
 import 'offline_maps_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -301,6 +302,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
+            ),
+          ),
+          _settingRow(
+            icon: Icons.groups_outlined,
+            title: 'Clanes',
+            subtitle: 'Solicitudes, miembros y verificación',
+            trailing: const Icon(AppIcons.chevronRight,
+                color: AppColors.textMuted, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ClubsScreen()),
             ),
           ),
           _settingRow(
