@@ -50,58 +50,85 @@ class MoterosApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: authBloc),
-        BlocProvider(
-          create: (_) => SearchBloc(datasource: NominatimDatasource()),
-        ),
-        BlocProvider(create: (_) => DashboardBloc(apiClient: apiClient)),
-        BlocProvider(create: (_) => ChallengesBloc(apiClient: apiClient)),
-        BlocProvider(create: (_) => RefugiosBloc()),
-        BlocProvider(create: (_) => MotoposadasBloc()),
-        BlocProvider(
-          create: (_) => PlacesBloc(
-            getNearbyPlaces: GetNearbyPlacesUseCase(
-              PlaceRemoteDataSource(apiClient),
-            ),
-          ),
-        ),
-        BlocProvider(create: (_) => RaidBloc()),
-        BlocProvider(create: (_) => PatchesBloc()),
-        // New F-29 to F-35 BLoCs
-        BlocProvider(create: (_) => RouteBloc(datasource: RouteDatasource())),
-        BlocProvider(create: (_) => MileageBloc()),
-        BlocProvider(create: (_) => LeaderboardBloc()),
-        BlocProvider(create: (_) => ShowcaseBloc()),
-        BlocProvider(create: (_) => ProgresoBloc()),
-        BlocProvider(create: (_) => ExplorarBloc()),
+        BlocProvider<ThemeCubit>(create: (_) => ThemeCubit()),
       ],
-      child: BlocProvider<ThemeCubit>(
-        create: (_) => ThemeCubit(),
-        child: BlocBuilder<ThemeCubit, ThemeMode>(
-          builder: (context, themeMode) => MaterialApp(
-            title: 'Moteros',
-            debugShowCheckedModeBanner: false,
-            themeMode: themeMode,
-            darkTheme: AppTheme.dark,
-            theme: AppTheme.light,
-            home: BlocBuilder<AuthBloc, AuthState>(
-              builder: (context, state) {
-                if (state is AuthInitial) {
-                  return const SplashScreen();
-                }
-                if (state is AuthLoading) {
-                  return const SplashScreen();
-                }
-                if (state is Authenticated) {
-                  return const AuthenticatedShell();
-                }
-                return const LoginScreen();
-              },
-            ),
-          ),
+      child: BlocBuilder<ThemeCubit, ThemeMode>(
+        builder: (context, themeMode) => BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            if (state is AuthInitial || state is AuthLoading) {
+              return _buildApp(
+                themeMode: themeMode,
+                home: const SplashScreen(),
+              );
+            }
+            if (state is Authenticated) {
+              // Los blocs de datos viven FUERA de `home` y envuelven el
+              // MaterialApp/Navigator autenticado completo: las rutas abiertas
+              // con Navigator.push (detalle de motoposada, mis motoposadas,
+              // crear/editar, recibidas…) se montan dentro de este scope.
+              // La key de sesión destruye blocs + Navigator de la sesión
+              // anterior al cambiar de cuenta: nada de estado residual.
+              return KeyedSubtree(
+                key: ValueKey('session-${state.user.id}'),
+                child: MultiBlocProvider(
+                  providers: [
+                    BlocProvider(
+                      create: (_) =>
+                          SearchBloc(datasource: NominatimDatasource()),
+                    ),
+                    BlocProvider(
+                      create: (_) => DashboardBloc(apiClient: apiClient),
+                    ),
+                    BlocProvider(
+                      create: (_) => ChallengesBloc(apiClient: apiClient),
+                    ),
+                    BlocProvider(create: (_) => RefugiosBloc()),
+                    BlocProvider(create: (_) => MotoposadasBloc()),
+                    BlocProvider(
+                      create: (_) => PlacesBloc(
+                        getNearbyPlaces: GetNearbyPlacesUseCase(
+                          PlaceRemoteDataSource(apiClient),
+                        ),
+                      ),
+                    ),
+                    BlocProvider(create: (_) => RaidBloc()),
+                    BlocProvider(create: (_) => PatchesBloc()),
+                    BlocProvider(
+                      create: (_) => RouteBloc(datasource: RouteDatasource()),
+                    ),
+                    BlocProvider(create: (_) => MileageBloc()),
+                    BlocProvider(create: (_) => LeaderboardBloc()),
+                    BlocProvider(create: (_) => ShowcaseBloc()),
+                    BlocProvider(create: (_) => ProgresoBloc()),
+                    BlocProvider(create: (_) => ExplorarBloc()),
+                  ],
+                  child: _buildApp(
+                    themeMode: themeMode,
+                    home: AuthenticatedShell(key: ValueKey(state.user.id)),
+                  ),
+                ),
+              );
+            }
+            return _buildApp(themeMode: themeMode, home: const LoginScreen());
+          },
         ),
       ),
     );
   }
+}
+
+/// MaterialApp por estado de sesión: el Navigator vive dentro del scope de los
+/// blocs autenticados (o fuera de ellos para login/splash). Cambiar de tema
+/// reconstruye el mismo árbol en la misma posición → el Navigator se preserva.
+Widget _buildApp({required ThemeMode themeMode, required Widget home}) {
+  return MaterialApp(
+    title: 'Moteros',
+    debugShowCheckedModeBanner: false,
+    themeMode: themeMode,
+    darkTheme: AppTheme.dark,
+    theme: AppTheme.light,
+    home: home,
+  );
 }
 
 /// Gate state for the first-access profile check (F-M12, ADR-001).
@@ -256,8 +283,7 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
           // volver → los contadores (KM/VIAJES/INSIGNIAS/FOTOS) quedarían
           // stale. Recarga explícita al re-entrar al tab.
           if (tab == AppTab.progreso) {
-            final userId =
-                Supabase.instance.client.auth.currentUser?.id ?? '';
+            final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
             if (userId.isNotEmpty) {
               context.read<ProgresoBloc>().add(LoadProgreso(userId: userId));
             }

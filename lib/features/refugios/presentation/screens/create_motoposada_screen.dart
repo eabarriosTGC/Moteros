@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/location/blur_coordinates.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/widgets/map_picker_screen.dart';
@@ -114,6 +115,53 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (_visibility == 'clan_only' || _visibility == 'clan_specific') {
+      // Visibilidad de clan: detectamos el clan activo del anfitrión antes de
+      // publicar. La policy 044 resuelve el match por club_members compartidos
+      // (clan_only) o por target_clan_id (clan_specific); sin clan, la
+      // publicación sería invisible para todos.
+      _resolveHostClanAndSubmit();
+      return;
+    }
+    _dispatchCreate();
+  }
+
+  Future<void> _resolveHostClanAndSubmit() async {
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      final row = uid == null
+          ? null
+          : await Supabase.instance.client
+              .from('club_members')
+              .select('club_id')
+              .eq('user_id', uid)
+              .maybeSingle();
+      if (row == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Para publicar con visibilidad "Solo mi clan" necesitás pertenecer a un clan.'),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+      _dispatchCreate(hostClanId: row['club_id'] as int?);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No pudimos verificar tu clan. Reintentá.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _dispatchCreate({int? hostClanId}) {
     HapticFeedback.mediumImpact();
 
     if (_isEditing) {
@@ -129,6 +177,7 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
           address: _addressController.text.trim(),
           maxGuests: _maxGuests,
           visibility: _visibility,
+          targetClanId: hostClanId,
           isActive: existing.isActive,
         ),
       );
@@ -157,6 +206,7 @@ class _CreateMotoposadaScreenState extends State<CreateMotoposadaScreen> {
           address: _addressController.text.trim(),
           maxGuests: _maxGuests,
           visibility: _visibility,
+          targetClanId: hostClanId,
         ),
       );
     }

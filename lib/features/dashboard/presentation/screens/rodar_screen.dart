@@ -36,6 +36,7 @@ import '../../../refugios/presentation/widgets/casa_motero_marker.dart';
 import '../../../refugios/presentation/widgets/casa_motero_card.dart';
 import '../../../refugios/presentation/screens/motoposada_detail_screen.dart';
 import '../../../../core/services/navigation_handler.dart';
+import '../../../../core/services/geocoding_service.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -48,7 +49,7 @@ class RodarScreen extends StatefulWidget {
 }
 
 class _RodarScreenState extends State<RodarScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _kmController;
   late Animation<double> _kmAnimation;
   bool _kmAnimated = false;
@@ -75,6 +76,7 @@ class _RodarScreenState extends State<RodarScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _kmController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -87,7 +89,11 @@ class _RodarScreenState extends State<RodarScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardBloc>().add(LoadDashboard(userId: 1));
       context.read<RaidBloc>().add(const LoadRaids());
-      context.read<MotoposadasBloc>().add(const LoadMotoposadas());
+      // El filtro arranca activo: la carga de motoposadas debe ocurrir al
+      // entrar (estado visual == estado lógico, ambos desde _showMotoposadas).
+      if (_showMotoposadas) {
+        context.read<MotoposadasBloc>().add(const LoadMotoposadas());
+      }
     });
 
     // Start passive position stream for blue dot (map only, no tracking).
@@ -95,6 +101,15 @@ class _RodarScreenState extends State<RodarScreen>
     // ANTES de abrir la app, GMS no emite error al suscribirse (stream
     // silencioso) — el banner saldría recién tras un timeout mudo.
     _ensureLocation();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Al reanudar, si el filtro sigue activo, recargar motoposadas: cubre el
+    // caso de datos stale tras cambiar de cuenta o volver de background.
+    if (state == AppLifecycleState.resumed && _showMotoposadas) {
+      context.read<MotoposadasBloc>().add(const LoadMotoposadas());
+    }
   }
 
   /// Verifica el estado de ubicación y suscribe el stream pasivo.
@@ -165,6 +180,7 @@ class _RodarScreenState extends State<RodarScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _passivePositionSub?.cancel();
     _locationRetryTimer?.cancel();
     _kmController.dispose();
@@ -223,6 +239,60 @@ class _RodarScreenState extends State<RodarScreen>
                   builder: (context, state) {
                     if (!_showMotoposadas) {
                       return const SizedBox.shrink();
+                    }
+                    if (state is MotoposadasError) {
+                      // Filtro activo + carga fallida → error visible con
+                      // reintento, nunca silencio (bug de "filtro
+                      // desincronizado": el chip quedaba seleccionado sin
+                      // markers ni mensaje).
+                      return Positioned(
+                        top: MediaQuery.of(context).padding.top + 172,
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        child: Material(
+                          color: AppColors.error.withAlpha(18),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            onTap: () => context
+                                .read<MotoposadasBloc>()
+                                .add(const LoadMotoposadas()),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.sm,
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.cloud_off,
+                                    color: AppColors.error,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  const Expanded(
+                                    child: Text(
+                                      'No se pudieron cargar las Motoposadas',
+                                      style: TextStyle(
+                                        color: AppColors.error,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    'REINTENTAR',
+                                    style: TextStyle(
+                                      color: AppColors.error,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
                     }
                     if (state is! MotoposadasLoaded) {
                       return const SizedBox.shrink();
@@ -603,7 +673,7 @@ class _RodarScreenState extends State<RodarScreen>
             border: Border.all(color: AppColors.primary, width: 2),
           ),
           child: Icon(
-            typeLabel == 'Casa' ? Icons.home_rounded : Icons.garage_rounded,
+            _motoposadaIcon(typeLabel),
             color: AppColors.primary,
             size: 14,
           ),
@@ -936,23 +1006,96 @@ class _RodarScreenState extends State<RodarScreen>
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withAlpha(20),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              mp.typeLabel,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 10,
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  mp.typeLabel,
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 10,
+                                  ),
+                                ),
                               ),
+                              if (mp.visibility != 'public')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withAlpha(20),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.groups_outlined,
+                                        size: 10,
+                                        color: AppColors.secondary,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        mp.visibilityLabel,
+                                        style: AppTypography.caption.copyWith(
+                                          color: AppColors.secondary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          // Ubicación general (municipio, departamento) —
+                          // nunca dirección exacta ni coordenadas. Se
+                          // resuelve con reverse geocode seguro (F-M9).
+                          const SizedBox(height: 4),
+                          FutureBuilder<String?>(
+                            future: GeocodingService.reverseGeocodeLocality(
+                              mp.lat,
+                              mp.lng,
                             ),
+                            builder: (context, snap) {
+                              final locality = snap.data;
+                              if (locality == null || locality.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    size: 14,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      locality,
+                                      style: AppTypography.caption.copyWith(
+                                        color: AppColors.textMuted,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -967,7 +1110,7 @@ class _RodarScreenState extends State<RodarScreen>
                     style: AppTypography.body.copyWith(
                       color: AppColors.textSecondary,
                     ),
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -978,7 +1121,7 @@ class _RodarScreenState extends State<RodarScreen>
                 ),
                 // ── Label ──
                 Text(
-                  'NAVEGAR CON',
+                  'CÓMO LLEGAR',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.textMuted,
                     letterSpacing: 1.2,

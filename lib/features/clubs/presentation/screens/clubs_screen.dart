@@ -9,25 +9,60 @@ class ClubsScreen extends StatefulWidget {
 }
 class _ClubsScreenState extends State<ClubsScreen> with SingleTickerProviderStateMixin {
   final _repo=ClubWorkflowRepository(); late final TabController _tabs;
-  bool _loading=true,_admin=false; String? _error; Map<String,dynamic>? _membership;
+  bool _loading=true,_admin=false;
+  // Estados de error independientes por sección: un fallo en una consulta
+  // (p. ej. la administrativa) ya no bloquea Descubrir ni las demás.
+  String? _clubsError,_membershipError,_requestsError,_adminError;
+  Map<String,dynamic>? _membership;
   List<Map<String,dynamic>> _clubs=[],_myRequests=[],_incoming=[],_members=[],_pending=[];
   bool get _manager => ['presidente','oficial'].contains(_membership?['role']);
   @override void initState(){super.initState();_tabs=TabController(length:3,vsync:this);_load();}
   @override void dispose(){_tabs.dispose();super.dispose();}
-  Future<void> _load() async {setState((){_loading=true;_error=null;});try{
-    final clubs=await _repo.clubs(), membership=await _repo.myMembership(), requests=await _repo.myRequests(), admin=await _repo.isAdmin();
-    List<Map<String,dynamic>> incoming=[],members=[],pending=[];
-    if(membership!=null){final id=membership['club_id'] as int;members=await _repo.members(id);if(['presidente','oficial'].contains(membership['role']))incoming=await _repo.requestsFor(id);}
-    if(admin) pending=await _repo.pendingClubs();
-    if(mounted)setState((){_clubs=clubs;_membership=membership;_myRequests=requests;_admin=admin;_incoming=incoming;_members=members;_pending=pending;_loading=false;});
-  }catch(e){if(mounted)setState((){_error=e.toString();_loading=false;});}}
+  Future<void> _load() async {setState((){_loading=true;_clubsError=null;_membershipError=null;_requestsError=null;_adminError=null;});
+    await Future.wait([_loadClubs(),_loadMembership(),_loadRequests(),_loadAdmin()]);
+    if(mounted)setState(()=>_loading=false);}
+  Future<void> _loadClubs() async {try{
+    final clubs=await _repo.clubs();
+    if(mounted)setState((){_clubs=clubs;_clubsError=null;});
+  }catch(e){if(mounted)setState(()=>_clubsError=_errMsg(e));}}
+  Future<void> _loadMembership() async {try{
+    final membership=await _repo.myMembership();
+    if(membership==null){if(mounted)setState((){_membership=null;_members=[];_incoming=[];_membershipError=null;});return;}
+    final id=membership['club_id'] as int;
+    final members=await _repo.members(id);
+    var incoming=<Map<String,dynamic>>[];
+    if(['presidente','oficial'].contains(membership['role']))incoming=await _repo.requestsFor(id);
+    if(mounted)setState((){_membership=membership;_members=members;_incoming=incoming;_membershipError=null;});
+  }catch(e){if(mounted)setState(()=>_membershipError=_errMsg(e));}}
+  Future<void> _loadRequests() async {try{
+    final requests=await _repo.myRequests();
+    if(mounted)setState((){_myRequests=requests;_requestsError=null;});
+  }catch(e){if(mounted)setState(()=>_requestsError=_errMsg(e));}}
+  Future<void> _loadAdmin() async {try{
+    final admin=await _repo.isAdmin();
+    var pending=<Map<String,dynamic>>[];
+    if(admin)pending=await _repo.pendingClubs();
+    if(mounted)setState((){_admin=admin;_pending=pending;_adminError=null;});
+  }catch(e){if(mounted)setState(()=>_adminError=_errMsg(e));}}
+  String _errMsg(Object e)=>e.toString().split('\n').first;
   Future<void> _act(Future<void> Function() action,String ok) async {try{await action();if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(ok)));await _load();}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('No se pudo completar: ${e.toString().split('\n').first}')));}}
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('CLANES'),bottom:TabBar(controller:_tabs,isScrollable:true,tabs:[const Tab(text:'DESCUBRIR'),Tab(text:_manager?'MI CLAN · GESTIÓN':'MI CLAN'),Tab(text:_admin?'VERIFICAR':'SOLICITUDES')])),
-    body:_loading?const Center(child:CircularProgressIndicator()):_error!=null?_failure():TabBarView(controller:_tabs,children:[_discover(),_mine(),_admin?_verification():_requests()]),
-    floatingActionButton:_membership==null?FloatingActionButton.extended(onPressed:()async{if(await Navigator.push<bool>(context,MaterialPageRoute(builder:(_)=>const CreateClubRequestScreen()))==true)_load();},icon:const Icon(Icons.add),label:const Text('CREAR CLAN')):null,
+    body:_loading?const Center(child:CircularProgressIndicator()):TabBarView(controller:_tabs,children:[
+      _clubsError!=null?_failure(_clubsError!,_loadClubs):_discover(),
+      _membershipError!=null?_failure(_membershipError!,_loadMembership):_mine(),
+      _admin?(_adminError!=null?_failure(_adminError!,_loadAdmin):_verification()):(_requestsError!=null?_failure(_requestsError!,_loadRequests):_requests()),
+    ]),
+    floatingActionButton:_membership==null?FloatingActionButton.extended(
+      // Deshabilitado mientras no sepamos si el usuario ya pertenece a un clan.
+      onPressed:_membershipError==null&&!_loading?()async{if(await Navigator.push<bool>(context,MaterialPageRoute(builder:(_)=>const CreateClubRequestScreen()))==true)_load();}:null,
+      icon:const Icon(Icons.add),label:const Text('CREAR CLAN')):null,
   );
-  Widget _failure()=>Center(child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.cloud_off,color:AppColors.error,size:48),const SizedBox(height:12),const Text('No pudimos cargar los clanes'),OutlinedButton(onPressed:_load,child:const Text('REINTENTAR'))]));
+  Widget _failure(String message,VoidCallback retry)=>Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+    const Icon(Icons.cloud_off,color:AppColors.error,size:48),const SizedBox(height:12),
+    const Text('No pudimos cargar esta sección'),
+    Padding(padding:const EdgeInsets.symmetric(horizontal:24,vertical:8),child:Text(message,textAlign:TextAlign.center,style:AppTypography.caption.copyWith(color:AppColors.textMuted))),
+    OutlinedButton(onPressed:retry,child:const Text('REINTENTAR'))]));
   Widget _discover()=>RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.all(16),children:[
     if (_clubs.isEmpty) const _Empty(icon: Icons.groups_outlined, text: 'Todavía no hay clanes verificados.'),
     ..._clubs.map(
