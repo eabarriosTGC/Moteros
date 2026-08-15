@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../bloc/explorar_bloc.dart';
 import '../bloc/explorar_event.dart';
@@ -12,6 +13,8 @@ import '../widgets/featured_motoposada_card.dart';
 import '../widgets/raid_card.dart';
 import '../../../raids/presentation/widgets/raid_join_sheet.dart';
 import '../../../refugios/presentation/screens/motoposada_detail_screen.dart';
+import '../../../refugios/presentation/screens/create_motoposada_screen.dart';
+import '../../../refugios/presentation/screens/my_motoposada_screen.dart';
 
 class ExplorarScreen extends StatefulWidget {
   const ExplorarScreen({super.key});
@@ -21,12 +24,37 @@ class ExplorarScreen extends StatefulWidget {
 }
 
 class _ExplorarScreenState extends State<ExplorarScreen> {
+  /// True si el usuario ya tiene una motoposada activa publicada → el CTA del
+  /// empty state pasa de "OFRECER MOTOPOSADA" a "ADMINISTRAR". Se resuelve de
+  /// forma defensiva: cualquier error (incl. Supabase sin inicializar en
+  /// tests) cae a false y muestra la acción de ofrecer.
+  bool _hasActiveListing = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ExplorarBloc>().add(const LoadExplorarData());
+      _resolveActiveListing();
     });
+  }
+
+  Future<void> _resolveActiveListing() async {
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) return;
+      final rows = await Supabase.instance.client
+          .from('motoposadas')
+          .select('id')
+          .eq('user_id', uid)
+          .eq('is_active', true)
+          .limit(1);
+      if (mounted) {
+        setState(() => _hasActiveListing = (rows as List).isNotEmpty);
+      }
+    } catch (_) {
+      // Sin Supabase (widget tests) o error de red → CTA de ofrecer.
+    }
   }
 
   @override
@@ -70,30 +98,31 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                     // Featured Motoposadas
                     _sectionHeader('MOTOPOSADAS DESTACADAS'),
                     const SizedBox(height: AppSpacing.sm),
-                    SizedBox(
-                      height: 150,
-                      child: state.featuredMotoposadas.isEmpty
-                          ? _emptyCard('Sin motoposadas destacadas', Icons.house_outlined)
-                          : ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: state.featuredMotoposadas.length,
-                              itemBuilder: (context, index) {
-                                final mp = state.featuredMotoposadas[index];
-                                return FeaturedMotoposadaCard(
-                                  motoposada: mp,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => MotoposadaDetailScreen(
-                                        motoposadaId: mp.id,
-                                        initialMotoposada: mp,
-                                      ),
-                                    ),
+                    if (state.featuredMotoposadas.isEmpty)
+                      _emptyMotoposadasCard()
+                    else
+                      SizedBox(
+                        height: 150,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: state.featuredMotoposadas.length,
+                          itemBuilder: (context, index) {
+                            final mp = state.featuredMotoposadas[index];
+                            return FeaturedMotoposadaCard(
+                              motoposada: mp,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => MotoposadaDetailScreen(
+                                    motoposadaId: mp.id,
+                                    initialMotoposada: mp,
                                   ),
-                                );
-                              },
-                            ),
-                    ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
 
                     const SizedBox(height: AppSpacing.lg),
 
@@ -130,6 +159,104 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
       letterSpacing: 1.5,
     ),
   );
+
+  /// Empty state de Motoposadas — tarjeta compacta, layout intrínseco (sin
+  /// altura fija: el overflow de 31px venía del SizedBox(height:150) rígido).
+  /// CTA dinámico: "OFRECER MOTOPOSADA" si el usuario no tiene publicaciones
+  /// activas; "ADMINISTRAR" si ya tiene una (lleva a Mis Motoposadas).
+  Widget _emptyMotoposadasCard() {
+    final hasListing = _hasActiveListing;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.home_work_outlined,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Todavía no hay Motoposadas cerca',
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Sé el primero en ofrecer un espacio seguro para la comunidad.',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => hasListing
+                      ? const MyMotoposadaScreen()
+                      : const CreateMotoposadaScreen(),
+                ),
+              ),
+              icon: Icon(
+                hasListing
+                    ? Icons.admin_panel_settings_outlined
+                    : Icons.add,
+                color: AppColors.primary,
+                size: 18,
+              ),
+              label: Text(
+                hasListing ? 'ADMINISTRAR' : 'OFRECER MOTOPOSADA',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.mdCircular,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _emptyCard(String message, IconData icon) {
     return Container(

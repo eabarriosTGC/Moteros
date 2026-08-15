@@ -23,7 +23,7 @@ class MyMotoposadaScreen extends StatefulWidget {
 }
 
 class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
 
   // Casa de motero (F-M9): cached eligibility (max-1 UX pre-check, M-CRUD-1)
@@ -45,11 +45,35 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MotoposadasBloc>().add(const LoadMyMotoposadas());
       _loadModerationAccess();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Al reanudar, recargar el buzón activo: los datos pueden haber cambiado
+    // (otro dispositivo, aprobación del presidente) o quedar stale tras
+    // cambiar de cuenta. Termina siempre en contenido, vacío o error con
+    // reintento — nunca en una bandeja congelada.
+    if (state == AppLifecycleState.resumed) {
+      final bloc = context.read<MotoposadasBloc>();
+      switch (_tabController.index) {
+        case 1:
+          setState(() { _loadingReceived = true; _receivedError = null; });
+          bloc.add(const LoadReceivedRequests());
+          break;
+        case 2:
+          setState(() { _loadingMyStays = true; _myStaysError = null; });
+          bloc.add(const LoadMyRequests());
+          break;
+        default:
+          bloc.add(const LoadMyMotoposadas());
+      }
+    }
   }
 
   Future<void> _loadModerationAccess() async {
@@ -66,6 +90,7 @@ class _MyMotoposadaScreenState extends State<MyMotoposadaScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
   }

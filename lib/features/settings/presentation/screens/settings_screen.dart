@@ -12,6 +12,8 @@ import '../../../../core/theme/app_icons.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../profile/presentation/screens/profile_edit_screen.dart';
+import '../../../clubs/presentation/screens/clubs_screen.dart';
+import '../../../refugios/presentation/screens/my_motoposada_screen.dart';
 import 'offline_maps_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -82,6 +84,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveInt(String key, int value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(key, value);
+  }
+
+  /// Logout seguro: cierra primero las rutas internas (evita que pantallas
+  /// del árbol autenticado sigan montadas sobre el Login) y despacha el
+  /// evento en el siguiente frame. La key de sesión en app.dart reconstruye
+  /// el árbol autenticado sin estado residual al cambiar de cuenta.
+  void _logout() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AuthBloc>().add(LogoutRequested());
+    });
   }
 
   @override
@@ -304,12 +317,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _settingRow(
+            icon: Icons.groups_outlined,
+            title: 'Clanes',
+            subtitle: 'Solicitudes, miembros y verificación',
+            trailing: const Icon(AppIcons.chevronRight,
+                color: AppColors.textMuted, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ClubsScreen()),
+            ),
+          ),
+          _settingRow(
+            icon: Icons.home_work_outlined,
+            title: 'Mis Motoposadas',
+            subtitle: 'Publicaciones, solicitudes y estancias',
+            trailing: const Icon(AppIcons.chevronRight,
+                color: AppColors.textMuted, size: 20),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyMotoposadaScreen()),
+            ),
+          ),
+          _settingRow(
             icon: Icons.logout,
             iconColor: AppColors.error,
             title: 'Cerrar sesión',
             trailing: const Icon(AppIcons.chevronRight,
                 color: AppColors.textMuted, size: 20),
-            onTap: () => context.read<AuthBloc>().add(LogoutRequested()),
+            onTap: () => _logout(),
           ),
         ]),
       ],

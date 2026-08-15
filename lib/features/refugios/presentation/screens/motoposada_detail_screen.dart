@@ -37,6 +37,34 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
   String? _resolvedLocality;
   bool _resolvingLocality = false;
 
+  /// True mientras request_motoposada está en vuelo: el botón ENVIAR se
+  /// deshabilita y muestra un spinner (nada de acciones silenciosas).
+  bool _submitting = false;
+
+  /// True si ya existe una solicitud pending del usuario para esta
+  /// motoposada → tarjeta persistente "SOLICITUD PENDIENTE" en vez del
+  /// botón/form. Se consulta al montar (defensivo: tests sin Supabase → false).
+  bool _hasPendingRequest = false;
+
+  Future<void> _checkPendingRequest(int motoposadaId) async {
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) return;
+      final rows = await Supabase.instance.client
+          .from('motoposada_requests')
+          .select('id')
+          .eq('motoposada_id', motoposadaId)
+          .eq('guest_id', uid)
+          .eq('status', 'pending')
+          .limit(1);
+      if (mounted) {
+        setState(() => _hasPendingRequest = (rows as List).isNotEmpty);
+      }
+    } catch (_) {
+      // Sin Supabase (widget tests) o error de red → no bloquea la pantalla.
+    }
+  }
+
   /// True si la publicación pertenece al usuario autenticado. La lectura del
   /// uid es tolerante a Supabase no inicializado (widget tests): en producción
   /// main.dart inicializa antes de runApp, así que nunca lanza.
@@ -52,6 +80,10 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
   @override
   void initState() {
     super.initState();
+    final mp = widget.initialMotoposada;
+    if (mp != null) {
+      _checkPendingRequest(mp.id);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Load individual detail not supported in Bloc yet; rely on parent state
     });
@@ -64,7 +96,9 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
   }
 
   void _sendRequest(int motoposadaId) {
+    if (_submitting) return;
     HapticFeedback.mediumImpact();
+    setState(() => _submitting = true);
     context.read<MotoposadasBloc>().add(
       SendMotoposadaRequest(
         motoposadaId: motoposadaId,
@@ -125,17 +159,25 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
         if (state is RequestSent) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Solicitud enviada'),
+              content: Text('✅ Solicitud enviada al anfitrión'),
               backgroundColor: AppColors.success,
             ),
           );
-          _showRequestForm = false;
+          setState(() {
+            _submitting = false;
+            _showRequestForm = false;
+            _hasPendingRequest = true;
+          });
         }
         if (state is MotoposadasError) {
+          // Error real visible; el form se conserva para reintentar.
+          setState(() => _submitting = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  'No se pudo enviar la solicitud: ${state.message}',
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -340,7 +382,9 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
                       ],
                       // Request form
                       if (!isOwner) ...[
-                        if (!_showRequestForm) ...[
+                        if (_hasPendingRequest)
+                          _buildPendingCard()
+                        else if (!_showRequestForm) ...[
                           SizedBox(
                             width: double.infinity,
                             height: AppSpacing.buttonHeight,
@@ -367,6 +411,52 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+
+  /// Tarjeta persistente de solicitud pendiente: reemplaza el botón/form
+  /// mientras exista una solicitud pending del usuario hacia esta motoposada
+  /// (verificada contra la base al montar y tras enviar).
+  Widget _buildPendingCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withAlpha(10),
+        borderRadius: AppRadius.mdCircular,
+        border: Border.all(color: AppColors.warning.withAlpha(40)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.hourglass_top_rounded,
+            color: AppColors.warning,
+            size: 22,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SOLICITUD PENDIENTE',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'El anfitrión recibió tu solicitud y aún no la responde.',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -449,7 +539,7 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
                 child: SizedBox(
                   height: 44,
                   child: ElevatedButton(
-                    onPressed: () => _sendRequest(mpId),
+                    onPressed: _submitting ? null : () => _sendRequest(mpId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.textOnAmber,
@@ -457,10 +547,19 @@ class _MotoposadaDetailScreenState extends State<MotoposadaDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text(
-                      'ENVIAR',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: AppColors.textOnAmber,
+                            ),
+                          )
+                        : const Text(
+                            'ENVIAR',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                   ),
                 ),
               ),
